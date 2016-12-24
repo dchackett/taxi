@@ -121,7 +121,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
         if isinstance(job, HMCJob) and gauge_dir is not None:
             saveg_path = gauge_dir + '/{Ns}x{Nt}/{beta}/{k4}_{k6}/'.format(Ns=hmc_job.Ns, Nt=hmc_job.Nt,
                                                                     beta=hmc_job.beta, k4=hmc_job.k4, k6=hmc_job.k6)
-            new_copy_job = CopyJob(src=job.fout,
+            new_copy_job = CopyJob(src=job.saveg,
                                    dest=os.path.abspath(saveg_path + '/' + job.saveg))
             new_copy_job.depends_on = [job]
             copy_jobs.append(new_copy_job)
