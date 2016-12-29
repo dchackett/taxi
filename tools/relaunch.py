@@ -10,7 +10,7 @@ import sqlite3
 import argparse
 
 ### Parse command line arguments
-parser = argparse.ArgumentParser(description="Workflow taxi")
+parser = argparse.ArgumentParser(description="Workflow taxi relauncher")
 
 parser.add_argument('--forest', type=str, required=True, help='Forest file to look for taxis in.')
 parser.add_argument('--dwork',  type=str, default=None, help='Work directory for taxi.')
