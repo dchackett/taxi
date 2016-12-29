@@ -39,7 +39,7 @@ def get_adjusted_nstep(files, min_AR=0.75, max_AR=0.85, die_AR=0.4, delta_nstep=
             
             # Track effective accept rate
             deltaS = float(line.split()[4][:-1]) # Trailing comma
-            accept_rates.append(math.exp(-deltaS))
+            accept_rates.append(min(1, math.exp(-deltaS)))
 
         # accepts += file_contents.count('ACCEPT: ')
         # rejects += file_contents.count('REJECT: ')
@@ -53,6 +53,10 @@ def get_adjusted_nstep(files, min_AR=0.75, max_AR=0.85, die_AR=0.4, delta_nstep=
 
     AR_actual = float(accepts)/float(accepts+rejects)
     AR_effective = sum(accept_rates) / float(len(accept_rates))
+    
+    # Diagnostic output
+    print "Actual accept rate:", AR_actual
+    print "Average effective accept rate:", AR_effective
 
     if min(AR_actual, AR_effective) <= die_AR:
         return None # Signal that AR is below minimum AR; kill stream
