@@ -193,7 +193,7 @@ class dispatch(object):
         self.taxi_name_generator = taxi_name_generator
         self.taxi_log_dir_for_name = taxi_log_dir_for_name
         self.taxi_time = taxi_time
-        self.max_taxis = None
+        self.max_taxis = max_taxis
         
         # Compile
         self._find_trees()
