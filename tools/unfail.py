@@ -50,6 +50,7 @@ if len(failed_tasks) > 0:
         # Print all failed tasks
         for task in failed_tasks:
             print "ID:", task['id']
+            print "     BY", task['by_taxi']
             print "   TYPE", task['task_type']
             print " STATUS", task['status']
             print "   DEPS", task['depends_on']
