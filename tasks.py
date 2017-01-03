@@ -137,7 +137,7 @@ class HMCJob(Job):
 
 
 class NstepAdjustor(Job):
-    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.75, max_AR=0.85, die_AR=0.4, delta_nstep=1):
+    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1):
         super(NstepAdjustor, self).__init__(req_time=0)
 
         self.adjust_hmc_job = adjust_hmc_job

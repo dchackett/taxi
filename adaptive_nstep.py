@@ -1,6 +1,6 @@
 import math
 
-def get_adjusted_nstep(files, min_AR=0.75, max_AR=0.85, die_AR=0.4, delta_nstep=1):
+def get_adjusted_nstep(files, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1):
     """Looks at the HMC output files in 'files', computes the acceptance rate and extracts nsteps (outer layer), and adjust nsteps to optimize HMC run.
 
     Arguments:

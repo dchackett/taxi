@@ -154,7 +154,7 @@ def get_last_N_hmc_jobs(hmc_job, N):
     return get_last_N_hmc_jobs(hmc_dependencies[0], N-1) + hmc_dependencies
 
 
-def use_adaptive_nsteps(job_pool, AR_from_last_N=2, min_AR=0.75, max_AR=0.85, die_AR=0.4, delta_nstep=1):
+def use_adaptive_nsteps(job_pool, AR_from_last_N=2, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1):
     """Add NstepAdjustor jobs to pool to adaptively adjust nsteps for HMC jobs."""
 
     new_jobs = []
