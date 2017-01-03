@@ -35,7 +35,11 @@ parg = parser.parse_args(sys.argv[1:]) # Call like "python taxi.py ...args..."
 def mkdir_p(path):
     if not os.path.exists(path):
         os.makedirs(path)
-        
+
+def flush_output():
+    sys.stdout.flush()
+    sys.stderr.flush()
+    
 ### Utilities for interacting with job forest sqlite DB
 def get_priorities(taxi_name):
     """Extracts priority list from the SQLite job forest DB table 'priority'.
@@ -194,6 +198,7 @@ def run_script(task_args):
     Checks if the script exited happily, returns True if so and False if not."""
 
     print "Running script", task_args['script']
+    flush_output()
 
     cmd_line_args = []
     if task_args.has_key('cmd_line_args'):
@@ -279,6 +284,8 @@ os.chdir(os.path.abspath(parg.dhome)) # move to desired working directory
 tasks_completed = 0 # For anti-thrash -- die if we can't complete a single non-recurring task
 
 while True:
+    flush_output()
+
     ## Get current priority list for this taxi
     ## and any tasks that are pending or recurring and belong to us / have no owners
     print ""
@@ -360,6 +367,7 @@ while True:
     task_type = task["task_type"]
     print "Performing task", task_id, task_type
     task_start_time = time.time()
+    flush_output()
 
     
     # Kill the taxi
@@ -447,10 +455,8 @@ while True:
     print "Run time:", task_run_time
     print "Time remaining:", parg.time - (time.time() - start_time)
     
-    # Force output
-    sys.stdout.flush()
-    sys.stderr.flush()
-    
+    flush_output()
+
 print "TAXI {taxi_name} DONE".format(taxi_name=parg.name)
 
 
