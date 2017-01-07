@@ -7,7 +7,7 @@ import time
 def taxi_in_queue(taxi_name):
     """Anti-thrashing utility function.  Checks if a taxi with this name is already
     in the queue, so we don't submit another one."""
-    found_taxi = (os.system("qstat | grep -qc {taxi_name}".format(taxi_name=taxi_name))) == 0 # If the taxi isn't in the queue, return code is an error
+    found_taxi = (os.system("qstat | grep -qc '{taxi_name} '".format(taxi_name=taxi_name))) == 0 # If the taxi isn't in the queue, return code is an error
     return found_taxi
 
     
