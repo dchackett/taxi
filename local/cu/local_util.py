@@ -7,7 +7,7 @@ Created on Fri Dec 16 15:36:57 2016
 
 from tasks import specify_binary_paths, specify_dir_with_runner_scripts, specify_spectro_binary_path
 
-def use_dan_binary_paths(screening=False, baryon=False, p_plus_a=False):
+def use_dan_binary_paths():
     print "WARNING: No binaries for baryon spectroscopy on CU"
     print "WARNING: No P+A non-screening-mass binaries on CU"
     print "WARNING: No phi binary exists on CU presently"
