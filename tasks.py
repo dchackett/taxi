@@ -3,11 +3,14 @@ import os
 
 ### Job classes
 class Job(object):
-    def __init__(self, req_time=0):
-        self.depends_on = []
+    def __init__(self, req_time=0, **kwargs):
         self.req_time = req_time
         self.status = 'pending'
         self.trunk = False
+        
+        # Want a default, but don't clobber anything set by a subclass before calling superconstructor
+        if not hasattr(self, 'depends_on'):
+            self.depends_on = []
         
     def compile(self):
         # Package in to JSON forest format
@@ -18,15 +21,15 @@ class Job(object):
         }
         
         # Get dependencies in job_id format
-        if self.depends_on is None or len(self.depends_on) == 0:
+        if not hasattr(self, 'depends_on') or self.depends_on is None or len(self.depends_on) == 0:
             self.compiled['depends_on'] = None
         else:
             self.compiled['depends_on'] = [d.job_id for d in self.depends_on]
             
 
 class CopyJob(Job):
-    def __init__(self, src, dest, req_time=60):
-        super(CopyJob, self).__init__(req_time=req_time)
+    def __init__(self, src, dest, req_time=60, **kwargs):
+        super(CopyJob, self).__init__(req_time=req_time, **kwargs)
         
         self.src = src
         self.dest = dest
@@ -53,8 +56,8 @@ class HMCJob(Job):
                  req_time,
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
-                 enable_metropolis=True):
-        super(HMCJob, self).__init__(req_time=req_time)
+                 enable_metropolis=True, **kwargs):
+        super(HMCJob, self).__init__(req_time=req_time, **kwargs)
         
         self.trunk = True # This is a 'trunk' job -- stream forks on these
         
@@ -145,7 +148,7 @@ class SextetHMCJob(HMCJob):
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
                  k4=0,
-                 enable_metropolis=True):
+                 enable_metropolis=True, **kwargs):
         
         if k4 != 0:
             print "WARNING: SextetHMCJob will ignore k4 = {k4} != 0".format(k4=k4)
@@ -154,7 +157,7 @@ class SextetHMCJob(HMCJob):
                                            k6=k6, label=label, count=count, req_time=req_time,
                                            N_traj=N_traj, N_traj_safe=N_traj_safe, nsteps=nsteps,
                                            nsteps_gauge=nsteps_gauge, starter=starter, seed=seed,
-                                           enable_metropolis=enable_metropolis)
+                                           enable_metropolis=enable_metropolis, **kwargs)
                            
                            
 class FundamentalHMCJob(HMCJob):
@@ -165,7 +168,7 @@ class FundamentalHMCJob(HMCJob):
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
                  k6=0,
-                 enable_metropolis=True):
+                 enable_metropolis=True, **kwargs):
         
         if k6 != 0:
             print "WARNING: FundamentalHMCJob will ignore k6 = {k6} != 0".format(k6=k6)
@@ -174,13 +177,13 @@ class FundamentalHMCJob(HMCJob):
                                            k6=0, label=label, count=count, req_time=req_time,
                                            N_traj=N_traj, N_traj_safe=N_traj_safe, nsteps=nsteps,
                                            nsteps_gauge=nsteps_gauge, starter=starter, seed=seed,
-                                           enable_metropolis=enable_metropolis)
+                                           enable_metropolis=enable_metropolis, **kwargs)
                                            
 
 
 class NstepAdjustor(Job):
-    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1):
-        super(NstepAdjustor, self).__init__(req_time=0)
+    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1, **kwargs):
+        super(NstepAdjustor, self).__init__(req_time=0, **kwargs)
 
         self.adjust_hmc_job = adjust_hmc_job
         self.examine_hmc_jobs = sorted(examine_hmc_jobs, key=lambda h: h.count)
@@ -206,10 +209,10 @@ class NstepAdjustor(Job):
         })
         
         
+        
 class HMCAuxJob(Job):
-    def __init__(self, hmc_job, req_time):
+    def __init__(self, hmc_job, req_time, **kwargs):
         assert isinstance(hmc_job, HMCJob)
-        super(HMCAuxJob, self).__init__(req_time=req_time)
 
         self.hmc_job = hmc_job
         self.depends_on = [hmc_job]
@@ -221,19 +224,36 @@ class HMCAuxJob(Job):
         self.count = hmc_job.count
         
         self.loadg = hmc_job.saveg
+
+        # Call super after retrieving parameters for multiple inheritance gracefulness
+        super(HMCAuxJob, self).__init__(req_time=req_time, **kwargs)
         
         
-class HMCAuxSpectroJob(HMCAuxJob):
+        
+class SpectroJob(Job):
+    """Abstract class.  Needs to be subclassed in such a way
+    as to fill in self.Ns, self.Nt, self.ensemble_name, and self.count before the SpectroJob
+    constructor is called, or the constructor will crash.  Needs self.loadg filled in before
+    compile() is called."""
+    
     spectro_script = 'spectro.py'
     binary_paths = {('f',   False, False, False) : '/path/to/spectro/binary_f',
                     ('as2', False, False, False) : '/path/to/spectro/binary_as2',
                     ('f',   True,  True,  False ) : '/path/to/spectro_binary_f_p+a_screening_noBaryons'}
-    
-    def __init__(self, hmc_job,
-                 irrep, r0, req_time, kappa=None,
+
+    def __init__(self, req_time,
+                 kappa, irrep, r0,
                  screening=False, p_plus_a=False, do_baryons=False,
-                 save_prop=False):
-        super(HMCAuxSpectroJob, self).__init__(hmc_job=hmc_job, req_time=req_time)
+                 save_prop=False, **kwargs):
+        super(SpectroJob, self).__init__(req_time=req_time, **kwargs)
+
+        # Physical parameters        
+        self.kappa = kappa
+        self.r0 = r0                             
+
+        self.screening = screening
+        self.p_plus_a = p_plus_a
+        self.do_baryons = do_baryons
         
         # Irrep convention: f, as2
         assert (isinstance(irrep, str) and irrep.lower() in ['f', 'as2', 'a2', '4', '6']) \
@@ -243,15 +263,6 @@ class HMCAuxSpectroJob(HMCAuxJob):
         elif str(irrep).lower() in ['as2', 'a2', '6']:
             self.irrep = 'as2'
         
-        # Physical parameters
-        self.kappa = kappa
-        if self.kappa is None:
-            self.kappa = hmc_job.k4 if irrep=='f' else hmc_job.k6
-        self.r0 = r0
-        self.screening = screening
-        self.p_plus_a = p_plus_a
-        self.do_baryons = do_baryons
-        
         self.generate_outfilename()
             
         if save_prop:
@@ -259,6 +270,7 @@ class HMCAuxSpectroJob(HMCAuxJob):
         else:
             self.savep = None
             
+        
     def generate_outfilename(self):
         # Filesystem
         self.fout = ("x" if self.screening else "t") + "spec" + ("pa" if self.p_plus_a else "") + "_" \
@@ -277,7 +289,7 @@ class HMCAuxSpectroJob(HMCAuxJob):
             raise Exception("Binary not specified for irrep {irrep}, p+a {p_plus_a}, screening {screening}, do_baryons {do_baryons}"\
                 .format(irrep=self.irrep, p_plus_a=self.p_plus_a, screening=self.screening, do_baryons=self.do_baryons))
         
-        super(HMCAuxSpectroJob, self).compile()
+        super(SpectroJob, self).compile()
         
         cmd_line_args = {
             "Ns" : self.Ns, "Nt" : self.Nt,
@@ -299,7 +311,25 @@ class HMCAuxSpectroJob(HMCAuxJob):
                 'ncpu_fmt' : "--cpus {cpus}",
                 'cmd_line_args' : cmd_line_args
             }
-        })
+        })        
+    
+        
+class HMCAuxSpectroJob(HMCAuxJob, SpectroJob):   
+    def __init__(self, hmc_job,
+                 irrep, r0, req_time, kappa=None,
+                 screening=False, p_plus_a=False, do_baryons=False,
+                 save_prop=False, **kwargs):         
+        
+        super(HMCAuxSpectroJob, self).__init__(hmc_job=hmc_job, req_time=req_time,
+                            # Spectroscopy-relevant physical parameters
+                            irrep=irrep, r0=r0, kappa=kappa,
+                            screening=False, p_plus_a=False, do_baryons=False,
+                            save_prop=False, **kwargs)
+                 
+        # Provided kappa stored in self by SpectroJob constructor.
+        # By default, extract appropriate kappa from hmc_job.  If specified, override for partial quenching
+        if self.kappa is None:
+            self.kappa = self.hmc_job.k4 if self.irrep=='f' else self.hmc_job.k6
         
         
 class HMCAuxFlowJob(HMCAuxJob):
