@@ -10,8 +10,9 @@ import os
 from random import seed, randint
 
 from tasks import CopyJob, SpawnJob, RespawnJob
-from tasks import HMCJob, NstepAdjustor
-from tasks import HMCAuxJob, HMCAuxSpectroJob, HMCAuxFlowJob, HMCAuxHRPLJob
+from tasks import HMCJob, NstepAdjustor, HMCAuxJob
+from tasks import HMCAuxFlowJob, HMCAuxHRPLJob
+from tasks import SpectroJob, FileSpectroJob, HMCAuxSpectroJob
 
 
 
@@ -81,7 +82,21 @@ def hrpl_jobs_for_hmc_jobs(hmc_stream, start_at_count=0):
             hrpl_jobs.append(HMCAuxHRPLJob(hmc_job))
     return hrpl_jobs
     
-    
+
+
+### Tools for running measurements on pre-existing gauge files
+def spectro_jobs_for_gaugefiles(gaugefiles, r0, irrep, req_time, screening=False,
+                                p_plus_a=False, do_baryons=False, save_prop=False):
+    spectro_jobs = []
+    for gfn in map(os.path.abspath, gaugefiles):
+        assert os.path.exists(gfn), "Gaugefile {gfn} does not exist to run spectroscopy on".format(gfn=gfn)
+        spectro_jobs.append(FileSpectroJob(loadg=gfn, req_time=req_time, irrep=irrep, r0=r0,
+                                           screening=screening, p_plus_a=p_plus_a,
+                                           do_baryons=do_baryons, save_prop=save_prop))
+    return spectro_jobs
+
+
+### Tools for organizing output files    
 def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=None):
     copy_jobs = []
     for job in job_pool:
@@ -100,7 +115,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
             # Output-type-specific path structure
             if   isinstance(job, HMCJob):
                 fout_path += 'hmc/'
-            elif isinstance(job, HMCAuxSpectroJob):
+            elif isinstance(job, SpectroJob):
                 if job.irrep == 'f':
                     fout_path += 'spec4_r{r0:g}/'.format(r0=job.r0)
                 elif job.irrep == 'as2':
@@ -128,7 +143,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
         
         
         # Copy jobs for saved propagators (Spectro only)
-        if isinstance(job, HMCAuxSpectroJob) and job.savep is not None and prop_dir is not None:
+        if isinstance(job, SpectroJob) and job.savep is not None and prop_dir is not None:
             savep_path = prop_dir 
             savep_path += ('prop4' if job.irrep == 'f' else 'prop6')
             savep_path += '_r{r0:g}/'.format(r0=job.r0)
@@ -143,6 +158,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
     return copy_jobs
 
 
+### Tools for adaptive nsteps for HMC jobs
 def get_last_N_hmc_jobs(hmc_job, N):
     if N == 0:
         return []

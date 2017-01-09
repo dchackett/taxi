@@ -312,8 +312,57 @@ class SpectroJob(Job):
                 'cmd_line_args' : cmd_line_args
             }
         })        
+
+
+
+class FileSpectroJob(SpectroJob):
+    def __init__(self, loadg,
+                 req_time,
+                 irrep, r0,
+                 kappa=None,
+                 Ns=None, Nt=None, ensemble_name=None, count=None,
+                 screening=False, p_plus_a=False, do_baryons=False,
+                 save_prop=False, **kwargs):
+
+        self.loadg = loadg
+        
+        # Parse params from loadg; allow overriding
+        parsed_params = self.parse_params_from_loadg()
+        self.Ns = Ns
+        if self.Ns is None:
+            self.Ns = parsed_params['Ns']
+        self.Nt = Nt        
+        if self.Nt is None:
+            self.Nt = parsed_params['Nt']
+        self.count = count        
+        if self.count is None:
+            self.count = parsed_params['count']
+        self.ensemble_name = ensemble_name        
+        if self.ensemble_name is None:
+            self.ensemble_name = parsed_params['ensemble_name']
+        
+        # Call superconstructor
+        super(FileSpectroJob, self).__init__(req_time=req_time, kappa=kappa, irrep=irrep,
+                                             r0=r0, screening=screening, p_plus_a=p_plus_a,
+                                             do_baryons=do_baryons, save_prop=save_prop, **kwargs)
+                                             
+        # Provided kappa stored in self by SpectroJob constructor.
+        # By default, extract appropriate kappa from hmc_job.  If specified, override for partial quenching
+        if self.kappa is None:
+            self.kappa = parsed_params['k4'] if self.irrep=='f' else parsed_params['k6']
     
-    
+    def parse_params_from_loadg(self):
+        # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
+        words = os.path.basename(self.loadg).split('_')
+        
+        return {'Ns' : int(words[1]),
+                'Nt' : int(words[2]),
+                'count': int(words[-1]),
+                'ensemble_name' : '_'.join(words[1:-1]),
+                'k4' : float(words[4]),
+                'k6' : float(words[5])}
+        
+        
         
 class HMCAuxSpectroJob(HMCAuxJob, SpectroJob):   
     def __init__(self, hmc_job,
