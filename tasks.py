@@ -313,6 +313,7 @@ class SpectroJob(Job):
             }
         })        
     
+    
         
 class HMCAuxSpectroJob(HMCAuxJob, SpectroJob):   
     def __init__(self, hmc_job,
@@ -331,14 +332,20 @@ class HMCAuxSpectroJob(HMCAuxJob, SpectroJob):
         if self.kappa is None:
             self.kappa = self.hmc_job.k4 if self.irrep=='f' else self.hmc_job.k6
         
-        
-class HMCAuxFlowJob(HMCAuxJob):
-    flow_script = 'flow.py'
-    flow_binary_path = '/path/to/flow/binary'
+
+class FlowJob(Job):
+    """Abstract superclass. Needs to be subclassed in such a way that self.Ns,
+    self.Nt, self.ensemble_name, self.count are filled in before the FlowJob
+    constructor is called or will crash.  Needs self.loadg provided before
+    compilation."""
     
-    def __init__(self, hmc_job, tmax, req_time, minE=0, mindE=0, epsilon=.01):
-        super(HMCAuxFlowJob, self).__init__(hmc_job=hmc_job, req_time=req_time)
-        
+    flow_script = 'flow.py'
+    flow_binary_path = '/path/to/flow/binary'    
+    
+    def __init__(self, req_time,
+                 tmax, minE=0, mindE=0, epsilon=.01, **kwargs):
+        super(FlowJob, self).__init__(req_time=req_time)
+
         # Physical parameters
         self.tmax = tmax
         self.minE = minE
@@ -348,15 +355,15 @@ class HMCAuxFlowJob(HMCAuxJob):
         # Make sure no trivial flow is run by accident
         if tmax == 0:
             assert minE != 0 or mindE != 0
-            
+
         # Filesystem
-        self.generate_outfilename()
+        self.generate_outfilename()        
         
     def generate_outfilename(self):
         self.fout = "flow_" + self.ensemble_name + "_{count}".format(count=self.count)
             
     def compile(self):
-        super(HMCAuxFlowJob, self).compile()
+        super(FlowJob, self).compile()
         
         cmd_line_args = {
             "Ns" : self.Ns, "Nt" : self.Nt,
@@ -379,16 +386,31 @@ class HMCAuxFlowJob(HMCAuxJob):
                 'cmd_line_args' : cmd_line_args
             }
         })
+
+
+
+class HMCAuxFlowJob(HMCAuxJob, FlowJob):
+    
+    def __init__(self, hmc_job, req_time,
+                 tmax, minE=0, mindE=0, epsilon=.01, **kwargs):
+        super(HMCAuxFlowJob, self).__init__(hmc_job=hmc_job, req_time=req_time,
+                                        tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon,
+                                        **kwargs)                
+
         
-        
-        
-class HMCAuxHRPLJob(HMCAuxJob):
+    
+class HRPLJob(Job):
+    """Abstract superclass. Needs to be subclassed in such a way that self.Ns,
+    self.Nt, self.ensemble_name, self.count are filled in before the FlowJob
+    constructor is called or will crash.  Needs self.loadg provided before
+    compilation."""
+
     hrpl_script = 'hrpl.py'
     hrpl_binary_path = '/path/to/hrpl/binary'
-    
-    def __init__(self, hmc_job):
+
+    def __init__(self, hmc_job, **kwargs):
         # These should always run really fast, req_time = 2 minutes is probably overkill
-        super(HMCAuxHRPLJob, self).__init__(hmc_job=hmc_job, req_time=120)
+        super(HRPLJob, self).__init__(req_time=120, **kwargs)
         
         self.generate_outfilename()
         
@@ -396,7 +418,7 @@ class HMCAuxHRPLJob(HMCAuxJob):
         self.fout = "hrpl_" + self.ensemble_name + "_{count}".format(count=self.count)
         
     def compile(self):
-        super(HMCAuxHRPLJob, self).compile()
+        super(HRPLJob, self).compile()
         
         cmd_line_args = {
             "Ns" : self.Ns, "Nt" : self.Nt,
@@ -414,6 +436,13 @@ class HMCAuxHRPLJob(HMCAuxJob):
                 'cmd_line_args' : cmd_line_args
             }
         })
+
+
+        
+class HMCAuxHRPLJob(HRPLJob, HMCAuxJob):
+    def __init__(self, hmc_job, **kwargs):
+        super(HMCAuxHRPLJob, self).__init__(hmc_job=hmc_job, **kwargs)       
+    
 
         
 class SpawnJob(Job):
@@ -475,6 +504,7 @@ def specify_dir_with_runner_scripts(run_script_dir):
     HMCJob.hmc_script = os.path.join(run_script_dir, HMCJob.hmc_script)
     SextetHMCJob.hmc_script = os.path.join(run_script_dir, SextetHMCJob.hmc_script)
     FundamentalHMCJob.hmc_script = os.path.join(run_script_dir, FundamentalHMCJob.hmc_script)
-    HMCAuxSpectroJob.spectro_script = os.path.join(run_script_dir, HMCAuxSpectroJob.spectro_script)
-    HMCAuxFlowJob.flow_script = os.path.join(run_script_dir, HMCAuxFlowJob.flow_script)
+    
+    SpectroJob.spectro_script = os.path.join(run_script_dir, SpectroJob.spectro_script)
+    FlowJob.flow_script = os.path.join(run_script_dir, FlowJob.flow_script)
     HMCAuxHRPLJob.hrpl_script = os.path.join(run_script_dir, HMCAuxHRPLJob.hrpl_script)
