@@ -43,8 +43,9 @@ class CopyJob(Job):
                 }
             })
             
+            
 class HMCJob(Job):
-    hmc_script = './SU4_nds_mrep.py'
+    hmc_script = 'SU4_nds_mrep.py'
     hmc_binary_path = '/path/to/hmc/binary'
     phi_binary_path = '/path/to/phi/binary'
     
@@ -134,6 +135,47 @@ class HMCJob(Job):
                 'cmd_line_args' : cmd_line_args
             }
         })
+        
+        
+class SextetHMCJob(HMCJob):
+    hmc_script = 'SU4_nds_sextet.py'
+    
+    def __init__(self, Ns, Nt, beta, gammarat, k6, label, count,
+                 req_time,
+                 N_traj, N_traj_safe, nsteps, nsteps_gauge,
+                 starter, seed,
+                 k4=0,
+                 enable_metropolis=True):
+        
+        if k4 != 0:
+            print "WARNING: SextetHMCJob will ignore k4 = {k4} != 0".format(k4=k4)
+            
+        super(SextetHMCJob, self).__init__(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=0,
+                                           k6=k6, label=label, count=count, req_time=req_time,
+                                           N_traj=N_traj, N_traj_safe=N_traj_safe, nsteps=nsteps,
+                                           nsteps_gauge=nsteps_gauge, starter=starter, seed=seed,
+                                           enable_metropolis=enable_metropolis)
+                           
+                           
+class FundamentalHMCJob(HMCJob):
+    hmc_script = 'SU4_nds_fund.py'
+    
+    def __init__(self, Ns, Nt, beta, gammarat, k4, label, count,
+                 req_time,
+                 N_traj, N_traj_safe, nsteps, nsteps_gauge,
+                 starter, seed,
+                 k6=0,
+                 enable_metropolis=True):
+        
+        if k6 != 0:
+            print "WARNING: FundamentalHMCJob will ignore k6 = {k6} != 0".format(k6=k6)
+            
+        super(FundamentalHMCJob, self).__init__(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=k4,
+                                           k6=0, label=label, count=count, req_time=req_time,
+                                           N_traj=N_traj, N_traj_safe=N_traj_safe, nsteps=nsteps,
+                                           nsteps_gauge=nsteps_gauge, starter=starter, seed=seed,
+                                           enable_metropolis=enable_metropolis)
+                                           
 
 
 class NstepAdjustor(Job):
@@ -182,7 +224,7 @@ class HMCAuxJob(Job):
         
         
 class HMCAuxSpectroJob(HMCAuxJob):
-    spectro_script = './spectro.py'
+    spectro_script = 'spectro.py'
     binary_paths = {('f',   False, False, False) : '/path/to/spectro/binary_f',
                     ('as2', False, False, False) : '/path/to/spectro/binary_as2',
                     ('f',   True,  True,  False ) : '/path/to/spectro_binary_f_p+a_screening_noBaryons'}
@@ -261,7 +303,7 @@ class HMCAuxSpectroJob(HMCAuxJob):
         
         
 class HMCAuxFlowJob(HMCAuxJob):
-    flow_script = './flow.py'
+    flow_script = 'flow.py'
     flow_binary_path = '/path/to/flow/binary'
     
     def __init__(self, hmc_job, tmax, req_time, minE=0, mindE=0, epsilon=.01):
@@ -311,7 +353,7 @@ class HMCAuxFlowJob(HMCAuxJob):
         
         
 class HMCAuxHRPLJob(HMCAuxJob):
-    hrpl_script = './hrpl.py'
+    hrpl_script = 'hrpl.py'
     hrpl_binary_path = '/path/to/hrpl/binary'
     
     def __init__(self, hmc_job):
@@ -400,7 +442,9 @@ def specify_spectro_binary_path(binary, irrep, p_plus_a, screening, do_baryons):
 def specify_dir_with_runner_scripts(run_script_dir):
     run_script_dir = os.path.abspath(run_script_dir)
     
-    HMCJob.hmc_script = run_script_dir + '/SU4_nds_mrep.py'
-    HMCAuxSpectroJob.spectro_script = run_script_dir + '/spectro.py'
-    HMCAuxFlowJob.flow_script = run_script_dir + '/flow.py'
-    HMCAuxHRPLJob.hrpl_script = run_script_dir + '/hrpl.py'
+    HMCJob.hmc_script = os.path.join(run_script_dir, HMCJob.hmc_script)
+    SextetHMCJob.hmc_script = os.path.join(run_script_dir, SextetHMCJob.hmc_script)
+    FundamentalHMCJob.hmc_script = os.path.join(run_script_dir, FundamentalHMCJob.hmc_script)
+    HMCAuxSpectroJob.spectro_script = os.path.join(run_script_dir, HMCAuxSpectroJob.spectro_script)
+    HMCAuxFlowJob.flow_script = os.path.join(run_script_dir, HMCAuxFlowJob.flow_script)
+    HMCAuxHRPLJob.hrpl_script = os.path.join(run_script_dir, HMCAuxHRPLJob.hrpl_script)
