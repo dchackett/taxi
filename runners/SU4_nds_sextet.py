@@ -53,7 +53,7 @@ parser.add_argument('--maxcgpf',   type=int,   default=500,  help='Maximum numbe
 parser.add_argument('--Ns',       type=int,   required=True,  help='Number of lattice points in spatial direction.')
 parser.add_argument('--Nt',       type=int,   required=True,  help='Number of lattice points in temporal direction.')
 parser.add_argument('--beta',     type=float, required=True,  help='Lattice beta parameter.')
-parser.add_argument('--k4',       type=float, required=True,  help='(IGNORED, left for convenience) Kappa parameter for fundamental fermions.')
+parser.add_argument('--k4',       type=float, default=0.,     help='(IGNORED, left for convenience) Kappa parameter for fundamental fermions.')
 parser.add_argument('--k6',       type=float, required=True,  help='Kappa parameter for 2-index antisymmetric fermions.')
 parser.add_argument('--gammarat', type=float, default =125.,  help='NDS action parameter. beta/gamma = gammarat, so gamma = beta/gammarat.')
 
@@ -113,6 +113,7 @@ nlevels 2
     
     output_str += \
 """ 
+## fermion actions
 kpid kap_as        # identifier
 kappa {k6}         # hopping parameter
 csw 1.0            # clover coefficient
