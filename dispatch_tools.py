@@ -29,7 +29,10 @@ def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_ti
                          start_count=0, N_traj=10, N_traj_safe=5,
                          gammarat=125., label='1',
                          nsteps_gauge=6, streamseed=None,
-                         enable_metropolis=True):
+                         enable_metropolis=True, hmc_class=HMCJob):
+
+    assert issubclass(hmc_class, HMCJob), "hmc_class must be an HMCJob or a subclass thereof, not {hmc}".format(hmc=str(hmc_class))
+    
     # Randomly generate a different seed for each hmc run
     if streamseed is None:
         streamseed = hash((Ns, Nt, beta, gammarat, k4, k6, label))
@@ -38,7 +41,7 @@ def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_ti
     hmc_stream = []
     for count in range(start_count, start_count+N_configs):
         job_seed = randint(0, 9999)
-        new_job = HMCJob(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=k4, k6=k6,
+        new_job = hmc_class(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=k4, k6=k6,
                          label=label, count=count, req_time=req_time, N_traj=N_traj,
                          N_traj_safe=N_traj_safe, nsteps=nsteps, nsteps_gauge=nsteps_gauge,
                          starter=starter, seed=job_seed, enable_metropolis=enable_metropolis)
