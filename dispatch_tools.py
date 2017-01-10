@@ -11,8 +11,10 @@ from random import seed, randint
 
 from tasks import CopyJob, SpawnJob, RespawnJob
 from tasks import HMCJob, NstepAdjustor, HMCAuxJob
-from tasks import HMCAuxFlowJob, HMCAuxHRPLJob
+
 from tasks import SpectroJob, FileSpectroJob, HMCAuxSpectroJob
+from tasks import FlowJob, HMCAuxFlowJob
+from tasks import HRPLJob, HMCAuxHRPLJob
 
 
 
@@ -96,21 +98,56 @@ def spectro_jobs_for_gaugefiles(gaugefiles, r0, irrep, req_time, screening=False
     return spectro_jobs
 
 
-### Tools for organizing output files    
+### Tools for organizing output files
+def parse_params_from_fn(fn):
+    words = os.path.basename(fn).split('_')
+    if words[0] in ['out', 'flow', 'GaugeSU4']:
+        # e.g., out_18_6_7.75_0.126_0.125_1_2
+        return {'Ns' : int(words[1]),
+                'Nt' : int(words[2]),
+                'beta' : float(words[3]),
+                'k4' : float(words[4]),
+                'k6' : float(words[5])}
+    elif 'spec' in words[0] or 'Prop' in words[0]:
+        # e.g., xspecpa_r6_f_18_6_7.75_0.126_0.125_1_10
+        return {'Ns' : int(words[3]),
+                'Nt' : int(words[4]),
+                'beta' : float(words[5]),
+                'k4' : float(words[6]),
+                'k6' : float(words[7])}
+                
+def parse_params_from_HMCJob(hmc_job):
+    return {'Ns' : hmc_job.Ns,
+            'Nt' : hmc_job.Nt,
+            'beta' : hmc_job.beta,
+            'k4' : hmc_job.k4,
+            'k6' : hmc_job.k6}
+        
 def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=None):
     copy_jobs = []
     for job in job_pool:
+        # Must find volume, couplings for multirep file structure
         if isinstance(job, HMCJob):
-            hmc_job = job
+            parsed_params = parse_params_from_HMCJob(job)
         elif isinstance(job, HMCAuxJob):
-            hmc_job = job.hmc_job
-        else:
+            parsed_params = parse_params_from_HMCJob(job.hmc_job)
+        elif hasattr(job, 'fout'):
+            # Duck typing -- parse necessary parameters out of whatever file exists
+            parsed_params = parse_params_from_fn(job.fout)
+        elif hasattr(job, 'saveg'):
+            # Duck typing -- rarely, something might save a gauge file but no output file
+            parsed_params = parse_params_from_fn(job.saveg)
+        else:            
             # No outputs to worry about
             continue
         
+        # Build multirep path structure
+        vol_subdir = '/{Ns}x{Nt}/'.format(**parsed_params)
+        mrep_subdir = '/{beta}/{k4}_{k6}/'.format(**parsed_params)
+        
         ## Copy jobs for outputs from binaries
         if data_dir is not None:
-            fout_path = data_dir + '/{Ns}x{Nt}/'.format(Ns=hmc_job.Ns, Nt=hmc_job.Nt)
+            fout_path = data_dir + vol_subdir
 
             # Output-type-specific path structure
             if   isinstance(job, HMCJob):
@@ -120,35 +157,36 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
                     fout_path += 'spec4_r{r0:g}/'.format(r0=job.r0)
                 elif job.irrep == 'as2':
                     fout_path += 'spec6_r{r0:g}/'.format(r0=job.r0)
-            elif isinstance(job, HMCAuxFlowJob):
+            elif isinstance(job, FlowJob):
                 fout_path += 'flow/'
-            elif isinstance(job, HMCAuxHRPLJob):
+            elif isinstance(job, HRPLJob):
                 fout_path += 'hrpl/'
+            else:
+                # Don't know how to name this output file
+                continue
 
-            fout_path += '{beta}/{k4}_{k6}/'.format(beta=hmc_job.beta, k4=hmc_job.k4, k6=hmc_job.k6)
+            fout_path += mrep_subdir
 
             new_copy_job = CopyJob(src=job.fout,
                                    dest=os.path.abspath(fout_path + '/' + job.fout))
             new_copy_job.depends_on = [job]
             copy_jobs.append(new_copy_job)
         
-        ## Copy jobs for saved gauge files (HMC only)
-        if isinstance(job, HMCJob) and gauge_dir is not None:
-            saveg_path = gauge_dir + '/{Ns}x{Nt}/{beta}/{k4}_{k6}/'.format(Ns=hmc_job.Ns, Nt=hmc_job.Nt,
-                                                                    beta=hmc_job.beta, k4=hmc_job.k4, k6=hmc_job.k6)
+        ## Copy jobs for saved gauge files
+        if gauge_dir is not None and hasattr(job, 'saveg') and job.saveg is not None:
+            saveg_path = gauge_dir + vol_subdir + mrep_subdir
             new_copy_job = CopyJob(src=job.saveg,
                                    dest=os.path.abspath(saveg_path + '/' + job.saveg))
             new_copy_job.depends_on = [job]
             copy_jobs.append(new_copy_job)
         
-        
         # Copy jobs for saved propagators (Spectro only)
-        if isinstance(job, SpectroJob) and job.savep is not None and prop_dir is not None:
+        if prop_dir is not None and hasattr(job, 'savep') and job.savep is not None:
             savep_path = prop_dir 
             savep_path += ('prop4' if job.irrep == 'f' else 'prop6')
             savep_path += '_r{r0:g}/'.format(r0=job.r0)
-            savep_path += '{Ns}x{Nt}/{beta}/{k4}_{k6}/'.format(Ns=hmc_job.Ns, Nt=hmc_job.Nt,
-                                                            beta=hmc_job.beta, k4=hmc_job.k4, k6=hmc_job.k6)
+            savep_path += vol_subdir + mrep_subdir
+            
             new_copy_job = CopyJob(src=job.fout,
                                    dest=os.path.abspath(savep_path + '/' + job.savep),
                                    req_time=600)
