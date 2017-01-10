@@ -13,8 +13,8 @@ from tasks import CopyJob, SpawnJob, RespawnJob
 from tasks import HMCJob, NstepAdjustor, HMCAuxJob
 
 from tasks import SpectroJob, FileSpectroJob, HMCAuxSpectroJob
-from tasks import FlowJob, HMCAuxFlowJob
-from tasks import HRPLJob, HMCAuxHRPLJob
+from tasks import FlowJob, FileFlowJob, HMCAuxFlowJob
+from tasks import HRPLJob, FileHRPLJob, HMCAuxHRPLJob
 
 
 
@@ -53,9 +53,9 @@ def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_ti
     return hmc_stream
     
     
-def spectro_jobs_for_hmc_jobs(hmc_stream, r0, irrep, req_time,
-                            kappa=None, screening=False, p_plus_a=False,
-                            save_prop=False, start_at_count=10):
+def spectro_jobs_for_hmc_jobs(hmc_stream, req_time,
+                            r0, irrep, kappa=None, screening=False,
+                            p_plus_a=False, save_prop=False, start_at_count=10):
     spectro_jobs = []
     for hmc_job in hmc_stream:
         if not isinstance(hmc_job, HMCJob):
@@ -67,7 +67,7 @@ def spectro_jobs_for_hmc_jobs(hmc_stream, r0, irrep, req_time,
     return spectro_jobs
     
     
-def flow_jobs_for_hmc_jobs(hmc_stream, tmax, req_time, minE=0, mindE=0, epsilon=.01, start_at_count=10):
+def flow_jobs_for_hmc_jobs(hmc_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
     flow_jobs = []
     for hmc_job in hmc_stream:
         if not isinstance(hmc_job, HMCJob):
@@ -90,7 +90,7 @@ def hrpl_jobs_for_hmc_jobs(hmc_stream, start_at_count=0):
 
 
 ### Tools for running measurements on pre-existing gauge files
-def spectro_jobs_for_gaugefiles(gaugefiles, r0, irrep, req_time, screening=False,
+def spectro_jobs_for_gaugefiles(gaugefiles, req_time, r0, irrep, screening=False,
                                 p_plus_a=False, do_baryons=False, save_prop=False):
     spectro_jobs = []
     for gfn in map(os.path.abspath, gaugefiles):
@@ -101,10 +101,28 @@ def spectro_jobs_for_gaugefiles(gaugefiles, r0, irrep, req_time, screening=False
     return spectro_jobs
 
 
+def flow_jobs_for_gaugefiles(gaugefiles, req_time, tmax, minE=0, mindE=0, epsilon=.01):
+    flow_jobs = []
+    for gfn in map(os.path.abspath, gaugefiles):
+        assert os.path.exists(gfn), "Gaugefile {gfn} does not exist to run flow on".format(gfn=gfn)
+        flow_jobs.append(FileFlowJob(gfn, req_time=req_time,
+                                     tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon))
+    return flow_jobs
+    
+    
+def hrpl_jobs_for_gaugefiles(gaugefiles):
+    hrpl_jobs = []
+    for gfn in map(os.path.abspath, gaugefiles):
+        assert os.path.exists(gfn), "Gaugefile {gfn} does not exist to measure HRPL for".format(gfn=gfn)
+        hrpl_jobs.append(FileHRPLJob(gfn))
+    return hrpl_jobs
+
+
+
 ### Tools for organizing output files
 def parse_params_from_fn(fn):
     words = os.path.basename(fn).split('_')
-    if words[0] in ['out', 'flow', 'GaugeSU4']:
+    if words[0] in ['out', 'flow', 'hrpl', 'GaugeSU4']:
         # e.g., out_18_6_7.75_0.126_0.125_1_2
         return {'Ns' : int(words[1]),
                 'Nt' : int(words[2]),
@@ -118,6 +136,8 @@ def parse_params_from_fn(fn):
                 'beta' : float(words[5]),
                 'k4' : float(words[6]),
                 'k6' : float(words[7])}
+    else:
+        raise Exception("Can't parse filename '{fn}' to make copy jobs".format(fn=fn))
                 
 def parse_params_from_HMCJob(hmc_job):
     return {'Ns' : hmc_job.Ns,

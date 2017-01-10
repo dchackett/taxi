@@ -429,6 +429,44 @@ class FlowJob(Job):
         })
 
 
+class FileFlowJob(FlowJob):
+    def __init__(self, loadg, req_time,
+                 tmax, minE=0, mindE=0, epsilon=.01,
+                 Ns=None, Nt=None, ensemble_name=None, count=None,
+                 **kwargs):
+
+        self.loadg = loadg
+        
+        # Parse params from loadg; allow overriding
+        parsed_params = self.parse_params_from_loadg()
+        self.Ns = Ns
+        if self.Ns is None:
+            self.Ns = parsed_params['Ns']
+        self.Nt = Nt        
+        if self.Nt is None:
+            self.Nt = parsed_params['Nt']
+        self.count = count        
+        if self.count is None:
+            self.count = parsed_params['count']
+        self.ensemble_name = ensemble_name        
+        if self.ensemble_name is None:
+            self.ensemble_name = parsed_params['ensemble_name']
+        
+        # Call superconstructor
+        super(FileFlowJob, self).__init__(req_time=req_time, tmax=tmax, minE=minE,
+                                          mindE=mindE, epsilon=epsilon, **kwargs)
+    
+    def parse_params_from_loadg(self):
+        # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
+        words = os.path.basename(self.loadg).split('_')
+        
+        return {'Ns' : int(words[1]),
+                'Nt' : int(words[2]),
+                'count': int(words[-1]),
+                'ensemble_name' : '_'.join(words[1:-1]),
+                'k4' : float(words[4]),
+                'k6' : float(words[5])}
+
 
 class HMCAuxFlowJob(HMCAuxJob, FlowJob):
     
@@ -442,14 +480,14 @@ class HMCAuxFlowJob(HMCAuxJob, FlowJob):
     
 class HRPLJob(Job):
     """Abstract superclass. Needs to be subclassed in such a way that self.Ns,
-    self.Nt, self.ensemble_name, self.count are filled in before the FlowJob
+    self.Nt, self.ensemble_name, self.count are filled in before the HRPLJob
     constructor is called or will crash.  Needs self.loadg provided before
     compilation."""
 
     hrpl_script = 'hrpl.py'
     hrpl_binary_path = '/path/to/hrpl/binary'
 
-    def __init__(self, hmc_job, **kwargs):
+    def __init__(self, **kwargs):
         # These should always run really fast, req_time = 2 minutes is probably overkill
         super(HRPLJob, self).__init__(req_time=120, **kwargs)
         
@@ -484,6 +522,43 @@ class HMCAuxHRPLJob(HRPLJob, HMCAuxJob):
     def __init__(self, hmc_job, **kwargs):
         super(HMCAuxHRPLJob, self).__init__(hmc_job=hmc_job, **kwargs)       
     
+    
+    
+class FileHRPLJob(HRPLJob):
+    def __init__(self, loadg,
+                 Ns=None, Nt=None, ensemble_name=None, count=None,
+                 **kwargs):
+
+        self.loadg = loadg
+        
+        # Parse params from loadg; allow overriding
+        parsed_params = self.parse_params_from_loadg()
+        self.Ns = Ns
+        if self.Ns is None:
+            self.Ns = parsed_params['Ns']
+        self.Nt = Nt        
+        if self.Nt is None:
+            self.Nt = parsed_params['Nt']
+        self.count = count        
+        if self.count is None:
+            self.count = parsed_params['count']
+        self.ensemble_name = ensemble_name        
+        if self.ensemble_name is None:
+            self.ensemble_name = parsed_params['ensemble_name']
+        
+        # Call superconstructor
+        super(FileHRPLJob, self).__init__(**kwargs)
+    
+    def parse_params_from_loadg(self):
+        # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
+        words = os.path.basename(self.loadg).split('_')
+        
+        return {'Ns' : int(words[1]),
+                'Nt' : int(words[2]),
+                'count': int(words[-1]),
+                'ensemble_name' : '_'.join(words[1:-1]),
+                'k4' : float(words[4]),
+                'k6' : float(words[5])}
 
         
 class SpawnJob(Job):
@@ -532,9 +607,9 @@ def specify_binary_paths(hmc_binary=None, phi_binary=None,
     if phi_binary is not None:
         HMCJob.phi_binary_path = os.path.abspath(phi_binary)
     if flow_binary is not None:
-        HMCAuxFlowJob.flow_binary_path = os.path.abspath(flow_binary)
+        FlowJob.flow_binary_path = os.path.abspath(flow_binary)
     if hrpl_binary is not None:
-        HMCAuxHRPLJob.hrpl_binary_path = os.path.abspath(hrpl_binary)
+        HRPLJob.hrpl_binary_path = os.path.abspath(hrpl_binary)
     
 def specify_spectro_binary_path(binary, irrep, p_plus_a, screening, do_baryons):
     HMCAuxSpectroJob.binary_paths[(irrep, p_plus_a, screening, do_baryons)] = os.path.abspath(binary)
