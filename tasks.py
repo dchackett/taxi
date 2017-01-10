@@ -147,12 +147,8 @@ class SextetHMCJob(HMCJob):
                  req_time,
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
-                 k4=0,
-                 enable_metropolis=True, **kwargs):
+                 enable_metropolis=True, k4=0, **kwargs):
         
-        if k4 != 0:
-            print "WARNING: SextetHMCJob will ignore k4 = {k4} != 0".format(k4=k4)
-            
         super(SextetHMCJob, self).__init__(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=0,
                                            k6=k6, label=label, count=count, req_time=req_time,
                                            N_traj=N_traj, N_traj_safe=N_traj_safe, nsteps=nsteps,
@@ -167,11 +163,7 @@ class FundamentalHMCJob(HMCJob):
                  req_time,
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
-                 k6=0,
-                 enable_metropolis=True, **kwargs):
-        
-        if k6 != 0:
-            print "WARNING: FundamentalHMCJob will ignore k6 = {k6} != 0".format(k6=k6)
+                 enable_metropolis=True, k6=0, **kwargs):
             
         super(FundamentalHMCJob, self).__init__(Ns=Ns, Nt=Nt, beta=beta, gammarat=gammarat, k4=k4,
                                            k6=0, label=label, count=count, req_time=req_time,
@@ -556,4 +548,4 @@ def specify_dir_with_runner_scripts(run_script_dir):
     
     SpectroJob.spectro_script = os.path.join(run_script_dir, SpectroJob.spectro_script)
     FlowJob.flow_script = os.path.join(run_script_dir, FlowJob.flow_script)
-    HMCAuxHRPLJob.hrpl_script = os.path.join(run_script_dir, HMCAuxHRPLJob.hrpl_script)
+    HRPLJob.hrpl_script = os.path.join(run_script_dir, HRPLJob.hrpl_script)
