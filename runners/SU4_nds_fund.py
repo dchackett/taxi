@@ -238,24 +238,28 @@ def mkdir_p(path):
             
 ### Body
 
-# Never clobber a gauge config
-# Check if job already done
-if os.path.exists(parg.saveg):
-    if not os.path.exists(parg.fout):
-        print "FATAL: Saved gauge file {saveg} already exists, output {fout} does not!".format(saveg=parg.saveg, fout=parg.fout)
-        sys.exit(ERR_SAVE_GAUGEFILE_ALREADY_EXISTS)
-    else:
-        print "Saved gauge file {saveg} and output {fout} already exist, checking if ok and exiting.".format(saveg=parg.saveg, fout=parg.fout)
-        sys.exit(hmc_check_ok(saveg=parg.saveg, fout=parg.fout, ntraj=parg.ntraj))
-else:
-    if os.path.exists(parg.fout):
-        print "FATAL: Output {fout} exists, saved gauge file {saveg} does not.  Multiple taxis tried this job?".format(saveg=parg.saveg, fout=parg.fout)
-        sys.exit(ERR_FOUT_ALREADY_EXISTS)
-        
 # Check load gauge file exists
 if parg.loadg is not None and not os.path.exists(parg.loadg):
     print "FATAL: Gauge file {loadg} does not exist".format(loadg=parg.loadg)
     sys.exit(ERR_LOAD_GAUGEFILE_DNE)
+
+# Never clobber a gauge config
+# Check if job already done
+if not os.path.exists(parg.fout):   
+    if not os.path.exists(parg.saveg):
+        # Desired case -- neither fout nor saveg exist already
+        # Create output file as soon as we know it doesn't exist as a "file lock" on this task
+        os.system("date > " + parg.fout) # Creates output file, puts date in    
+    else:
+        print "FATAL: Saved gauge file {saveg} already exists, output {fout} does not!".format(saveg=parg.saveg, fout=parg.fout)
+        sys.exit(ERR_SAVE_GAUGEFILE_ALREADY_EXISTS)        
+else:
+    if os.path.exists(parg.saveg):
+        print "Saved gauge file {saveg} and output {fout} already exist, checking if ok and exiting.".format(saveg=parg.saveg, fout=parg.fout)
+        sys.exit(hmc_check_ok(saveg=parg.saveg, fout=parg.fout, ntraj=parg.ntraj))
+    else:
+        print "FATAL: Output {fout} exists, saved gauge file {saveg} does not.  Multiple taxis tried this job?".format(saveg=parg.saveg, fout=parg.fout)
+        sys.exit(ERR_FOUT_ALREADY_EXISTS)
     
 input_str = build_hmc_input_string(**vars(parg))
 
@@ -267,7 +271,6 @@ print "mynode", platform.node().split('.')[0] #os.system("set mynode = ` hostnam
 print "output " + parg.fout
 print "running", parg.cpus, "nodes"
 print "current working directory " + os.getcwd()
-os.system("date > " + parg.fout) # Creates output file, puts date in
 
 # Make sure output dirs exist
 mkdir_p(os.path.split(parg.fout)[0])

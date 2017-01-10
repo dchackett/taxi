@@ -11,6 +11,7 @@ ERR_NONE = 0
 ERR_OUTPUT_DNE = 1
 ERR_BAD_OUTPUT = 2
 ERR_GAUGEFILE_DNE = 3
+ERR_FOUT_ALREADY_EXISTS = 4
 
 import os, sys
 import platform
@@ -130,9 +131,17 @@ def mkdir_p(path):
 ### Body -- Set up the environment to run the spectroscopy binary, and then run it
 
 ## Check load gauge file exists
-#if not os.path.exists(parg.loadg):
-#    print "FATAL: Gauge file {loadg} does not exist".format(loadg=parg.loadg)
-#    sys.exit(ERR_GAUGEFILE_DNE)
+if not os.path.exists(parg.loadg):
+    print "FATAL: Gauge file {loadg} does not exist".format(loadg=parg.loadg)
+    sys.exit(ERR_GAUGEFILE_DNE)
+    
+## Don't clobber output file (as a file-locking redundancy to DB serialization)
+if not os.path.exists(parg.fout):
+    # Create output file ASAP to prevent serialization mistakes
+    os.system("date > " + parg.fout) # Creates output file, puts date in
+else:
+    print "FATAL: Output file {fout} already exists".format(fout=parg.fout)
+    sys.exit(ERR_FOUT_ALREADY_EXISTS)
 
 input_str = build_spectro_input_string(**vars(parg))
 
@@ -149,8 +158,6 @@ print "current working directory " + os.getcwd()
 mkdir_p(os.path.split(parg.fout)[0])
 if parg.savep is not None:
     mkdir_p(os.path.split(parg.savep)[0])
-
-os.system("date > " + parg.fout) # Creates output file, puts date in
 
 # Build MPI call string
 # call_str = "/usr/local/mpich2-1.4.1p1/bin/mpirun -np %d "%parg.cpus   # CU cluster
