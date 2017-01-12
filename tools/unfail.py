@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser(description="Workflow forest unfailer")
 
 parser.add_argument('--forest', type=str, required=True, help='Forest file to fix failed tasks in.')
 parser.add_argument('--unfail', dest='unfail', action='store_true', help='If provided, change failed tasks to pending. If not provided, list failed tasks.')
+parser.add_argument('--id', type=int, default=None, help='If provided, only target this task.  Still need unfail to unfail.')
 parser.set_defaults(unfail=False)
 
 parg = parser.parse_args(sys.argv[1:]) # Call like "python taxi.py ...args..."
@@ -27,10 +28,17 @@ conn.row_factory = sqlite3.Row
 
 ### Get all failed tasks in the forest
 with conn:
-    failed_tasks = conn.execute("""
-        SELECT * FROM tasks
-        WHERE status='failed'
-    """).fetchall()
+    if parg.id is None:
+        failed_tasks = conn.execute("""
+            SELECT * FROM tasks
+            WHERE status='failed'
+        """).fetchall()
+    else:
+        failed_tasks = conn.execute("""
+            SELECT * FROM tasks
+            WHERE status='failed'
+            AND id={task_id}
+        """.format(task_id=parg.id)).fetchall()
 
 print "Found", len(failed_tasks), "failed tasks"
 
