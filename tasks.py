@@ -6,7 +6,10 @@ class Job(object):
     def __init__(self, req_time=0, **kwargs):
         self.req_time = req_time
         self.status = 'pending'
+        
+        # Tree properties
         self.trunk = False
+        self.branch_root = False
         
         # Want a default, but don't clobber anything set by a subclass before calling superconstructor
         if not hasattr(self, 'depends_on'):
