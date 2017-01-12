@@ -30,7 +30,7 @@ parser.add_argument('--binary', type=str,   required=True,  help='Path + filenam
 parser.add_argument('--Nt',     type=int,   required=True,  help='Number of lattice points in temporal direction.')
 parser.add_argument('--Ns',     type=int,   required=True,  help='Number of lattice points in spatial direction.')
 parser.add_argument('--kappa',  type=float, required=True,  help='Kappa parameter.')
-parser.add_argument('--r0',     type=float, required=True,  help='Source/sink smearing radius parameter.')
+parser.add_argument('--r0',     type=float, required=True,  help='Source/sink smearing radius parameter.  If 0, uses "point" instead of "gaussian".')
 
 parser.add_argument('--maxcgiter',  type=int, default=500,   help='Maximum number of CG iterations')
 
@@ -64,13 +64,20 @@ u0 1.0
 max_cg_iterations {maxcgiter}
 max_cg_restarts 10
 error_for_propagator 1e-06
-gaussian
-r0 {r0}
+""".format(Ns=Ns, Nt=Nt, kappa=kappa, maxcgiter=maxcgiter)
+
+    if r0 == 0:
+        output_str += "point\n"
+    else:
+        output_str += "gaussian\n"
+
+    output_str += \
+"""r0 {r0}
 
 reload_serial {loadg}
 coulomb_gauge_fix
 forget
-""".format(Ns=Ns, Nt=Nt, kappa=kappa, maxcgiter=maxcgiter, r0=r0, loadg=loadg)
+""".format(r0=r0, loadg=loadg)
 
     if loadp is not None:
         output_str += "reload_serial_wprop {loadp}\n".format(loadp=loadp)
