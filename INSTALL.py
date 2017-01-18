@@ -25,7 +25,7 @@ install_dir = os.path.abspath(parg.path)
 
 
 ### Implementation check
-if machine not in ['cu', 'janus', 'fnal']:
+if machine not in ['cu', 'janus', 'fnal', 'summit']:
     raise Exception("Machine '{machine}' not implemented.".format(machine=parg.machine))
     
 
