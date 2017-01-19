@@ -27,7 +27,7 @@ if parg.rollback and parg.droll is None:
 
 if parg.rollback and parg.dwork is None:
     raise Exception("Must provide working directory --dwork to find files to roll back in.")
-    
+
 droll = os.path.abspath(parg.droll)
 dwork = os.path.abspath(parg.dwork)
     
@@ -145,7 +145,7 @@ for task in rollback_tasks:
     elif task['task_type'] == 'copy':
         dest = task['task_args']['dest']
         if os.path.exists(dest):
-            to_fn = find_available_filename(os.path.join(droll, dest + '(COPIED)'))
+            to_fn = find_available_filename(os.path.join(droll, os.path.basename(dest) + '(COPIED)'))
             print 'copy_dest', to_fn
             if parg.rollback:
                 shutil.move(dest, to_fn)                    
