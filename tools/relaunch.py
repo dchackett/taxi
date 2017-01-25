@@ -36,11 +36,11 @@ if not os.path.exists(forest_file):
 #    taxi_shell_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/taxi.sh' # ../taxi.sh
 #else:
 #    taxi_shell_script = os.path.abspath(parg.dshell) + '/taxi.sh'
-taxi_shell_script = install_dir + '/taxi.sh'
+taxi_shell_script = os.path.abspath(os.path.join(install_dir, 'taxi.sh'))
 if not os.path.exists(taxi_shell_script):
     raise Exception("{fn} does not exist.".format(fn=taxi_shell_script))
 
-work_dir = parg.dwork
+work_dir = os.path.abspath(parg.dwork)
 if work_dir is None and parg.taxi is not None:
     raise Exception("Must specify working directory to launch taxi.")    
 
