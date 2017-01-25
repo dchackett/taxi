@@ -116,7 +116,7 @@ def find_available_filename(to_fn):
 # Move files from dwork to droll
 N_rolled_back = 0
 for task in rollback_tasks:
-    print 'ROLLING BACK TASK', task['id']
+    print 'ROLLING BACK TASKS' + ('' if parg.rollback else ' (DRY RUN)'), task['id']
     
     ## Some script ran
     if task['task_type'] == 'run_script':
@@ -137,7 +137,7 @@ for task in rollback_tasks:
             from_fn = os.path.join(dwork, fn)
             to_fn   = find_available_filename(os.path.join(droll, fn))
             if os.path.exists(from_fn):
-                print fkey, fn
+                print fkey, to_fn
                 if parg.rollback:
                     shutil.move(from_fn, to_fn)
     
@@ -160,5 +160,6 @@ for task in rollback_tasks:
             """, (task['id'],))
             
     N_rolled_back += 1
-    
-print "Rolled back", N_rolled_back, "tasks"
+
+if parg.rollback:
+    print "Rolled back", N_rolled_back, "tasks"
