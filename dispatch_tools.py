@@ -241,7 +241,7 @@ def get_last_N_hmc_jobs(hmc_job, N, look_through_branch_roots=False):
     elif len(hmc_dependencies) == 0:
         return [] # At root of HMC tree
     
-    return hmc_dependencies + get_last_N_hmc_jobs(hmc_dependencies[0], N-1)
+    return get_last_N_hmc_jobs(hmc_dependencies[0], N-1) + hmc_dependencies
 
 
 def use_adaptive_nsteps(job_pool, AR_from_last_N=2, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1,
