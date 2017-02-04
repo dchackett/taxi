@@ -294,7 +294,13 @@ class dispatch(object):
         self.taxi_log_dir_for_name = taxi_log_dir_for_name
         self.taxi_time = taxi_time
         self.max_taxis = max_taxis
-        
+
+        # Error check        
+        for j in job_pool:
+            if j.req_time > self.taxi_time:
+                raise Exception("Job {j} has req_time={rt} > taxi_time={tt}".format(j=j, rt=j.req_time, tt=self.taxi_time))
+                
+                
         # Compile
         self._find_trees()
         self._figure_out_taxi_spawns()
