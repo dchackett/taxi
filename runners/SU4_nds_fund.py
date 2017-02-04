@@ -169,7 +169,7 @@ ntraj_safe {nsafe}
 nstep_safe {nsteps_safe}
 
 ## load/save
-""".format(nstepsg=nstepsg, nsafe=nsafe, nsteps_safe = nsteps1*2)
+""".format(nstepsg=nstepsg, nsafe=nsafe, nsteps_safe = nsteps1*4)
 
     if loadg is None: 
         output_str += "fresh   # all-identity start\n"
