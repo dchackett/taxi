@@ -368,8 +368,8 @@ class HMCAuxSpectroJob(HMCAuxJob, SpectroJob):
         super(HMCAuxSpectroJob, self).__init__(hmc_job=hmc_job, req_time=req_time,
                             # Spectroscopy-relevant physical parameters
                             irrep=irrep, r0=r0, kappa=kappa,
-                            screening=False, p_plus_a=False, do_baryons=False,
-                            save_prop=False, **kwargs)
+                            screening=screening, p_plus_a=p_plus_a, do_baryons=do_baryons,
+                            save_prop=save_prop, **kwargs)
                  
         # Provided kappa stored in self by SpectroJob constructor.
         # By default, extract appropriate kappa from hmc_job.  If specified, override for partial quenching
