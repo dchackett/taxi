@@ -10,7 +10,7 @@ import os
 from random import seed, randint
 
 from tasks import CopyJob, SpawnJob, RespawnJob
-from tasks import HMCJob, NstepAdjustor, HMCAuxJob
+from tasks import HMCJob, HMCAuxJob # , NstepAdjustor
 
 from tasks import SpectroJob, FileSpectroJob, HMCAuxSpectroJob
 from tasks import FlowJob, FileFlowJob, HMCAuxFlowJob
