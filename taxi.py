@@ -227,45 +227,45 @@ def run_script(task_args):
     
 
 ### Nstep adaptor
-def adjust_hmc_nstep(task_args, task_blob):
-    adjust_id = task_args['adjust_job']
-    adjust_task = task_blob[adjust_id]
-
-    if adjust_task['status'] != 'pending':
-        print "Tried to adjust nsteps for non-pending job", adjust_id
-        return False
-    
-    # Look at files, figure out AR and new nstep
-    new_nstep = get_adjusted_nstep(task_args['files'], min_AR=task_args['min_AR'],
-                               max_AR=task_args['max_AR'], die_AR=task_args['die_AR'],
-                               delta_nstep=task_args['delta_nstep'])
-    if new_nstep is None:
-        print "Accept rate dropped below", task_args['die_AR'], "aborting"
-        return False
-
-    # Edit local copy of HMC task
-    # Legacy code for cmd_line_args as a list; cut this out when old dispatches are done
-    new_task_args = adjust_task['task_args']
-    if isinstance(new_task_args['cmd_line_args'], list):
-        cmd_line_args = new_task_args['cmd_line_args']
-        for aa, arg in enumerate(cmd_line_args):
-            if "--nsteps1 " in arg:
-                words = arg.split()
-                for ww, word in enumerate(words):
-                    if '--nsteps1' in word:
-                        words[ww+1] = nstep
-                        break
-                cmd_line_args[aa] = " ".join(map(str,words))
-                break
-        new_task_args['cmd_line_args'] = cmd_line_args # Probably redundant
-    elif isinstance(new_task_args['cmd_line_args'], dict):
-        new_task_args['cmd_line_args']['nsteps1'] = new_nstep
-
-    # Write change to DB
-    conn.execute("""UPDATE tasks SET task_args=? WHERE id=?""", (json.dumps(new_task_args), adjust_id))
-
-    print "New nstep", new_nstep
-    return True
+#def adjust_hmc_nstep(task_args, task_blob):
+#    adjust_id = task_args['adjust_job']
+#    adjust_task = task_blob[adjust_id]
+#
+#    if adjust_task['status'] != 'pending':
+#        print "Tried to adjust nsteps for non-pending job", adjust_id
+#        return False
+#    
+#    # Look at files, figure out AR and new nstep
+#    new_nstep = get_adjusted_nstep(task_args['files'], min_AR=task_args['min_AR'],
+#                               max_AR=task_args['max_AR'], die_AR=task_args['die_AR'],
+#                               delta_nstep=task_args['delta_nstep'])
+#    if new_nstep is None:
+#        print "Accept rate dropped below", task_args['die_AR'], "aborting"
+#        return False
+#
+#    # Edit local copy of HMC task
+#    # Legacy code for cmd_line_args as a list; cut this out when old dispatches are done
+#    new_task_args = adjust_task['task_args']
+#    if isinstance(new_task_args['cmd_line_args'], list):
+#        cmd_line_args = new_task_args['cmd_line_args']
+#        for aa, arg in enumerate(cmd_line_args):
+#            if "--nsteps1 " in arg:
+#                words = arg.split()
+#                for ww, word in enumerate(words):
+#                    if '--nsteps1' in word:
+#                        words[ww+1] = nstep
+#                        break
+#                cmd_line_args[aa] = " ".join(map(str,words))
+#                break
+#        new_task_args['cmd_line_args'] = cmd_line_args # Probably redundant
+#    elif isinstance(new_task_args['cmd_line_args'], dict):
+#        new_task_args['cmd_line_args']['nsteps1'] = new_nstep
+#
+#    # Write change to DB
+#    conn.execute("""UPDATE tasks SET task_args=? WHERE id=?""", (json.dumps(new_task_args), adjust_id))
+#
+#    print "New nstep", new_nstep
+#    return True
             
     
 ### Open connection to job forest sqlite DB
@@ -428,9 +428,9 @@ while True:
             task_successful = (os.system('rsync -Paz {src} {dest}'.format(**task_args)) >> 8) == 0
         
 
-    # Adaptive nstep
-    elif task_type == 'adjust_nstep':
-        task_successful = adjust_hmc_nstep(task['task_args'], task_blob)
+#    # Adaptive nstep
+#    elif task_type == 'adjust_nstep':
+#        task_successful = adjust_hmc_nstep(task['task_args'], task_blob)
 
     # Print something (debug)
     elif task_type == "print":

@@ -226,55 +226,55 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
     return copy_jobs
 
 
-### Tools for adaptive nsteps for HMC jobs
-def get_last_N_hmc_jobs(hmc_job, N, look_through_branch_roots=False):
-    if N == 0:
-        return []
-
-    # Don't look through branch roots
-    if hmc_job.branch_root and not look_through_branch_roots:
-        return []
-
-    hmc_dependencies = filter(lambda j: isinstance(j, HMCJob), hmc_job.depends_on)
-    if len(hmc_dependencies) > 1:
-        raise Exception("Don't know how to handle an HMC run depending on multiple HMC runs")
-    elif len(hmc_dependencies) == 0:
-        return [] # At root of HMC tree
-    
-    return get_last_N_hmc_jobs(hmc_dependencies[0], N-1) + hmc_dependencies
-
-
-def use_adaptive_nsteps(job_pool, AR_from_last_N=2, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1,
-                        adjust_branch_roots=False):
-    """Add NstepAdjustor jobs to pool to adaptively adjust nsteps for HMC jobs.
-    
-    If adjust_branch_roots is True, when a new HMC stream (branch) forks off from a running
-    stream (trunk), the current nsteps of the trunk will be applied to the branch.  If False,
-    whatever nsteps was specified by the user for the branch stream will be applied to the
-    branch root (first HMC job in the branch stream)."""
-
-    new_jobs = []
-
-    for job in job_pool:
-        if not isinstance(job, HMCJob):
-            continue
-
-        # New streams forking off start with the number of steps specified by the user
-        if job.branch_root and not adjust_branch_roots:
-            continue
-            
-        prev_hmc_jobs = get_last_N_hmc_jobs(job, AR_from_last_N, look_through_branch_roots=adjust_branch_roots)
-        if len(prev_hmc_jobs) < AR_from_last_N:
-            continue # Not deep enough in to stream to get enough AR data
-
-        adjust_job = NstepAdjustor(adjust_hmc_job=job,
-                                      examine_hmc_jobs=prev_hmc_jobs,
-                                      min_AR=min_AR, max_AR=max_AR, die_AR=die_AR, delta_nstep=delta_nstep)
-        job.depends_on.append(adjust_job) # HMC job needs to have its nsteps adjusted before running
-        adjust_job.depends_on = prev_hmc_jobs # Adjustor can't run until all the HMC jobs it needs to check ARs from have run
-        new_jobs.append(adjust_job)
-
-    return new_jobs + job_pool
+#### Tools for adaptive nsteps for HMC jobs
+#def get_last_N_hmc_jobs(hmc_job, N, look_through_branch_roots=False):
+#    if N == 0:
+#        return []
+#
+#    # Don't look through branch roots
+#    if hmc_job.branch_root and not look_through_branch_roots:
+#        return []
+#
+#    hmc_dependencies = filter(lambda j: isinstance(j, HMCJob), hmc_job.depends_on)
+#    if len(hmc_dependencies) > 1:
+#        raise Exception("Don't know how to handle an HMC run depending on multiple HMC runs")
+#    elif len(hmc_dependencies) == 0:
+#        return [] # At root of HMC tree
+#    
+#    return get_last_N_hmc_jobs(hmc_dependencies[0], N-1) + hmc_dependencies
+#
+#
+#def use_adaptive_nsteps(job_pool, AR_from_last_N=2, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1,
+#                        adjust_branch_roots=False):
+#    """Add NstepAdjustor jobs to pool to adaptively adjust nsteps for HMC jobs.
+#    
+#    If adjust_branch_roots is True, when a new HMC stream (branch) forks off from a running
+#    stream (trunk), the current nsteps of the trunk will be applied to the branch.  If False,
+#    whatever nsteps was specified by the user for the branch stream will be applied to the
+#    branch root (first HMC job in the branch stream)."""
+#
+#    new_jobs = []
+#
+#    for job in job_pool:
+#        if not isinstance(job, HMCJob):
+#            continue
+#
+#        # New streams forking off start with the number of steps specified by the user
+#        if job.branch_root and not adjust_branch_roots:
+#            continue
+#            
+#        prev_hmc_jobs = get_last_N_hmc_jobs(job, AR_from_last_N, look_through_branch_roots=adjust_branch_roots)
+#        if len(prev_hmc_jobs) < AR_from_last_N:
+#            continue # Not deep enough in to stream to get enough AR data
+#
+#        adjust_job = NstepAdjustor(adjust_hmc_job=job,
+#                                      examine_hmc_jobs=prev_hmc_jobs,
+#                                      min_AR=min_AR, max_AR=max_AR, die_AR=die_AR, delta_nstep=delta_nstep)
+#        job.depends_on.append(adjust_job) # HMC job needs to have its nsteps adjusted before running
+#        adjust_job.depends_on = prev_hmc_jobs # Adjustor can't run until all the HMC jobs it needs to check ARs from have run
+#        new_jobs.append(adjust_job)
+#
+#    return new_jobs + job_pool
         
     
 ### Dispatch class to build job dispatches

@@ -176,32 +176,32 @@ class FundamentalHMCJob(HMCJob):
                                            
 
 
-class NstepAdjustor(Job):
-    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1, **kwargs):
-        super(NstepAdjustor, self).__init__(req_time=0, **kwargs)
-
-        self.adjust_hmc_job = adjust_hmc_job
-        self.examine_hmc_jobs = sorted(examine_hmc_jobs, key=lambda h: h.count)
-
-        self.min_AR = min_AR
-        self.max_AR = max_AR
-        self.die_AR = die_AR
-        self.delta_nstep = delta_nstep
-        
-    def compile(self):
-        super(NstepAdjustor, self).compile()
-
-        self.compiled.update({
-            'task_type' : 'adjust_nstep',
-            'task_args' : {
-                'adjust_job' : self.adjust_hmc_job.job_id,
-                'files' : [h.fout for h in self.examine_hmc_jobs],
-                'min_AR' : self.min_AR,
-                'max_AR' : self.max_AR,
-                'die_AR' : self.die_AR,
-                'delta_nstep' : self.delta_nstep
-            }
-        })
+#class NstepAdjustor(Job):
+#    def __init__(self, adjust_hmc_job, examine_hmc_jobs, min_AR=0.85, max_AR=0.9, die_AR=0.4, delta_nstep=1, **kwargs):
+#        super(NstepAdjustor, self).__init__(req_time=0, **kwargs)
+#
+#        self.adjust_hmc_job = adjust_hmc_job
+#        self.examine_hmc_jobs = sorted(examine_hmc_jobs, key=lambda h: h.count)
+#
+#        self.min_AR = min_AR
+#        self.max_AR = max_AR
+#        self.die_AR = die_AR
+#        self.delta_nstep = delta_nstep
+#        
+#    def compile(self):
+#        super(NstepAdjustor, self).compile()
+#
+#        self.compiled.update({
+#            'task_type' : 'adjust_nstep',
+#            'task_args' : {
+#                'adjust_job' : self.adjust_hmc_job.job_id,
+#                'files' : [h.fout for h in self.examine_hmc_jobs],
+#                'min_AR' : self.min_AR,
+#                'max_AR' : self.max_AR,
+#                'die_AR' : self.die_AR,
+#                'delta_nstep' : self.delta_nstep
+#            }
+#        })
         
         
         
