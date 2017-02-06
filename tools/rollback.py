@@ -13,6 +13,8 @@ parser.add_argument('--droll', type=str, default=None, help='Folder to move roll
 parser.add_argument('--dwork', type=str, default=None, help='Working folder to find files to roll back. Must be provided if --rollback is provided.')
 parser.add_argument('--rollback', dest='rollback', action='store_true', help='If provided, perform specified rollback. If not provided, list jobs that would be rolled back.')
 parser.set_defaults(rollback=False)
+parser.add_argument('--nuclear', dest='nuclear', action='store_true', help='If provided, ignore id and roll back entire forest.')
+parser.set_defaults(nuclear=False)
 
 parg = parser.parse_args(sys.argv[1:]) # Call like "python taxi.py ...args..."
 
@@ -69,23 +71,27 @@ for task_id, task in tasks.items():
         parent['dependents'].append(task_id)
 
 # Slice out rollback tasks and tasks after
-rollback_tasks = [tasks[parg.id]]
-for task in rollback_tasks:
-    if not task.has_key('dependents'):
-        continue # leaf
-    for dep_id in task['dependents']:
-        dep_task = tasks[dep_id]
-        if dep_task['status'] in ['failed', 'complete', 'active']:
-            rollback_tasks.append(tasks[dep_id])
+if not parg.nuclear:
+    rollback_tasks = [tasks[parg.id]]
+    for task in rollback_tasks:
+        if not task.has_key('dependents'):
+            continue # leaf
+        for dep_id in task['dependents']:
+            dep_task = tasks[dep_id]
+            if dep_task['status'] in ['failed', 'complete', 'active']:
+                rollback_tasks.append(tasks[dep_id])
+else:
+    rollback_tasks = [task for (task_id,task) in tasks.items()]
             
 # Check for active tasks
-for task in rollback_tasks:
-    if task['status'] == 'active':
-        err_msg = 'Task-to-rollback {task_id} is active'.format(task_id=task['id'])
-        if parg.rollback:
-            raise Exception(err_msg)
-        else:
-            print "WARNING: " + err_msg
+if not parg.nuclear:
+    for task in rollback_tasks:
+        if task['status'] == 'active':
+            err_msg = 'Task-to-rollback {task_id} is active'.format(task_id=task['id'])
+            if parg.rollback:
+                raise Exception(err_msg)
+            else:
+                print "WARNING: " + err_msg
 
 ## If not performing the rollback, print out rollback tasks in detail
 def pretty_print_dict(D, prefix=""):
