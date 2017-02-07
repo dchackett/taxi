@@ -11,9 +11,6 @@ import json
 # Need to bring our own argparse, so make sure PYTHONPATH includes taxi dir
 import argparse
 
-# Adaptive nsteps
-from adaptive_nstep import get_adjusted_nstep
-
 
 ### Parse command line arguments
 parser = argparse.ArgumentParser(description="Workflow taxi")
