@@ -266,7 +266,7 @@ def run_script(task_args):
             
     
 ### Open connection to job forest sqlite DB
-conn = sqlite3.connect(parg.forest)
+conn = sqlite3.connect(parg.forest, timeout=30.0)
 conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
     
