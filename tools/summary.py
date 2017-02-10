@@ -16,6 +16,8 @@ parser.add_argument('--failed', dest='failed', action='store_true', help='Print 
 parser.set_defaults(failed=False)
 parser.add_argument('--active', dest='active', action='store_true', help='Print details of active tasks.')
 parser.set_defaults(active=False)
+parser.add_argument('--abandoned', dest='abandoned', action='store_true', help='Print details of abandoned tasks.')
+parser.set_defaults(abandoned=False)
 parser.add_argument('--ready', dest='ready', action='store_true', help='Print details of tasks that are ready but not yet active.')
 parser.set_defaults(ready=False)
 parser.add_argument('--taxis', dest='taxis', action='store_true', help='Find which taxis are associated with active tasks.')
@@ -118,11 +120,16 @@ for task in active_tasks:
         running_taxis.append(task['by_taxi'])
     else:
         mia_taxis.append(task['by_taxi'])
+        task['abandoned'] = True
         
 for taxi in all_taxis:
     if taxi['taxi_name'] not in running_taxis and taxi['taxi_name'] not in mia_taxis:
         if local_taxi.taxi_in_queue(taxi['taxi_name'], suppress_output=True):
             queue_taxis.append(taxi['taxi_name'])
+
+# Look for abandoned tasks
+abandoned_tasks = [task for task in active_tasks if task.has_key('abandoned') and task['abandoned']]
+active_tasks = [task for task in active_tasks if task not in abandoned_tasks]
 
 ## Output
 
@@ -143,6 +150,15 @@ if parg.active:
         print ""
 else:
     print "ACTIVE TASKS:", [task['id'] for task in active_tasks]
+    
+if parg.abandoned:
+    print "ABANDONED TASKS"
+    for task in abandoned_tasks:
+        print "TASK", task['id']
+        pretty_print_dict(task)
+        print ""
+else:
+    print "ABANDONED TASKS:", [task['id'] for task in abandoned_tasks]
         
 if parg.failed:
     print "FAILED TASKS"
