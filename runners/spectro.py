@@ -147,8 +147,8 @@ if not os.path.exists(parg.fout):
     # Create output file ASAP to prevent serialization mistakes
     os.system("date > " + parg.fout) # Creates output file, puts date in
 else:
-    print "FATAL: Output file {fout} already exists".format(fout=parg.fout)
-    sys.exit(ERR_FOUT_ALREADY_EXISTS)
+    print "Output file {fout} already exists, checking if okay and exiting".format(fout=parg.fout)
+    sys.exit(spectro_check_ok(parg.fout))
 
 input_str = build_spectro_input_string(**vars(parg))
 
