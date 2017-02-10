@@ -20,6 +20,8 @@ parser.add_argument('--abandoned', dest='abandoned', action='store_true', help='
 parser.set_defaults(abandoned=False)
 parser.add_argument('--ready', dest='ready', action='store_true', help='Print details of tasks that are ready but not yet active.')
 parser.set_defaults(ready=False)
+parser.add_argument('--blocked', dest='blocked', action='store_true', help='Print details of tasks that are blocked by some upstream failure.')
+parser.set_defaults(blocked=False)
 parser.add_argument('--taxis', dest='taxis', action='store_true', help='Find which taxis are associated with active tasks.')
 parser.set_defaults(taxis=False)
 
@@ -60,9 +62,6 @@ tasks = task_dict
 
 # Find blocked tasks
 for task_id, task in tasks.items():
-    task['blocked'] = False
-    task['ready'] = False
-    
     if not task.has_key('depends_on') or task['depends_on'] is None:        
         continue
 
@@ -77,10 +76,8 @@ for task_id, task in tasks.items():
         if tasks[dep_id]['status'] != 'complete':
             parents_all_complete = False
             
-    if failed_parent:
-        task['blocked'] = True
-    elif parents_all_complete:
-        task['ready'] = True
+    task['blocked'] = failed_parent
+    task['ready'] = not failed_parent and parents_all_complete
 
 # Sort tasks in to interesting piles
 pending_tasks  = []
@@ -93,16 +90,19 @@ ready_tasks    = []
 for task_id, task in tasks.items():
     if task['status'] == 'pending':
         pending_tasks.append(task)
+        
+        if task.has_key('blocked') and task['blocked']:
+            blocked_tasks.append(task)
+        elif task.has_key('ready') and task['ready']:
+            ready_tasks.append(task)
+            
     elif task['status'] == 'active':
         active_tasks.append(task)
     elif task['status'] == 'complete':
         complete_tasks.append(task)
     elif task['status'] == 'failed':
         failed_tasks.append(task)
-    elif task['blocked']:
-        blocked_tasks.append(task)
-    elif task['ready']:
-        ready_tasks.append(task)
+    
 
 # Look for abandoned taxis
 running_taxis = []
@@ -177,6 +177,16 @@ if parg.ready:
         print ""
 else:
     print "READY TASKS:", [task['id'] for task in ready_tasks]
+    
+if parg.blocked:
+    print "BLOCKED TASKS"
+    for task in blocked_tasks:
+        print "TASK", task['id']
+        pretty_print_dict(task)
+        print ""
+else:
+    print "BLOCKED TASKS:", [task['id'] for task in blocked_tasks]
+    
     
 if parg.taxis:
     print "ACTIVE TAXIS"
