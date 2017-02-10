@@ -3,10 +3,15 @@ import subprocess
 import time
 
 ### Queue interaction utilities
-def taxi_in_queue(taxi_name):
+def taxi_in_queue(taxi_name, suppress_output=False):
     """Anti-thrashing utility function.  Checks if a taxi with this name is already
     in the queue, so we don't submit another one."""
-    found_taxi = (os.system("qstat -j {taxi_name} > /dev/null".format(taxi_name=taxi_name)) >> 8) == 0 # If the taxi isn't in the queue, return code is an error
+    #found_taxi = (os.system("qstat -j {taxi_name}".format(taxi_name=taxi_name)) >> 8) == 0 # If the taxi isn't in the queue, return code is an error
+    if suppress_output:
+        found_taxi = subprocess.call("qstat -j {taxi_name}".format(taxi_name=taxi_name), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
+    else:
+        found_taxi = subprocess.call("qstat -j {taxi_name}".format(taxi_name=taxi_name), shell=True) == 0
+    
     return found_taxi
 
     

@@ -105,11 +105,24 @@ for task_id, task in tasks.items():
 # Look for abandoned taxis
 running_taxis = []
 mia_taxis = []
+queue_taxis = []
+
+with conn:
+    all_taxis = conn.execute("""
+        SELECT * FROM taxis
+    """).fetchall()
+all_taxis = map(dict, all_taxis)
+    
 for task in active_tasks:
-    if local_taxi.taxi_in_queue(task['by_taxi']):
+    if local_taxi.taxi_in_queue(task['by_taxi'], suppress_output=True):
         running_taxis.append(task['by_taxi'])
     else:
         mia_taxis.append(task['by_taxi'])
+        
+for taxi in all_taxis:
+    if taxi['taxi_name'] not in running_taxis and taxi['taxi_name'] not in mia_taxis:
+        if local_taxi.taxi_in_queue(taxi['taxi_name'], suppress_output=True):
+            queue_taxis.append(taxi['taxi_name'])
 
 ## Output
 
@@ -156,6 +169,7 @@ if parg.taxis:
 else:
     print "RUNNING TAXIS:", map(str, running_taxis)
     print "MIA TAXIS:", map(str, mia_taxis)
+    print "QUEUED TAXIS:", map(str, queue_taxis)
         
     
         

@@ -1,7 +1,7 @@
 import subprocess
 
 ### Queue interaction utilities
-def taxi_in_queue(taxi_name):
+def taxi_in_queue(taxi_name, suppress_output=False):
     """Anti-thrashing utility function.  Checks if a taxi with this name is already
     in the queue, so we don't submit another one."""
     ntaxis, err = subprocess.Popen("squeue --name='%s' | grep -c '%s'"%(taxi_name, taxi_name),
