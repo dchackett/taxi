@@ -4,6 +4,10 @@ import os, sys
 import sqlite3, json
 import argparse
 
+install_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # /taxi/tools/../
+sys.path.insert(0, install_dir)
+import local_taxi
+
 ### Parse command line arguments
 parser = argparse.ArgumentParser(description="Workflow forest summarizer")
 
@@ -63,6 +67,9 @@ for task_id, task in tasks.items():
     failed_parent = False
     parents_all_complete = True
     for dep_id in task['depends_on']:
+        if not tasks.has_key(dep_id):
+            failed_parent = True
+            continue
         if tasks[dep_id]['status'] == 'failed':
             failed_parent = True
         if tasks[dep_id]['status'] != 'complete':
@@ -95,6 +102,14 @@ for task_id, task in tasks.items():
     elif task['ready']:
         ready_tasks.append(task)
 
+# Look for abandoned taxis
+running_taxis = []
+mia_taxis = []
+for task in active_tasks:
+    if local_taxi.taxi_in_queue(task['by_taxi']):
+        running_taxis.append(task['by_taxi'])
+    else:
+        mia_taxis.append(task['by_taxi'])
 
 ## Output
 
@@ -137,7 +152,12 @@ else:
 if parg.taxis:
     print "ACTIVE TAXIS"
     for task in active_tasks:
-        print task['by_taxi'], task['id']
+        print task['by_taxi'], task['id'], '(RUNNING)' if task['by_taxi'] in running_taxis else '(MIA)'
+else:
+    print "RUNNING TAXIS:", map(str, running_taxis)
+    print "MIA TAXIS:", map(str, mia_taxis)
+        
+    
         
 # Print summary
 print "PENDING %d  ACTIVE %d  COMPLETE %d  FAILED %d  BLOCKED %d  READY %d"%(len(pending_tasks), len(active_tasks), len(complete_tasks), len(failed_tasks), len(blocked_tasks), len(ready_tasks))
