@@ -40,9 +40,12 @@ taxi_shell_script = os.path.abspath(os.path.join(install_dir, 'taxi.sh'))
 if not os.path.exists(taxi_shell_script):
     raise Exception("{fn} does not exist.".format(fn=taxi_shell_script))
 
-work_dir = os.path.abspath(parg.dwork)
-if work_dir is None and parg.taxi is not None:
-    raise Exception("Must specify working directory to launch taxi.")    
+work_dir = parg.dwork
+if work_dir is None:
+    if parg.launch:
+        raise Exception("Must specify working directory to launch taxi.")    
+else:
+    work_dir = os.path.abspath(work_dir)
 
 ### Open forest db
 conn = sqlite3.connect(forest_file)
