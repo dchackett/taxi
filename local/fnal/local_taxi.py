@@ -32,7 +32,8 @@ def taxi_launcher(taxi_name, taxi_forest, home_dir, taxi_dir, taxi_time, taxi_no
     # Logs go in taxi dir, like dtaxi/taxi-name_1241234.log
     # PBS should replace $PBS_JOBID in -o to the job id, but it doesn't.
     #logfn = "{taxi_dir}/{taxi_name}_$PBS_JOBID.log".format(taxi_dir=taxi_dir, taxi_name=taxi_name)
-    logfn = "{taxi_dir}/{taxi_name}_{subtime}.log".format(taxi_dir=taxi_dir, taxi_name=taxi_name, subtime=time.strftime('%Y%m%d%H%M'))
+    logfn = "{taxi_dir}/{taxi_name}_{subtime}".format(taxi_dir=taxi_dir, taxi_name=taxi_name,
+                                                          subtime=time.strftime("%Y%b%d-%H%M"))
     taxi_call += " -o {logfn} ".format(logfn=logfn)
 
     ## Call taxi wrapper bash script

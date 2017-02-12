@@ -24,7 +24,8 @@ def taxi_launcher(taxi_name, taxi_forest, home_dir, taxi_dir, taxi_time, taxi_no
     taxi_call += " -N {taxi_name} ".format(taxi_name=taxi_name)
     
     # Logs go in taxi dir, like dtaxi/taxi-name_1241234.log
-    logfn = "{taxi_dir}/{taxi_name}_{subtime}.log".format(taxi_dir=taxi_dir, taxi_name=taxi_name, subtime=time.strftime('%Y%m%d%H%M'))
+    logfn = "{taxi_dir}/{taxi_name}_{subtime}".format(taxi_dir=taxi_dir, taxi_name=taxi_name,
+                                                          subtime=time.strftime("%Y%b%d-%H%M"))
     taxi_call += " -o {logfn} ".format(logfn=logfn)
     
     ## Call taxi wrapper bash script
