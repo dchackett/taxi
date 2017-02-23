@@ -12,6 +12,7 @@ ERR_OUTPUT_DNE = 1
 ERR_BAD_OUTPUT = 2
 ERR_GAUGEFILE_DNE = 3
 ERR_FOUT_ALREADY_EXISTS = 4
+ERR_KAPPA_ZERO = 5
 
 import os, sys
 import platform
@@ -136,6 +137,11 @@ def mkdir_p(path):
    
    
 ### Body -- Set up the environment to run the spectroscopy binary, and then run it
+
+## Fail if we accidentally try to run with zero kappa
+if parg.kappa == 0:
+    print "FATAL: Tried to run spectroscopy with kappa=0"
+    sys.exit(ERR_KAPPA_ZERO)
 
 ## Check load gauge file exists
 if not os.path.exists(parg.loadg):
