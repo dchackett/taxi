@@ -8,7 +8,8 @@ import argparse
 parser = argparse.ArgumentParser(description="Workflow forest unfailer")
 
 parser.add_argument('--forest', type=str, required=True, help='Forest file to fix failed tasks in.')
-parser.add_argument('--unfail', dest='unfail', action='store_true', help='If provided, change failed tasks to pending. If not provided, list failed tasks.')
+parser.add_argument('--unfail', dest='unfail', action='store_true', help='If provided, change failed tasks to provided status. If not provided, list failed tasks.')
+parser.add_argument('--status', type=str, default='pending', help='Status to change failed task(s) to.')
 parser.add_argument('--id', type=int, default=None, help='If provided, only target this task.  Still need unfail to unfail.')
 parser.set_defaults(unfail=False)
 
@@ -20,6 +21,8 @@ forest_file = os.path.abspath(parg.forest)
 if not os.path.exists(forest_file):
     raise Exception("Specified forest {fn} does not exist".format(fn=forest_file))
 
+if parg.status not in ['pending', 'complete', 'active']:
+    raise Exception("Unknown status %s"%str(parg.status))
 
 ### Open forest db
 conn = sqlite3.connect(forest_file)
@@ -70,7 +73,7 @@ if len(failed_tasks) > 0:
                 print task['id'], ":", task['task_type']
                 conn.execute("""
                     UPDATE tasks
-                    SET status='pending'
+                    SET status=?
                     WHERE id=?
-                """, (task['id'],))
+                """, (parg.status, task['id'],))
         print "DONE"
