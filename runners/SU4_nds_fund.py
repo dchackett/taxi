@@ -18,6 +18,7 @@ ERR_LOAD_GAUGEFILE_DNE = 3
 ERR_SAVE_GAUGEFILE_DNE = 4
 ERR_SAVE_GAUGEFILE_ALREADY_EXISTS = 5
 ERR_FOUT_ALREADY_EXISTS = 6
+ERR_ACCEPT_RATE_TOO_LOW = 7
 
 import os, sys
 import platform
@@ -46,6 +47,7 @@ parser.add_argument('--nsteps1',  type=int,   required=True,  help='Number of st
 parser.add_argument('--nsteps2',  type=int,   default=None,   help='No Hasenbuch if not provided. Number of gauge steps between (D^2 + m^2 / D^2)^-1 evaluations.')
 parser.add_argument('--nstepsg',  type=int,   default=6,      help='Number of gauge steps to run.')
 parser.add_argument('--shift',    type=float, default=0.,     help='Fake m to use in D^2 + m^2.')
+parser.add_argument('--minAR',    type=int,   default=4,      help='Minimum number of accepts for job to succeed')
 
 parser.add_argument('--maxcgobs',  type=int,   default=500,  help='Maximum number of CG iterations to run for fermion observables.')
 parser.add_argument('--maxcgpf',   type=int,   default=500,  help='Maximum number of CG iterations to run for pseudofermions.')
@@ -210,14 +212,17 @@ def hmc_check_ok(saveg, fout, ntraj):
     count_gmes = 0
     count_traj = 0
     count_exit = 0
+    count_accept = 0
     with open(fout) as f:
         for line in f:
             if line.startswith("GMES"):
                 count_gmes += 1
             elif line.startswith("exit: "):
                 count_exit += 1     
-            elif line.startswith("ACCEPT") or line.startswith("SAFE_ACCEPT") \
-               or line.startswith("REJECT") or line.startswith("SAFE_REJECT"):
+            elif line.startswith("ACCEPT") or line.startswith("SAFE_ACCEPT"):
+                count_traj += 1
+                count_accept += 1
+            elif line.startswith("REJECT") or line.startswith("SAFE_REJECT"):
                 count_traj += 1
                 
     if count_traj < ntraj:
@@ -227,6 +232,10 @@ def hmc_check_ok(saveg, fout, ntraj):
     if count_exit < 1:
         print "HMC ok check fails: No exit in " + fout
         return ERR_BAD_OUTPUT
+
+    if count_accept < parg.minAR:
+        print "HMC ok check fails: %d acceptances < specified minimum %d"%(count_accept, parg.minAR)
+        return ERR_ACCEPT_RATE_TOO_LOW
         
     return ERR_NONE
     
