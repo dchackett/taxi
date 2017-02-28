@@ -11,8 +11,8 @@ def use_ethan_binary_paths():
     print "WARNING: No binaries for thermo-related spectroscopy (screening masses, P+A) on Summit!"
 
     specify_binary_paths(
-        hmc_binary='/home/etne1079/bin/summit/sun_mrep_hmc_icc_v8',
-        phi_binary='/home/etne1079/bin/summit/sun_mrep_phi_icc_v8',
+        hmc_binary='/home/etne1079/bin/summit/sun_mrep_hmc_icc_v8_dbl',
+        phi_binary='/home/etne1079/bin/summit/sun_mrep_phi_icc_v8_dbl',
         flow_binary='/home/etne1079/bin/summit/su4_wf_icc'
     )
 
