@@ -94,9 +94,7 @@ forget
     output_str += \
 """
 serial_scratch_wprop w.scr
-EOFif not os.path.exists(parg.binary):
-    print "FATAL: Binary {binary} does not exist".format(binary=parg.binary)
-    sys.exit(ERR_BINARY_DNE)
+EOF
 """
     
     return output_str
