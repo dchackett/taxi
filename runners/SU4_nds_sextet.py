@@ -19,6 +19,7 @@ ERR_SAVE_GAUGEFILE_DNE = 4
 ERR_SAVE_GAUGEFILE_ALREADY_EXISTS = 5
 ERR_FOUT_ALREADY_EXISTS = 6
 ERR_ACCEPT_RATE_TOO_LOW = 7
+ERR_BINARY_DNE = 8
 
 import os, sys
 import platform
@@ -245,7 +246,12 @@ def mkdir_p(path):
         os.makedirs(path)
             
 ### Body
-            
+
+## Check binary exists
+if not os.path.exists(parg.binary):
+    print "FATAL: Binary {binary} does not exist".format(binary=parg.binary)
+    sys.exit(ERR_BINARY_DNE)
+    
 # Check load gauge file exists
 if parg.loadg is not None and not os.path.exists(parg.loadg):
     print "FATAL: Gauge file {loadg} does not exist".format(loadg=parg.loadg)

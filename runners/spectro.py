@@ -13,6 +13,7 @@ ERR_BAD_OUTPUT = 2
 ERR_GAUGEFILE_DNE = 3
 ERR_FOUT_ALREADY_EXISTS = 4
 ERR_KAPPA_ZERO = 5
+ERR_BINARY_DNE = 6
 
 import os, sys
 import platform
@@ -93,7 +94,9 @@ forget
     output_str += \
 """
 serial_scratch_wprop w.scr
-EOF
+EOFif not os.path.exists(parg.binary):
+    print "FATAL: Binary {binary} does not exist".format(binary=parg.binary)
+    sys.exit(ERR_BINARY_DNE)
 """
     
     return output_str
@@ -138,6 +141,11 @@ def mkdir_p(path):
    
 ### Body -- Set up the environment to run the spectroscopy binary, and then run it
 
+## Check binary exists
+if not os.path.exists(parg.binary):
+    print "FATAL: Binary {binary} does not exist".format(binary=parg.binary)
+    sys.exit(ERR_BINARY_DNE)
+    
 ## Fail if we accidentally try to run with zero kappa
 if parg.kappa == 0:
     print "FATAL: Tried to run spectroscopy with kappa=0"

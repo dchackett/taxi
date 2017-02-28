@@ -10,6 +10,7 @@ ERR_OUTPUT_DNE = 1
 ERR_BAD_OUTPUT = 2
 ERR_GAUGEFILE_DNE = 3
 ERR_FOUT_ALREADY_EXISTS = 4
+ERR_BINARY_DNE = 5
 
 import os, sys
 import platform
@@ -89,6 +90,11 @@ def mkdir_p(path):
    
    
 ### Body -- Set up environment for flow binary call, then call it
+
+## Check binary exists
+if not os.path.exists(parg.binary):
+    print "FATAL: Binary {binary} does not exist".format(binary=parg.binary)
+    sys.exit(ERR_BINARY_DNE)
 
 ## Check load gauge file exists
 if not os.path.exists(parg.loadg):
