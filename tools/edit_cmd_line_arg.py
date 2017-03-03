@@ -13,6 +13,9 @@ parser.add_argument('--cla', type=str, required=True, help='Command line argumen
 parser.add_argument('--value', type=str, required=True, help='New value for command line argument')
 parser.add_argument('--cascade', dest='cascade', action='store_true', help='If provided and task is an HMC task, apply change to all rest of HMC tasks in stream as well (does not propagate to other streams that fork off).')
 parser.set_defaults(cascade=False)
+parser.add_argument('--new', dest='new_cla', action='store_true', help='Must provide this to set a new command line argument, versus altering an existing one.')
+parser.set_defaults(new_cla=False)
+
 
 parg = parser.parse_args(sys.argv[1:]) # Call like "python taxi.py ...args..."
 
@@ -123,17 +126,22 @@ print "Tasks to modify:", [t['id'] for t in target_tasks]
 for task in target_tasks:
     # Update
     if task['task_args']['cmd_line_args'].has_key(parg.cla):
-
-        task['task_args']['cmd_line_args'][parg.cla] = type(task['task_args']['cmd_line_args'][parg.cla])(parg.value)
-    
-        # Recompile, post to DB
-        task['task_args'] = json.dumps(task['task_args'])
-        with conn:
-            conn.execute("""
-                UPDATE tasks
-                SET task_args=?
-                WHERE id=?
-            """, (task['task_args'], task['id']))
+        if parg.new_cla:
+            print "WARNING: Task", task['id'], "already has command line arg", parg.cla
+        #task['task_args']['cmd_line_args'][parg.cla] = type(task['task_args']['cmd_line_args'][parg.cla])(parg.value)        
     else:
-        print "Task", task['id'], "does not have command line arg", parg.cla
-        print "CLAs present:", task['task_args']['cmd_line_args']
+        if not parg.new_cla:
+            print "Task", task['id'], "does not have command line arg", parg.cla
+            print "CLAs present:", task['task_args']['cmd_line_args']
+            continue # Don't make new CLAs if not told to do so explicitly
+        
+    task['task_args']['cmd_line_args'][parg.cla] = str(parg.value)
+    
+    # Recompile, post to DB
+    task['task_args'] = json.dumps(task['task_args'])
+    with conn:
+        conn.execute("""
+            UPDATE tasks
+            SET task_args=?
+            WHERE id=?
+        """, (task['task_args'], task['id']))
