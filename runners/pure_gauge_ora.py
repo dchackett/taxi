@@ -62,7 +62,7 @@ def build_ora_input_string(Ns, Nt, beta,
 nx {Ns}
 ny {Ns}
 nz {Ns}
-nt {Ns}
+nt {Nt}
 
 iseed {seed}
 
