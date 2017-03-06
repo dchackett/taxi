@@ -11,6 +11,7 @@ from random import seed, randint
 
 from tasks import CopyJob, SpawnJob, RespawnJob
 from tasks import HMCJob, HMCAuxJob # , NstepAdjustor
+from tasks import PureGaugeORAJob
 
 from tasks import SpectroJob, FileSpectroJob, HMCAuxSpectroJob
 from tasks import FlowJob, FileFlowJob, HMCAuxFlowJob
@@ -24,7 +25,7 @@ def mkdir_p(path):
         os.makedirs(path)
     
         
-### Stream-maker convenience functions
+### HMC stream-maker convenience functions
 def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_time,
                          start_count=0, N_traj=10, N_traj_safe=5,
                          gammarat=125., label='1',
@@ -58,7 +59,7 @@ def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_ti
     hmc_stream[0].branch_root = True
         
     return hmc_stream
-    
+
     
 def spectro_jobs_for_hmc_jobs(hmc_stream, req_time,
                             r0, irrep, kappa=None, screening=False,
@@ -93,7 +94,61 @@ def hrpl_jobs_for_hmc_jobs(hmc_stream, start_at_count=0):
         if hmc_job.count >= start_at_count:
             hrpl_jobs.append(HMCAuxHRPLJob(hmc_job))
     return hrpl_jobs
+
+
+### Pure gauge stream-maker convenience functions
+def make_ora_job_stream(Ns, Nt, beta,
+                        N_configs,
+                        starter, req_time,
+                        nsteps=4, qhb_steps=1,
+                        start_count=0, N_traj=100, warms=0,
+                        label='1',
+                        streamseed=None, seeds=None,
+                        ora_class=PureGaugeORAJob):
+
+    assert issubclass(ora_class, PureGaugeORAJob), "hmc_class must be an PureGaugeORAJob or a subclass thereof, not {ora}".format(ora=str(ora_class))
     
+    # Randomly generate a different seed for each hmc run
+    if streamseed is None:
+        streamseed = hash((Ns, Nt, beta, label))
+    seed(streamseed%10000)
+    
+    ora_stream = []
+    for cc, count in enumerate(range(start_count, start_count+N_configs)):
+        if seeds is None:        
+            job_seed = randint(0, 9999)
+        else:
+            job_seed = seeds[cc]
+            
+        new_job = ora_class(Ns=Ns, Nt=Nt, beta=beta,
+                         label=label, count=count, req_time=req_time, N_traj=N_traj,
+                         nsteps=nsteps, qhb_steps=qhb_steps, warms=warms,
+                         starter=starter, seed=job_seed)
+        
+        if isinstance(starter, PureGaugeORAJob):
+            new_job.depends_on.append(starter)
+        starter = new_job
+        ora_stream.append(new_job)
+        
+        warms = 0 # Only do warmups at beginning of stream
+        
+    # Let the first job know it's the beginning of a new branch/sub-trunk
+    ora_stream[0].branch_root = True
+        
+    return ora_stream        
+
+
+def flow_jobs_for_ora_jobs(ora_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
+    flow_jobs = []
+    for ora_job in ora_stream:
+        if not isinstance(ora_job, PureGaugeORAJob):
+            continue
+        if ora_job.count >= start_at_count:
+            new_job = FileFlowJob(ora_job.saveg, req_time=req_time,
+                        tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon)
+            new_job.depends_on = [ora_job]
+            flow_jobs.append(new_job)
+    return flow_jobs
 
 
 ### Tools for running measurements on pre-existing gauge files
@@ -152,6 +207,11 @@ def parse_params_from_HMCJob(hmc_job):
             'beta' : hmc_job.beta,
             'k4' : hmc_job.k4,
             'k6' : hmc_job.k6}
+    
+def parse_params_from_PGJob(pg_job):
+    return {'Ns' : pg_job.Ns,
+            'Nt' : pg_job.Nt,
+            'beta' : pg_job.beta}
         
 def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=None):
     copy_jobs = []
@@ -161,6 +221,9 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
             parsed_params = parse_params_from_HMCJob(job)
         elif isinstance(job, HMCAuxJob):
             parsed_params = parse_params_from_HMCJob(job.hmc_job)
+        elif isinstance(job, PureGaugeORAJob):
+            parsed_params = parse_params_from_PGJob(job)
+            
         elif hasattr(job, 'fout'):
             # Duck typing -- parse necessary parameters out of whatever file exists
             parsed_params = parse_params_from_fn(job.fout)
@@ -173,7 +236,10 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
         
         # Build multirep path structure
         vol_subdir = '/{Ns}x{Nt}/'.format(**parsed_params)
-        mrep_subdir = '/{beta}/{k4}_{k6}/'.format(**parsed_params)
+        if parsed_params.has_key('k4') and parsed_params.has_key('k6'):
+            coupling_subdir = '/{beta}/{k4}_{k6}/'.format(**parsed_params)
+        else:
+            coupling_subdir = '/{beta}/'.format(**parsed_params)
         
         ## Copy jobs for outputs from binaries
         if data_dir is not None:
@@ -182,6 +248,8 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
             # Output-type-specific path structure
             if   isinstance(job, HMCJob):
                 fout_path += 'hmc/'
+            elif isinstance(job, PureGaugeORAJob):
+                fout_path += 'ora/'
             elif isinstance(job, SpectroJob):
                 if job.irrep == 'f':
                     fout_path += 'spec4_r{r0:g}/'.format(r0=job.r0)
@@ -195,7 +263,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
                 # Don't know how to name this output file
                 continue
 
-            fout_path += mrep_subdir
+            fout_path += coupling_subdir
 
             new_copy_job = CopyJob(src=job.fout,
                                    dest=os.path.abspath(fout_path + '/' + job.fout))
@@ -204,7 +272,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
         
         ## Copy jobs for saved gauge files
         if gauge_dir is not None and hasattr(job, 'saveg') and job.saveg is not None:
-            saveg_path = gauge_dir + vol_subdir + mrep_subdir
+            saveg_path = gauge_dir + vol_subdir + coupling_subdir
             new_copy_job = CopyJob(src=job.saveg,
                                    dest=os.path.abspath(saveg_path + '/' + job.saveg))
             new_copy_job.depends_on = [job]
@@ -215,7 +283,7 @@ def copy_jobs_to_sort_output(job_pool, data_dir=None, gauge_dir=None, prop_dir=N
             savep_path = prop_dir 
             savep_path += ('prop4' if job.irrep == 'f' else 'prop6')
             savep_path += '_r{r0:g}/'.format(r0=job.r0)
-            savep_path += vol_subdir + mrep_subdir
+            savep_path += vol_subdir + coupling_subdir
             
             new_copy_job = CopyJob(src=job.fout,
                                    dest=os.path.abspath(savep_path + '/' + job.savep),

@@ -47,7 +47,94 @@ class CopyJob(Job):
                     'src' : self.src,
                     'dest' : self.dest
                 }
-            })
+            })    
+
+
+class PureGaugeORAJob(Job):
+    pg_script = 'pure_gauge_ora.py'
+    pg_binary_path = '/path/to/ora/binary'
+    
+    def __init__(self, Ns, Nt, beta, label, count,
+                 req_time,
+                 N_traj, nsteps, qhb_steps,
+                 starter, seed,
+                 warms=0,
+                 **kwargs):
+        super(PureGaugeORAJob, self).__init__(req_time=req_time, **kwargs)
+        
+        self.trunk = True # This is a 'trunk' job -- stream forks on these
+        
+        # Physical parameters
+        self.Ns = Ns
+        self.Nt = Nt
+        self.beta = beta
+        
+        self.req_time = req_time
+        self.count = count
+        
+        # Stream/ensemble name, filesystem
+        self.label = label
+        self.generate_ensemble_name()
+        self.generate_gaugefilename()
+        self.generate_outfilename()
+        
+        # Deterministically generate a stream seed if none is provided
+        self.seed = seed
+            
+        # Integrator parameters
+        self.N_traj = N_traj
+        self.nsteps = nsteps
+        self.qhb_steps = qhb_steps
+        self.warms = warms
+                
+        # How to start stream
+        self.starter = starter
+        if isinstance(starter, PureGaugeORAJob) or starter is None:
+            pass
+        elif isinstance(starter, str):
+            assert os.path.exists(starter)
+        else:
+            raise Exception("Invalid starter {s}".format(s=starter))
+            
+    def generate_ensemble_name(self):
+        self.ensemble_name = "{Ns}_{Nt}_{beta}_{label}".format(Ns=self.Ns, Nt=self.Nt, beta=self.beta, label=self.label)
+    def generate_gaugefilename(self):
+        self.saveg = "Gauge_" + self.ensemble_name + "_{count}".format(count=self.count)
+    def generate_outfilename(self):
+        self.fout = "out_" + self.ensemble_name + "_{count}".format(count=self.count)
+            
+    def compile(self):
+        super(PureGaugeORAJob, self).compile()
+        
+        cmd_line_args = {
+            "binary" : self.pg_binary_path,
+            "seed"   : self.seed,
+            "warms"  : self.warms,
+            "ntraj" : self.N_traj,
+            "nsteps" : self.nsteps,
+            "qhb_steps" : self.qhb_steps,
+            "Ns" : self.Ns, "Nt" : self.Nt,
+            "beta" : self.beta,
+            "fout" : self.fout, "saveg" : self.saveg
+        }
+        
+        # Load gauge configuration: behavior cases (starter=None -> No loadg -> fresh start)
+        if isinstance(self.starter, PureGaugeORAJob):
+            cmd_line_args["loadg"] = self.starter.saveg
+        elif isinstance(self.starter, str):
+            cmd_line_args["loadg"] = self.starter
+        else:
+            pass # Providing no --loadg tells the HMC runner to do a fresh start
+                                 
+        # Package in to JSON forest format
+        self.compiled.update({
+            'task_type' : 'run_script',
+            'task_args' : {
+                'script' : self.pg_script,
+                'ncpu_fmt' : "--cpus {cpus}",
+                'cmd_line_args' : cmd_line_args
+            }
+        })
             
             
 class HMCJob(Job):
@@ -59,7 +146,9 @@ class HMCJob(Job):
                  req_time,
                  N_traj, N_traj_safe, nsteps, nsteps_gauge,
                  starter, seed,
-                 enable_metropolis=True, **kwargs):
+                 enable_metropolis=True,
+                 nsteps2=None, shift=0.2, # Hasenbuch disabled by default
+                 **kwargs):
         super(HMCJob, self).__init__(req_time=req_time, **kwargs)
         
         self.trunk = True # This is a 'trunk' job -- stream forks on these
@@ -90,6 +179,10 @@ class HMCJob(Job):
         self.N_traj_safe = N_traj_safe       
         self.nsteps = nsteps
         self.nsteps_gauge = nsteps_gauge
+        
+        assert (nsteps2 is None) or (shift is not None), "Must provide nsteps2 AND shift for Hasenbuch preconditioning; passed nsteps2={nsteps2} and shift={shift}".format(nsteps2=nsteps2, shift=shift)
+        self.nsteps2 = nsteps2
+        self.shift = shift
         
         # How to start stream
         self.starter = starter
@@ -132,6 +225,11 @@ class HMCJob(Job):
         else:
             pass # Providing no --loadg tells the HMC runner to do a fresh start
         
+        # Hasenbuch, if enabled
+        if self.nsteps2 is not None and self.shift is not None:
+            cmd_line_args['nsteps2'] = self.nsteps2
+            cmd_line_args['shift'] = self.shift
+                         
         # Package in to JSON forest format
         self.compiled.update({
             'task_type' : 'run_script',
@@ -603,12 +701,15 @@ class RespawnJob(Job):
         
 ### Functions for localization convenience
 def specify_binary_paths(hmc_binary=None, phi_binary=None,
+                         ora_binary=None,
                          flow_binary=None,
                          hrpl_binary=None):
     if hmc_binary is not None:
         HMCJob.hmc_binary_path = os.path.abspath(hmc_binary)
     if phi_binary is not None:
         HMCJob.phi_binary_path = os.path.abspath(phi_binary)
+    if ora_binary is not None:
+        PureGaugeORAJob.pg_binary_path = os.path.abspath(ora_binary)
     if flow_binary is not None:
         FlowJob.flow_binary_path = os.path.abspath(flow_binary)
     if hrpl_binary is not None:
@@ -623,6 +724,8 @@ def specify_dir_with_runner_scripts(run_script_dir):
     HMCJob.hmc_script = os.path.join(run_script_dir, HMCJob.hmc_script)
     SextetHMCJob.hmc_script = os.path.join(run_script_dir, SextetHMCJob.hmc_script)
     FundamentalHMCJob.hmc_script = os.path.join(run_script_dir, FundamentalHMCJob.hmc_script)
+    
+    PureGaugeORAJob.pg_script = os.path.join(run_script_dir, PureGaugeORAJob.pg_script )
     
     SpectroJob.spectro_script = os.path.join(run_script_dir, SpectroJob.spectro_script)
     FlowJob.flow_script = os.path.join(run_script_dir, FlowJob.flow_script)
