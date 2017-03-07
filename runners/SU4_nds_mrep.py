@@ -262,7 +262,7 @@ def hmc_check_ok(saveg, fout, ntraj):
             elif line.startswith("REJECT") or line.startswith("SAFE_REJECT"):
                 count_traj += 1
                 
-    if ( (count_traj < ntraj) and (count_gmes < ntraj) ):
+    if (count_traj < ntraj) and (count_gmes < ntraj):
         print "HMC ok check fails: Not enough GMES or ACCEPT/REJECT in " + fout + " %d/%d, %d/%d"%(ntraj,count_traj,ntraj,count_gmes)
         return ERR_BAD_OUTPUT
         
