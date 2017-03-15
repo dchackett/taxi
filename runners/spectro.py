@@ -35,6 +35,7 @@ parser.add_argument('--kappa',  type=float, required=True,  help='Kappa paramete
 parser.add_argument('--r0',     type=float, required=True,  help='Source/sink smearing radius parameter.  If 0, uses "point" instead of "gaussian".')
 
 parser.add_argument('--maxcgiter',  type=int, default=500,   help='Maximum number of CG iterations')
+parser.add_argument('--cgtol', type=float, default=1e-6, help='CG error/site tolerance')
 
 parser.add_argument('--loadg',  type=str,   required=True,  help='Path + filename of gauge configuration to load and start from.')
 parser.add_argument('--fout',   type=str,   required=True,  help='Path + filename to write out file to.')
@@ -47,7 +48,7 @@ parg = parser.parse_args(sys.argv[1:])
  
 ### Function to build input string for spectroscopy binary
 ### Beware, long here-docs to follow
-def build_spectro_input_string(Ns, Nt, kappa, r0, maxcgiter,
+def build_spectro_input_string(Ns, Nt, kappa, r0, maxcgiter, cgtol,
                                loadg, loadp, savep, **kwargs):
     output_str = \
 """
@@ -65,8 +66,8 @@ clov_c 1.0
 u0 1.0
 max_cg_iterations {maxcgiter}
 max_cg_restarts 10
-error_for_propagator 1e-06
-""".format(Ns=Ns, Nt=Nt, kappa=kappa, maxcgiter=maxcgiter)
+error_for_propagator {cgtol}
+""".format(Ns=Ns, Nt=Nt, kappa=kappa, maxcgiter=maxcgiter, cgtol=cgtol)
 
     if r0 == 0:
         output_str += "point\n"
