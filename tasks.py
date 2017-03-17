@@ -336,6 +336,7 @@ class SpectroJob(Job):
 
     def __init__(self, req_time,
                  kappa, irrep, r0,
+                 cgtol=None,
                  screening=False, p_plus_a=False, do_baryons=False,
                  save_prop=False, **kwargs):
         super(SpectroJob, self).__init__(req_time=req_time, **kwargs)
@@ -347,7 +348,9 @@ class SpectroJob(Job):
         self.screening = screening
         self.p_plus_a = p_plus_a
         self.do_baryons = do_baryons
-        
+
+        self.cgtol = cgtol
+
         # Irrep convention: f, as2
         assert (isinstance(irrep, str) and irrep.lower() in ['f', 'as2', 'a2', '4', '6']) \
             or (isinstance(irrep, int) and irrep in [4,6])
@@ -394,7 +397,10 @@ class SpectroJob(Job):
         }
         
         if self.savep is not None:
-            cmd_line_args.append("--savep %s"%self.savep)
+            cmd_line_args["savep"] = self.savep
+
+        if self.cgtol is not None:
+            cmd_line_args["cgtol"] = self.cgtol
             
         # Package in to JSON forest format
         self.compiled.update({

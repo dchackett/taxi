@@ -64,16 +64,17 @@ def make_hmc_job_stream(Ns, Nt, beta, k4, k6, N_configs, nsteps, starter, req_ti
 
     
 def spectro_jobs_for_hmc_jobs(hmc_stream, req_time,
-                            r0, irrep, kappa=None, screening=False,
-                            p_plus_a=False, save_prop=False, start_at_count=10):
+                            r0, irrep, kappa=None, cgtol=None,
+                            screening=False, p_plus_a=False,
+                            save_prop=False, start_at_count=10):
     spectro_jobs = []
     for hmc_job in hmc_stream:
         if not isinstance(hmc_job, HMCJob):
             continue
         if hmc_job.count >= start_at_count:
             spectro_jobs.append(HMCAuxSpectroJob(hmc_job, req_time=req_time,
-                                                irrep=irrep, r0=r0, kappa=kappa, screening=screening,
-                                                p_plus_a=p_plus_a, save_prop=save_prop))
+                                                irrep=irrep, r0=r0, kappa=kappa, cgtol=cgtol,
+                                                screening=screening, p_plus_a=p_plus_a, save_prop=save_prop))
     return spectro_jobs
     
     
@@ -154,12 +155,12 @@ def flow_jobs_for_ora_jobs(ora_stream, req_time, tmax, minE=0, mindE=0, epsilon=
 
 
 ### Tools for running measurements on pre-existing gauge files
-def spectro_jobs_for_gaugefiles(gaugefiles, req_time, r0, irrep, screening=False,
-                                p_plus_a=False, do_baryons=False, save_prop=False):
+def spectro_jobs_for_gaugefiles(gaugefiles, req_time, r0, irrep, cgtol=None,
+                                screening=False, p_plus_a=False, do_baryons=False, save_prop=False):
     spectro_jobs = []
     for gfn in map(os.path.abspath, gaugefiles):
         assert os.path.exists(gfn), "Gaugefile {gfn} does not exist to run spectroscopy on".format(gfn=gfn)
-        spectro_jobs.append(FileSpectroJob(loadg=gfn, req_time=req_time, irrep=irrep, r0=r0,
+        spectro_jobs.append(FileSpectroJob(loadg=gfn, req_time=req_time, irrep=irrep, r0=r0, cgtol=cgtol,
                                            screening=screening, p_plus_a=p_plus_a,
                                            do_baryons=do_baryons, save_prop=save_prop))
     return spectro_jobs
