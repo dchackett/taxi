@@ -28,7 +28,11 @@ def use_dan_binary_paths():
     # Screening
     specify_spectro_binary_path('/projects/daha5747/bin/su4_f_clov_cg_s',   irrep='f',   p_plus_a=False, screening=True, do_baryons=False)
     specify_spectro_binary_path('/projects/daha5747/bin/su4_as2_clov_cg_s', irrep='as2', p_plus_a=False, screening=True, do_baryons=False)
-                
+
+    # P+A
+    specify_spectro_binary_path('/projects/daha5747/bin/su4_f_clov_cg_pa',   irrep='f',   p_plus_a=True, screening=False, do_baryons=False)
+    specify_spectro_binary_path('/projects/daha5747/bin/su4_as2_clov_cg_pa', irrep='as2', p_plus_a=True, screening=False, do_baryons=False)
+
     # Screening P+A
     specify_spectro_binary_path('/projects/daha5747/bin/su4_f_clov_cg_s_pa',   irrep='f',   p_plus_a=True, screening=True, do_baryons=False)
     specify_spectro_binary_path('/projects/daha5747/bin/su4_as2_clov_cg_s_pa', irrep='as2', p_plus_a=True, screening=True, do_baryons=False)
