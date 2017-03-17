@@ -52,6 +52,7 @@ parser.add_argument('--minAR',    type=int,   default=4,      help='Minimum numb
 
 parser.add_argument('--maxcgobs',  type=int,   default=500,  help='Maximum number of CG iterations to run for fermion observables.')
 parser.add_argument('--maxcgpf',   type=int,   default=500,  help='Maximum number of CG iterations to run for pseudofermions.')
+parser.add_argument('--cgtol',   type=float, default=1e-06,  help='Maximum CG error per site for pseudofermions and fermion observables.')
 
 parser.add_argument('--Ns',       type=int,   required=True,  help='Number of lattice points in spatial direction.')
 parser.add_argument('--Nt',       type=int,   required=True,  help='Number of lattice points in temporal direction.')
@@ -73,7 +74,7 @@ parg = parser.parse_args(sys.argv[1:])
 def build_hmc_input_string(Ns, Nt, beta, gammarat, k4, k6,
                            seed, warms, ntraj, trajL, tpm, nsafe,
                            nsteps1, nsteps2, nstepsg, shift,
-                           maxcgobs, maxcgpf,
+                           maxcgobs, maxcgpf, cgtol,
                            loadg, saveg, **kwargs):
     output_str = \
 """
@@ -93,10 +94,10 @@ gammarat {gammarat}
 ## fermion observables
 max_cg_iterations {maxcgobs}
 max_cg_restarts 10
-error_per_site 1.0e-06
+error_per_site {cgtol}
     
 ## dynamical fermions
-nkappas 1""".format(Ns=Ns, Nt=Nt, seed=seed, beta=beta, gammarat=gammarat, maxcgobs=maxcgobs)
+nkappas 1""".format(Ns=Ns, Nt=Nt, seed=seed, beta=beta, gammarat=gammarat, maxcgobs=maxcgobs, cgtol=cgtol)
 
     if nsteps2 is None:
         # No Hasenbuch
@@ -133,8 +134,8 @@ level 1            # which MD update level
 shift1 {shift}     # for simulating det(M^dag M + shift1^2)
 iters {maxcgpf}    # CG iterations
 rstrt 10           # CG restarts
-resid 1.0e-6       # CG stopping condition
-""".format(k6=k6, shift=shift, maxcgpf=maxcgpf)
+resid {cgtol}       # CG stopping condition
+""".format(k6=k6, shift=shift, maxcgpf=maxcgpf, cgtol=cgtol)
 
     if nsteps2 is not None:
         # Second pseudofermion level for Hasenbuch
@@ -149,8 +150,8 @@ shift1 .0          # simulates det(M^dag M + shift1^2)/det(M^dag M + shift2^2)
 shift2 {shift}
 iters {maxcgpf}    # CG iterations
 rstrt 10           # CG restarts
-resid 1.0e-6       # CG stopping condition
-""".format(shift=shift, maxcgpf=maxcgpf)
+resid {cgtol}       # CG stopping condition
+""".format(shift=shift, maxcgpf=maxcgpf, cgtol=cgtol)
 
     output_str += \
 """
