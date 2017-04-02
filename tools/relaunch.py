@@ -28,7 +28,10 @@ parg = parser.parse_args(sys.argv[1:]) # Call like "python taxi.py ...args..."
 
 
 ### Defaults, error checking, and massaging
-forest_file = os.path.abspath(parg.forest)
+def truepath(fn):
+    return os.path.abspath(os.path.realpath(os.path.expanduser(fn)))
+
+forest_file = truepath(parg.forest)
 if not os.path.exists(forest_file):
     raise Exception("Specified forest {fn} does not exist".format(fn=forest_file))
     
@@ -36,7 +39,7 @@ if not os.path.exists(forest_file):
 #    taxi_shell_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/taxi.sh' # ../taxi.sh
 #else:
 #    taxi_shell_script = os.path.abspath(parg.dshell) + '/taxi.sh'
-taxi_shell_script = os.path.abspath(os.path.join(install_dir, 'taxi.sh'))
+taxi_shell_script = truepath(os.path.join(install_dir, 'taxi.sh'))
 if not os.path.exists(taxi_shell_script):
     raise Exception("{fn} does not exist.".format(fn=taxi_shell_script))
 
@@ -45,7 +48,7 @@ if work_dir is None:
     if parg.launch:
         raise Exception("Must specify working directory to launch taxi.")    
 else:
-    work_dir = os.path.abspath(work_dir)
+    work_dir = truepath(work_dir)
 
 ### Open forest db
 conn = sqlite3.connect(forest_file)
