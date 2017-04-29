@@ -9,7 +9,6 @@ from tasks import specify_binary_paths, specify_dir_with_runner_scripts, specify
 
 def use_dan_binary_paths():
     print "WARNING: No binaries for baryon spectroscopy on CU"
-    print "WARNING: No P+A non-screening-mass binaries on CU"
     print "WARNING: No phi binary exists on CU presently"
     
     specify_binary_paths(
@@ -22,6 +21,10 @@ def use_dan_binary_paths():
     specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',   irrep='f',   p_plus_a=False, screening=False, do_baryons=False)
     specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg', irrep='as2', p_plus_a=False, screening=False, do_baryons=False)
                 
+    # P+A
+    specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_pa',   irrep='f',   p_plus_a=True, screening=False, do_baryons=False)
+    specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_pa', irrep='as2', p_plus_a=True, screening=False, do_baryons=False)
+
     # Screening P+A
     specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_s_pa',   irrep='f',   p_plus_a=True, screening=True, do_baryons=False)
     specify_spectro_binary_path('/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_s_pa', irrep='as2', p_plus_a=True, screening=True, do_baryons=False)
