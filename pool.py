@@ -27,8 +27,17 @@ class Pool(object):
         self.work_dir = work_dir
         self.log_dir = log_dir
 
-    ### Backend interaction ###
+    def _taxi_id(self, my_taxi):
+        ## Polymorphism!  (I wonder if there's a cleaner Python way to do this...)
+        if type(my_taxi) == taxi.Taxi:
+            return my_taxi.id
+        elif type(my_taxi) == int:
+            return my_taxi
+        else:
+            raise TypeError
 
+    ### Backend interaction ###
+    
     def get_all_taxis_in_pool(self):
         raise NotImplementedError
 
@@ -233,13 +242,6 @@ class SQLitePool(Pool):
             all_taxis.append(row_taxi)
 
         return all_taxis
-
-    def _taxi_id(self, my_taxi):
-        ## Polymorphism!  (I wonder if there's a cleaner Python way to do this...)
-        if my_taxi.__class__ == taxi.Taxi:
-            return my_taxi.id
-        elif my_taxi.__class__ == int:
-            return my_taxi
 
     def get_taxi(self, my_taxi):
         taxi_id = self._taxi_id(my_taxi)

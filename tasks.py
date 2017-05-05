@@ -28,7 +28,32 @@ class Job(object):
             self.compiled['depends_on'] = None
         else:
             self.compiled['depends_on'] = [d.job_id for d in self.depends_on]
-            
+
+    def count_unresolved_dependencies(self, task_blob):
+        """Looks at the status of all jobs in the job forest DB that 'task' depends upon.
+        Counts up number of jobs that are not complete, and number of jobs that are failed.
+        Returns tuple (n_unresolved, n_failed)"""
+        
+        dependencies = self.depends_on
+        
+        # Sensible behavior for dependency-tree roots
+        if dependencies is []:
+            return 0, 0
+        
+        # Count up number of incomplete, number of failed
+        N_unresolved = 0
+        N_failed = 0
+        for dep_job in dependencies:
+            dependency_id = dep_job.job_id
+            if not task_blob.has_key(dependency_id):
+                continue # Completes weren't requested in task blob
+            dependency_status = task_blob[dependency_id]['status']
+            if dependency_status != 'complete':
+                N_unresolved += 1
+            if dependency_status == 'failed':
+                N_failed += 1
+
+        return N_unresolved, N_failed
 
 class CopyJob(Job):
     def __init__(self, src, dest, req_time=60, **kwargs):

@@ -8,6 +8,7 @@ class Taxi(object):
         self.time_limit = time_limit
         self.node_limit = node_limit
         self.time_last_submitted = None
+        self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
 
     def taxi_name(self):
