@@ -23,9 +23,13 @@ class Pool(object):
         'E',    # error in queue submission
     ]
 
-    def __init__(self, work_dir, log_dir):
+    def __init__(self, work_dir, log_dir, thrash_delay=300):
         self.work_dir = work_dir
         self.log_dir = log_dir
+
+        ## thrash_delay sets the minimum time between taxi resubmissions, in seconds.
+        ## Default is 5 minutes.
+        self.thrash_delay = thrash_delay
 
     def _taxi_id(self, my_taxi):
         ## Polymorphism!  (I wonder if there's a cleaner Python way to do this...)
@@ -64,7 +68,13 @@ class Pool(object):
     ### Queue interaction ###
 
     def check_for_thrashing(self, my_taxi):
-        raise NotImplementedError
+        last_submit = self.get_taxi(my_taxi).time_last_submitted
+
+        if last_submit is None:
+            return False
+        else:
+            return (last_submit - time.time()) < self.thrash_delay
+
 
     def submit_taxi_to_queue(self, my_taxi, queue):
         # Don't submit hold/error status taxis

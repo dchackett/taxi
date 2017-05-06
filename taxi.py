@@ -11,6 +11,17 @@ class Taxi(object):
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
 
+    def __eq__(self, other):
+        eq = (self.id == other.id)
+        eq = eq and (self.pool_name == other.pool_name)
+        eq = eq and (self.time_limit == other.time_limit)
+        eq = eq and (self.node_limit == other.node_limit)
+        eq = eq and (self.time_last_submitted == other.time_last_submitted)
+        eq = eq and (self.start_time == other.start_time)
+        eq = eq and (self.status == other.status)
+
+        return eq
+
     def taxi_name(self):
         return '{0:s}_{1:d}'.format(self.pool_name, self.id)
 
