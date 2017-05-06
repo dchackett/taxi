@@ -166,7 +166,65 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
         self.assertTrue(my_queue.launch_taxi.call_args_list[1][0][0] == self.taxi_two)
         self.assertEqual(my_queue.launch_taxi.call_count, 2)  ## Only taxis 1 and 2 should be submitted
 
+    def test_check_thrashing(self):
+        with self.test_pool:
+            self.test_pool.update_taxi_last_submitted(self.taxi_one, time.time())
+            self.test_pool.update_taxi_last_submitted(self.taxi_two, time.time() - 3600.)
 
+            self.assertTrue(self.test_pool.check_for_thrashing(self.taxi_one))
+            self.assertFalse(self.test_pool.check_for_thrashing(self.taxi_two))
+
+
+    def test_submit_to_queue(self):
+        my_queue = BatchQueue()
+        my_queue.launch_taxi = mock.MagicMock()
+
+        with self.test_pool:
+            self.test_pool.update_taxi_last_submitted(self.taxi_two, time.time())
+            self.test_pool.update_taxi_status(self.taxi_three, 'I')
+
+            self.test_pool.submit_taxi_to_queue(self.taxi_one, my_queue)
+            self.test_pool.submit_taxi_to_queue(self.taxi_two, my_queue)
+
+            self.assertEqual(my_queue.launch_taxi.call_count, 1)
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'H')
+
+            my_queue.launch_taxi.side_effect = BaseException()
+            self.assertRaises(BaseException, self.test_pool.submit_taxi_to_queue, self.taxi_three, my_queue)
+
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'E')
+
+
+    def test_delete_from_queue(self):
+        my_queue = BatchQueue()
+        mock_status = {
+            'status': 'R',
+            'job_numbers': [123, 456, 789],
+            'running_time': [4750.2, 3889.3, 1341.4], 
+        }
+        mock_status_two = {
+            'status': 'X',
+            'job_numbers': [],
+            'running_time': [],
+        }
+
+        my_queue.report_taxi_status = mock.MagicMock(return_value=mock_status)
+        my_queue.cancel_job = mock.MagicMock()
+
+        with self.test_pool:
+            self.test_pool.remove_taxi_from_queue(self.taxi_one, my_queue)
+            self.assertEquals(my_queue.cancel_job.call_args_list, [mock.call(123),mock.call(456),mock.call(789)])
+
+            my_queue.report_taxi_status = mock.MagicMock(return_value=mock_status_two)
+            my_queue.cancel_job.call_count = 0
+
+            self.test_pool.remove_taxi_from_queue(self.taxi_two, my_queue)
+            self.assertEqual(my_queue.cancel_job.call_count, 0)
+
+
+            
+    def test_update_all_queue_status(self):
+        raise NotImplementedError
 
     
 

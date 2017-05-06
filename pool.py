@@ -73,7 +73,7 @@ class Pool(object):
         if last_submit is None:
             return False
         else:
-            return (last_submit - time.time()) < self.thrash_delay
+            return (time.time() - last_submit) < self.thrash_delay
 
 
     def submit_taxi_to_queue(self, my_taxi, queue):
@@ -85,7 +85,7 @@ class Pool(object):
 
         if (self.check_for_thrashing(my_taxi)):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {}; set to hold.".format(taxi)
+            print "Thrashing detected for taxi {}; set to hold.".format(my_taxi)
             self.update_taxi_status(my_taxi, 'H')
             return
 
@@ -147,11 +147,12 @@ class SQLitePool(Pool):
     Concrete implementation of the Pool class using an SQLite backend.
     """
 
-    def __init__(self, db_path, pool_name, work_dir, log_dir):
+    def __init__(self, db_path, pool_name, work_dir, log_dir, thrash_delay=300):
         self.db_path = db_path
         self.pool_name = pool_name
         self.work_dir = work_dir
         self.log_dir = log_dir
+        self.thrash_delay = thrash_delay
 
         self.conn = None
 
