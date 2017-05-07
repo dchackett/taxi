@@ -224,7 +224,35 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
 
             
     def test_update_all_queue_status(self):
-        raise NotImplementedError
+        my_queue = BatchQueue()
+
+        mock_status = {
+            'status': 'Q',
+            'job_numbers': [193],
+            'running_time': [4902.4],
+        }
+
+        status_list = [ mock_status.copy() for i in range(3) ]
+
+        status_list[1]['status'] = 'X'
+        status_list[2]['status'] = 'X'
+
+        with self.test_pool:
+            self.test_pool.update_taxi_status(self.taxi_two, 'R')
+
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'I')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'R')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H')
+
+            my_queue.report_taxi_status = mock.MagicMock(side_effect=status_list)
+            self.test_pool.update_all_taxis_queue_status(my_queue)
+
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'Q')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'I')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H')
+
+
+
 
     
 

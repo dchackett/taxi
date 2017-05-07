@@ -115,7 +115,7 @@ class Pool(object):
     def update_all_taxis_queue_status(self, queue):
         taxi_list = self.get_all_taxis_in_pool()
         for my_taxi in taxi_list:
-            queue_status = queue.report_taxi_status(taxi)
+            queue_status = queue.report_taxi_status(taxi)['status']
             if queue_status in ('Q', 'R'):
                 self.update_taxi_status(my_taxi, queue_status)
             elif queue_status == 'X':
