@@ -32,7 +32,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
     def test_write_tables(self):
         with self.test_pool:
-            empty_taxis = self.test_pool.conn.execute("""SELECT id, pool_name, time_limit, time_last_submitted, 
+            empty_taxis = self.test_pool.conn.execute("""SELECT name, pool_name, time_limit, time_last_submitted, 
                 status, node_limit FROM taxis""").fetchall()
             pools = map(dict, self.test_pool.conn.execute("""SELECT name, working_dir, log_dir FROM pools""").fetchall())
 
@@ -45,7 +45,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
     def test_read_write_taxi(self):
         with self.test_pool:
-            taxi_one = taxi.Taxi(time_limit=4000, node_limit=8)
+            taxi_one = taxi.Taxi(time_limit=4000, node_limit=8, name="one")
             taxi_one = self.test_pool.register_new_taxi(taxi_one)
 
             taxi_list = self.test_pool.get_all_taxis_in_pool()
@@ -53,7 +53,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
             taxi_one_return = taxi_list[0]
 
-            self.assertEqual(taxi_one_return.id, 1)
+            self.assertEqual(taxi_one_return.name, "one")
             self.assertEqual(taxi_one_return.time_limit, taxi_one.time_limit)
             self.assertEqual(taxi_one_return.node_limit, taxi_one.node_limit)
             self.assertEqual(taxi_one_return.time_last_submitted, None)
@@ -80,8 +80,8 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
         super(TestSQLitePoolWithTaxis, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000, node_limit=8)
-            self.taxi_two = taxi.Taxi(time_limit=9999, node_limit=1)
+            self.taxi_one = taxi.Taxi(time_limit=4000, node_limit=8, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999, node_limit=1, name="two")
 
             self.taxi_one = self.test_pool.register_new_taxi(self.taxi_one)
             self.taxi_two = self.test_pool.register_new_taxi(self.taxi_two)
@@ -97,20 +97,20 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
 
             taxi_two_return = taxi_list[1]
 
-            self.assertEqual(taxi_two_return.id, 2)
+            self.assertEqual(taxi_two_return.name, "two")
             self.assertEqual(taxi_two_return.time_limit, self.taxi_two.time_limit)
 
-            taxi_one_return = self.test_pool.get_taxi(1)
+            taxi_one_return = self.test_pool.get_taxi("one")
 
-            self.assertEqual(taxi_one_return.id, 1)
+            self.assertEqual(taxi_one_return.name, "one")
             self.assertEqual(taxi_one_return.time_limit, self.taxi_one.time_limit)
 
-    def test_get_taxi_by_object_or_id(self):
+    def test_get_taxi_by_object_or_name(self):
         with self.test_pool:
             taxi_one_return = self.test_pool.get_taxi(self.taxi_one)
             self.assertEqual(taxi_one_return.time_limit, self.taxi_one.time_limit)
 
-            taxi_two_return = self.test_pool.get_taxi(self.taxi_two.id)
+            taxi_two_return = self.test_pool.get_taxi(self.taxi_two.name)
             self.assertEqual(taxi_two_return.time_limit, self.taxi_two.time_limit)
 
     def test_update_status_and_last_submit(self):
@@ -120,7 +120,7 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
             self.assertEqual(taxi_one_return.status, 'Q')
 
             self.test_pool.update_taxi_last_submitted(self.taxi_two, 13985738.5)
-            taxi_two_return = self.test_pool.get_taxi(self.taxi_two.id)
+            taxi_two_return = self.test_pool.get_taxi(self.taxi_two.name)
             self.assertEqual(taxi_two_return.time_last_submitted, 13985738.5)
 
 
@@ -139,9 +139,9 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
         super(TestSQLitePoolQueueInteraction, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000., node_limit=8)
-            self.taxi_two = taxi.Taxi(time_limit=9999., node_limit=1)
-            self.taxi_three = taxi.Taxi(time_limit=4040., node_limit=8)
+            self.taxi_one = taxi.Taxi(time_limit=4000., node_limit=8, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999., node_limit=1, name="two")
+            self.taxi_three = taxi.Taxi(time_limit=4040., node_limit=8, name="three")
 
             self.taxi_one = self.test_pool.register_new_taxi(self.taxi_one)
             self.taxi_two = self.test_pool.register_new_taxi(self.taxi_two)
@@ -250,10 +250,6 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
             self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'Q')
             self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'I')
             self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H')
-
-
-
-
     
 
 

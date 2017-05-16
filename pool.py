@@ -31,11 +31,11 @@ class Pool(object):
         ## Default is 5 minutes.
         self.thrash_delay = thrash_delay
 
-    def _taxi_id(self, my_taxi):
+    def _taxi_name(self, my_taxi):
         ## Polymorphism!  (I wonder if there's a cleaner Python way to do this...)
         if type(my_taxi) == taxi.Taxi:
-            return my_taxi.id
-        elif type(my_taxi) == int:
+            return my_taxi.name
+        elif type(my_taxi) == str:
             return my_taxi
         else:
             raise TypeError
@@ -123,7 +123,7 @@ class Pool(object):
                 if pool_status in ('E', 'H'):
                     continue
                 else:
-                    self.update_taxi_status(my_taxi.id, 'I')
+                    self.update_taxi_status(my_taxi, 'I')
             else:
                 print "Invalid queue status code - '{}'".format(queue_status)
                 raise BaseException
@@ -146,7 +146,7 @@ class SQLitePool(Pool):
     """
     Concrete implementation of the Pool class using an SQLite backend.
     """
-
+    
     def __init__(self, db_path, pool_name, work_dir, log_dir, thrash_delay=300):
         self.db_path = db_path
         self.pool_name = pool_name
@@ -192,7 +192,7 @@ class SQLitePool(Pool):
     def write_table_structure(self):
         create_taxi_str = """
             CREATE TABLE IF NOT EXISTS taxis (
-                id integer PRIMARY KEY,
+                name text PRIMARY KEY,
                 pool_name text REFERENCES pools (name),
                 time_limit real,
                 node_limit integer,
@@ -255,41 +255,42 @@ class SQLitePool(Pool):
         return all_taxis
 
     def get_taxi(self, my_taxi):
-        taxi_id = self._taxi_id(my_taxi)
+        taxi_name = self._taxi_name(my_taxi)
 
-        query = """SELECT * FROM taxis WHERE id == ?"""
-        this_taxi = self.create_taxi_object(self.execute_select(query, taxi_id)[0])
+        query = """SELECT * FROM taxis WHERE name == ?"""
+        this_taxi = self.create_taxi_object(self.execute_select(query, taxi_name)[0])
 
         return this_taxi
     
     def update_taxi_status(self, my_taxi, status):
-        taxi_id = self._taxi_id(my_taxi)
+        taxi_name = self._taxi_name(my_taxi)
 
-        update_query = """UPDATE taxis SET status = ? WHERE id = ?"""
-        self.execute_update(update_query, status, taxi_id)
+        update_query = """UPDATE taxis SET status = ? WHERE name = ?"""
+        self.execute_update(update_query, status, taxi_name)
 
         return
 
     def update_taxi_last_submitted(self, my_taxi, last_submit_time):
-        taxi_id = self._taxi_id(my_taxi)
+        taxi_name = self._taxi_name(my_taxi)
         
-        update_query = """UPDATE taxis SET time_last_submitted = ? WHERE id = ?"""
-        self.execute_update(update_query, last_submit_time, taxi_id)
+        update_query = """UPDATE taxis SET time_last_submitted = ? WHERE name = ?"""
+        self.execute_update(update_query, last_submit_time, taxi_name)
 
         return
 
     def register_new_taxi(self, my_taxi):
-        taxi_id_query = """SELECT id FROM taxis;"""
-        all_taxi_ids = map(lambda t: t['id'], self.execute_select(taxi_id_query))
+        """
+        Register a new taxi with the pool.
+        """
+        taxi_name_query = """SELECT name FROM taxis;"""
+        all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
 
-        if len(all_taxi_ids) == 0:
-            new_id = 1
-        else:
-            new_id = max(all_taxi_ids) + 1
-        
-        my_taxi.id = new_id
+        if (my_taxi.name is None):
+            raise ValueError("Cannot register taxi with unspecified name!")
+        if (my_taxi.name in all_taxi_names):
+            raise Exception("Taxi {} already registered with pool {}!".format(my_taxi.name, self.pool_name))
+            
         my_taxi.pool_name = self.pool_name
-
         self._add_taxi_to_pool(my_taxi)
 
         return my_taxi
@@ -302,24 +303,23 @@ class SQLitePool(Pool):
         """
 
         insert_taxi_query = """INSERT OR REPLACE INTO taxis
-            (id, pool_name, time_limit, node_limit, time_last_submitted, status)
+            (name, pool_name, time_limit, node_limit, time_last_submitted, status)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        self.execute_update(insert_taxi_query, my_taxi.id, my_taxi.pool_name, my_taxi.time_limit, 
+        self.execute_update(insert_taxi_query, my_taxi.name, my_taxi.pool_name, my_taxi.time_limit, 
             my_taxi.node_limit, my_taxi.time_last_submitted, my_taxi.status)
 
         return
 
 
     def delete_taxi_from_pool(self, my_taxi):
-        # Pseudocode:
-        # If taxi is a taxi object, extract id.
-        # Otherwise, if it's an integer assume it's already an id.
-        # Otherwise, complain!
-        taxi_id = self._taxi_id(my_taxi)
+        """
+        Delete a particular taxi from the pool.
+        """
+        taxi_name = self._taxi_name(my_taxi)
 
-        remove_query = """DELETE FROM taxis WHERE ID = ?"""
+        remove_query = """DELETE FROM taxis WHERE name = ?"""
 
-        self.execute_update(remove_query, taxi_id)
+        self.execute_update(remove_query, taxi_name)
 
         return
