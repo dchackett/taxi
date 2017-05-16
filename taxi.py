@@ -2,9 +2,9 @@
 
 class Taxi(object):
 
-    def __init__(self, time_limit=None, node_limit=None):
-        self.id = None
-        self.pool_name = None
+    def __init__(self, name=None, pool_name=None, time_limit=None, node_limit=None):
+        self.name = name
+        self.pool_name = pool_name
         self.time_limit = time_limit
         self.node_limit = node_limit
         self.time_last_submitted = None
@@ -12,7 +12,7 @@ class Taxi(object):
         self.status = 'I'
 
     def __eq__(self, other):
-        eq = (self.id == other.id)
+        eq = (self.name == other.name)
         eq = eq and (self.pool_name == other.pool_name)
         eq = eq and (self.time_limit == other.time_limit)
         eq = eq and (self.node_limit == other.node_limit)
@@ -23,11 +23,11 @@ class Taxi(object):
         return eq
 
     def taxi_name(self):
-        return '{0:s}_{1:d}'.format(self.pool_name, self.id)
+        return '{0:s}_{1:d}'.format(self.pool_name, self.name)
 
     def rebuild_from_dict(self, taxi_dict):
         try:
-            self.id = taxi_dict['id']
+            self.name = taxi_dict['name']
             self.pool_name = taxi_dict['pool_name']
             self.time_limit = taxi_dict['time_limit']
             self.node_limit = taxi_dict['node_limit']
@@ -43,7 +43,8 @@ class Taxi(object):
             raise
 
     def __repr__(self):
-        return "Taxi<{},{},{},{},{},'{}'>".format(self.id, self.pool_name, self.time_limit,
+        return "Taxi<{},{},{},{},{},'{}'>".format(self.name, self.pool_name, self.time_limit,
             self.node_limit, self.time_last_submitted, self.status)
-        
 
+
+    
