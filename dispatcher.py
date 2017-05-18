@@ -3,7 +3,6 @@
 # Definition of "Dispatcher" class - manages task forest and assigns tasks to Taxis.
 
 import os
-import tasks
 import time
 import json
 
@@ -284,3 +283,4 @@ class SQLiteDispatcher(Dispatcher):
             raise TaskClaimException("Failed to claim task {}: status {}".format(task_id, task_status))
 
         self.update_task(task_id=task_id, status='active', by_taxi=taxi.name)
+

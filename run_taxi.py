@@ -114,14 +114,15 @@ while True:
             print str(e)
             continue
 
-        ## TODO: Create task object?
-        pass
 
     ## Execute task
     try:
-        pass
+        taxi_obj.execute_task(task)
     except:
-        raise
+        ## Record task as failed
+        pass
 
     ## Record exit status, time taken, etc.
     pass
+
+    

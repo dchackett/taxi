@@ -47,4 +47,27 @@ class Taxi(object):
             self.node_limit, self.time_last_submitted, self.status)
 
 
+    def execute_task(self, task):
+        """Execute the given task, according to task['task_type']."""
+        
+        # Record start time
+        pass
+
+        # Run task
+        task_type = task['task_type']
+        if (task_type == 'die'):
+            # Die
+            pass
+        elif (task_type == 'copy'):
+            # Copy
+            pass
+        elif (task_type == 'run_script'):
+            # Run script
+            pass
+        else:
+            raise ValueError("Invalid task type specified: {}".format(task_type))
+
+        # Return when complete
+        return
+
     
