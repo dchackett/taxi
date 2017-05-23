@@ -182,7 +182,7 @@ class Dispatcher(object):
     def initialize_new_job_pool(self, job_pool, priority_method='tree'):
         self._find_trees(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
-        self._compile()
+        self._compile(job_pool)
         self._populate_task_table()
 
 
@@ -266,17 +266,27 @@ class SQLiteDispatcher(Dispatcher):
 
         return
 
-    def get_task_blob(self, my_taxi):
-        """Get all incomplete tasks pertinent to this taxi."""
+    def get_task_blob(self, my_taxi, include_complete=False):
+        """Get all incomplete tasks pertinent to this taxi (or to all taxis.)"""
 
-        taxi_name = self._taxi_name(my_taxi)
+        if (my_taxi is None):
+            task_query = """
+                SELECT * FROM tasks
+                WHERE (for_taxi IS null)"""
+            if (not include_complete):
+                task_query += """AND (status != 'complete')"""
 
-        task_query = """
-            SELECT * FROM tasks
-            WHERE (for_taxi=? OR for_taxi IS null)
-            AND (status != 'complete')"""
+            task_res = self.execute_select(task_query)
+        else:
+            taxi_name = self._taxi_name(my_taxi)
+
+            task_query = """
+                SELECT * FROM tasks
+                WHERE (for_taxi=? OR for_taxi IS null)"""
+            if (not include_complete):
+                task_query += """AND (status != 'complete')"""
         
-        task_res = self.execute_select(task_query, taxi_name)
+            task_res = self.execute_select(task_query, taxi_name)
 
         if len(task_res) == 0:
             return None
@@ -390,6 +400,6 @@ class SQLiteDispatcher(Dispatcher):
                         task['req_time'], 
                         task['priority'])
 
-            self.execute_update(task_query, task_values)
+            self.execute_update(task_query, *task_values)
         
 

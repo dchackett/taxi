@@ -20,9 +20,12 @@ class Job(object):
     def compile(self):
         # Package in to JSON forest format
         self.compiled = {
-            'id'        : self.job_id,
-            'req_time'  : self.req_time,
-            'status'    : self.status,
+            'task_type' :   'none',
+            'id'        :   self.job_id,
+            'req_time'  :   self.req_time,
+            'status'    :   self.status,
+            'is_recurring': self.is_recurring,
+            'priority':     self.priority,
         }
         
         # Get dependencies in job_id format
