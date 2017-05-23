@@ -244,15 +244,6 @@ class SQLiteDispatcher(Dispatcher):
 
         return
 
-    def create_taxi_object(self, db_taxi):
-        """
-        Interface to translate Taxi representation in the DB to a Taxi object.
-        """
-        new_taxi = taxi.Taxi()
-        new_taxi.rebuild_from_dict(db_taxi)
-        return new_taxi
-
-
     def execute_select(self, query, *query_args):
         try:
             with self.conn:
