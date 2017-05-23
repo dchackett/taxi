@@ -8,12 +8,31 @@ import json
 
 import taxi
 
-def mkdir_p(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
+def task_priority_sort(a, b):
+    """
+    Order tasks by their priority score.
+    Negative priority (default -1) is the lowest.
+    For positive priority, smaller numbers are higher priority.
+    """
+    if a['priority'] < 0:
+        if b['priority'] > 0:
+            return 1
+        else:
+            return 0
+    elif b['priority'] < 0:
+        ## At this point a['priority'] must be positive
+        return -1
+    elif a['priority'] < b['priority']:
+        return 1
+    elif a['priority'] > b['priority']:
+        return -1
+    else:
+        return 0
 
 class TaskClaimException(Exception):
     pass
+
+
 
 class Dispatcher(object):
 
@@ -27,13 +46,7 @@ class Dispatcher(object):
         elif type(my_taxi) == str:
             return my_taxi
         else:
-            raise TypeError
-
-    def get_priorities(self, taxi_name):
-        """If there's a taxi-specific list for taxi_name, extracts that priority list.
-        
-        Otherwise, finds the list labeled 'all'."""
-        raise NotImplementedError
+            raise TypeError("{} is not a Taxi or taxi name!".format(my_taxi))
 
     def get_task_blob(self, taxi_name):
         """Get all incomplete tasks pertinent to this taxi."""
@@ -61,7 +74,117 @@ class Dispatcher(object):
         time_remaining = my_taxi.time_limit - elapsed_time
         return time_remaining > task.req_time
 
-    
+    ## Initialization
+
+    def _find_trees(self, job_pool):
+        ## Scaffolding
+        # Give each task an identifier, reset dependents
+        for jj, job in enumerate(job_pool):
+            job._dependents = []
+
+        # Let dependencies know they have a dependent
+        for job in job_pool:
+            for dependency in job.depends_on:
+                dependency._dependents.append(job)
+                
+        ## Break apart jobs into separate trees
+        # First, find all roots
+        self.trees = []
+        for job in job_pool:
+            if job.depends_on is None or len(job.depends_on) == 0:
+                self.trees.append([job])
+
+        ## Build out from roots
+        # TODO:
+        # - If dependent has different number of nodes, make it a new tree
+        # - If job is a trunk job and two dependents are trunk jobs, make one of them a new tree
+        for tree in self.trees:
+            for tree_job in tree:
+                if not tree_job.trunk:
+                    continue
+                n_trunks_found = 0
+                for d in tree_job._dependents:
+                    # Count number of trunk tasks encountered in dependents, fork if this isn't the first
+                    if d.trunk:
+                        n_trunks_found += 1
+                        if n_trunks_found > 1:
+                            self.trees.append([d]) # Break branch off in to a new tree
+                            continue
+                    # Normal behavior: build on current tree
+                    tree.append(d)
+                
+    def _find_lowest_job_priority(self, job_pool):
+        lowest_priority = 0
+        for job in job_pool:
+            if job.priority > lowest_priority:
+                lowest_priority = job.priority
+
+        return lowest_priority
+
+
+    def _assign_priorities(self, job_pool, priority_method='tree'):
+        """
+        Assign task priorities to the newly tree-structured job pool.  Respects
+        any user-assigned priority values that already exist.  All auto-assigned
+        tasks have lower priority than user-chosen ones.
+
+        'priority_method' describes the algorithm to be used for assigning priority.
+        Currently, the following options are available:
+
+        - 'tree': Tree-first priority: the workflow will attempt to finish an entire tree
+        of jobs, before moving on to the next one.
+        - 'trunk': Trunk-first priority: the workflow will attempt to finish all available
+        tasks at the same tree depth, before moving deeper.
+        - 'anarchy': No priorities are automatically assigned.  In the absence of user-determined
+        priorities, the tasks will be run in arbitrary order, except that dependencies will be
+        resolved first.
+        """
+        lowest_priority = self._find_lowest_job_priority(job_pool)
+
+        if priority_method == 'tree':
+            for tree in self.trees:
+                tree_priority = lowest_priority + 1
+                lowest_priority = tree_priority
+
+                for tree_job in tree:
+                    if (tree_job.priority < 0):
+                        tree_job.priority = tree_priority
+            
+            return
+
+        elif priority_method == 'trunk':
+            ## I'll need to think about this implementation...not sure exactly the right way to assign
+            ## depth-first priorities based on the current tree-construction algorithm.
+            raise NotImplementedError
+
+        elif priority_method == 'anarchy':
+            ## Do nothing
+            return
+
+        else:
+            raise ValueError("Invalid choice of priority assignment method: {}".format(priority_method))
+
+
+    def _compile(self, job_pool):
+        # Give each job an integer id
+        for jj, job in enumerate(job_pool):
+            job.job_id = jj
+            
+        # Tell all jobs to compile themselves
+        for job in job_pool:
+            job.compile()
+            
+        self.task_pool = [job.compiled for job in job_pool]
+
+    def _populate_task_table(self):
+        raise NotImplementedError
+
+    def initialize_new_job_pool(self, job_pool, priority_method='tree'):
+        self._find_trees(job_pool)
+        self._assign_priorities(job_pool, priority_method=priority_method)
+        self._compile()
+        self._populate_task_table()
+
 
 
     
@@ -105,25 +228,19 @@ class SQLiteDispatcher(Dispatcher):
             CREATE TABLE IF NOT EXISTS tasks (
                 id integer PRIMARY KEY,
                 task_type text,
+                task_args text,
                 depends_on text,
                 status text,
                 for_taxi text,
                 by_taxi text,
+                is_recurring bool,
                 req_time integer DEFAULT 0,
                 run_time real DEFAULT -1,
-                task_args text
-            )"""
-        create_priority_str = """
-            CREATE TABLE IF NOT EXISTS priority (
-                id integer PRIMARY KEY,
-                taxi_name text,
-                list text,
-                CONSTRAINT priority_taxi_unique UNIQUE (taxi) 
+                priority integer DEFAULT -1
             )"""
 
         with self.conn:
             self.conn.execute(create_task_str)
-            self.conn.execute(create_priority_str)
 
         return
 
@@ -157,26 +274,6 @@ class SQLiteDispatcher(Dispatcher):
             raise
 
         return
-
-    def get_priorities(self, my_taxi):
-        """If there's a taxi-specific list for taxi_name, extracts that priority list.
-        
-        Otherwise, finds the list labeled 'all'."""
-
-        taxi_name = self._taxi_name(my_taxi)
-
-        priority_query = """SELECT * FROM priority WHERE taxi=? OR taxi='all'"""
-        priority_res = self.execute_select(priority_query, taxi_name)
-
-        res_dict = {}
-        for r in map(dict, priority_res):
-            res_dict[r['taxi']] = r
-
-        if res_dict.has_key(taxi_name):
-            return json.loads(dict(res_dict[taxi_name])['list'])
-        else:
-            return json.loads(dict(res_dict['all'])['list'])
-
 
     def get_task_blob(self, my_taxi):
         """Get all incomplete tasks pertinent to this taxi."""
@@ -279,8 +376,29 @@ class SQLiteDispatcher(Dispatcher):
         """Attempt to claim task for a given taxi.  Fails if the status has been changed from pending."""
 
         task_status = self.check_task_status(task_id)
-        if task_status not in ['pending', 'recurring']:
+        if task_status != 'pending':
             raise TaskClaimException("Failed to claim task {}: status {}".format(task_id, task_status))
 
         self.update_task(task_id=task_id, status='active', by_taxi=taxi.name)
+
+    def _populate_task_table(self):
+        ## TODO: is there a more efficient way than generating N queries using a Python for loop?
+
+        for task in self.task_pool:
+            task_query = """INSERT OR REPLACE INTO tasks
+            (id, task_type, task_args, depends_on, status, for_taxi, is_recurring, req_time, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+            task_values = (task['id'], 
+                        task['task_type'], 
+                        json.dumps(task['task_args']) if task.has_key('task_args') else None,
+                        json.dumps(task['depends_on']),
+                        task['status'], 
+                        task['for_taxi'] if task.has_key('for_taxi') else None, 
+                        task['is_recurring'],
+                        task['req_time'], 
+                        task['priority'])
+
+            self.execute_update(task_query, task_values)
+        
 

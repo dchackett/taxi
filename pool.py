@@ -115,18 +115,23 @@ class Pool(object):
     def update_all_taxis_queue_status(self, queue):
         taxi_list = self.get_all_taxis_in_pool()
         for my_taxi in taxi_list:
-            queue_status = queue.report_taxi_status(taxi)['status']
-            if queue_status in ('Q', 'R'):
-                self.update_taxi_status(my_taxi, queue_status)
-            elif queue_status == 'X':
-                pool_status = self.get_taxi(my_taxi).status
-                if pool_status in ('E', 'H'):
-                    continue
-                else:
-                    self.update_taxi_status(my_taxi, 'I')
+            self.update_taxi_queue_status(my_taxi, queue)
+
+    def update_taxi_queue_status(self, my_taxi, queue):
+        queue_status = queue.report_taxi_status(my_taxi)['status']
+        if queue_status in ('Q', 'R'):
+            self.update_taxi_status(my_taxi, queue_status)
+            return
+        elif queue_status == 'X':
+            pool_status = self.get_taxi(my_taxi).status
+            if pool_status in ('E', 'H'):
+                return
             else:
-                print "Invalid queue status code - '{}'".format(queue_status)
-                raise BaseException
+                self.update_taxi_status(my_taxi, 'I')
+                return
+        else:
+            print "Invalid queue status code - '{}'".format(queue_status)
+            raise BaseException
 
     def spawn_idle_taxis(self, queue):
         taxi_list = self.get_all_taxis_in_pool()
@@ -134,8 +139,6 @@ class Pool(object):
             pool_status = self.get_taxi(my_taxi).status
             if pool_status == 'I':
                 self.submit_taxi_to_queue(my_taxi, queue)
-    
-
 
 
 

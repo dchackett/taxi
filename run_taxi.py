@@ -61,27 +61,21 @@ while True:
     ## Check with dispatch for tasks to execute
     with my_dispatch:
         task_blob = my_dispatch.get_task_blob(taxi_obj)
-        task_priority = my_dispatch.get_priorities(taxi_obj)
 
         N_pending_tasks = 0
         found_ready_task = False
 
-        # TODO: "task_ii" is never used, is there a better syntax for this?
-        for task_ii, task_id in enumerate(task_priority):
+        # Order tasks in blob by priority
+        task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=dispatcher.task_priority_sort) ]
+
+        for task_id in task_priority_ids:
             task = task_blob[task_id]
 
-            # We only asked for pending and recurring tasks, excluding "failed", "complete", and "active" tasks
-            if not task_blob.has_key(task_id):
+            # Only try to do pending tasks
+            if task['status'] != 'pending':
                 continue
-            task = task_blob[task_id]
-
-            # Only try to do pending or recurring tasks
-            if task['status'] not in ['pending', 'recurring']:
-                continue
-
-            # Count number of pending tasks
-            if task['status'] == 'pending':
-                N_pending_tasks += 1
+            
+            N_pending_tasks += 1
                 
             # Check whether task is ready to go
             N_unresolved, N_failed = my_dispatch.count_unresolved_dependencies(task=task, task_blob=task_blob)
@@ -101,8 +95,21 @@ while True:
             print "WORK COMPLETE: no tasks pending"
             ## TODO: I think this will break both the with: and the outer while True:,
             ## but add a test case!
+
+            # No work to be done, so place the taxi on hold
+            with my_pool:
+                my_pool.update_taxi_status(taxi_obj, 'H')
+
             break
         if not found_ready_task:
+            ## TODO: we could add another status code that puts the taxi to sleep,
+            ## but allows it to restart after some amount of time...
+            ## Either that, or another script somewhere that checks the Pool
+            ## and un-holds taxis that were waiting for dependencies to resolved
+            ## once it sees that it's happened.
+            ## Also need to be wary of interaction with insufficient time check,
+            ## which we should maybe track separately.
+
             print "WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks
             break
 
@@ -116,13 +123,28 @@ while True:
 
 
     ## Execute task
+    failed_task = False
     try:
         taxi_obj.execute_task(task)
     except:
         ## Record task as failed
-        pass
+        failed_task = True
 
     ## Record exit status, time taken, etc.
-    pass
+    taxi_obj.task_finish_time = time.time()
+    task_run_time = taxi_obj.task_finish_time - taxi_obj.task_start_time
+
+    if failed_task:
+        task_status = 'failed'
+    else:
+        if (task['is_recurring']):
+            task_status = 'pending'
+        else:
+            task_status = 'complete'
+
+    with my_dispatch:
+        my_dispatch.update_task(task['id'], task_status, run_time=task_run_time, by_taxi=taxi_obj)
+
+
 
     
