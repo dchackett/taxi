@@ -4,6 +4,7 @@ import taxi
 import dispatcher
 import pool
 import tasks
+import task_runners
 
 import sys
 import argparse
@@ -45,6 +46,10 @@ my_pool = pool.SQLitePool(
     pool_name=parg.pool_name,
 )
 my_queue = local_queue.LocalQueue()
+
+## Decoding for runner objects; relevant TaskRunner subclasses
+## should be imported in local_taxi above!
+runner_decoder = task_runners.runner_rebuilder_factory()
 
 ## Record starting time
 taxi_obj.start_time = time.time()
@@ -130,13 +135,14 @@ while True:
 
         sys.exit(0)
 
-    
-
+    # Alright, this is a little odd...
+    task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
 
     failed_task = False
     try:
-        taxi_obj.execute_task(task)
+        task_obj.execute()
     except:
+        ## TODO: some exception logging here?
         ## Record task as failed
         failed_task = True
 
