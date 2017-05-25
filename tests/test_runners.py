@@ -11,8 +11,8 @@ from task_runners import *
 class TestBaseTaskRunner(unittest.TestCase):
     
     def test_json_rebuild(self):
-        json_one = json.dumps({'task_type': 'CopyRunner', 'src': 'abc', 'dst': 'xyz'})
-        json_two = json.dumps({'task_type': 'CopyRunner', 'src': 'abc', 'dst': 'xyz', 'bad_arg': 4})
+        json_one = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dst': 'xyz'} })
+        json_two = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dst': 'xyz', 'bad_arg': 4} })
         json_three = json.dumps({'task_type': 'FakeRunner'})
 
         runner_parser = runner_rebuilder_factory()
@@ -45,7 +45,7 @@ class TestCopyRunner(unittest.TestCase):
         os.remove(self.dst)
 
     def test_copy(self):
-        json_copy = json.dumps({'task_type': 'CopyRunner', 'src': self.src, 'dst': self.dst})
+        json_copy = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': self.src, 'dst': self.dst } })
 
         copy_run = json.loads(json_copy, object_hook=self.runner_parser)
         copy_run.execute()

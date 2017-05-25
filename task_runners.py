@@ -22,8 +22,8 @@ def runner_rebuilder_factory():
     class_dict = dict(zip(valid_class_names, valid_runner_classes))
 
     def runner_decoder(s):
-        if s['task_type'] in valid_class_names:
-            return class_dict[s['task_type']](**s)
+        if s.get('task_type') in valid_class_names:
+            return class_dict[s['task_type']](**s['task_args'])
 
         return s
 
