@@ -150,7 +150,7 @@ class SQLitePool(Pool):
     Concrete implementation of the Pool class using an SQLite backend.
     """
     
-    def __init__(self, db_path, pool_name, work_dir, log_dir, thrash_delay=300):
+    def __init__(self, db_path, pool_name, work_dir='', log_dir='', thrash_delay=300):
         self.db_path = db_path
         self.pool_name = pool_name
         self.work_dir = work_dir
@@ -178,8 +178,9 @@ class SQLitePool(Pool):
         self.write_table_structure()
 
         # Make sure pool details are written
-        pool_query = """SELECT * FROM pools WHERE name == ?"""
+        pool_query = """SELECT * FROM pools WHERE name = ?"""
         this_pool_row = self.execute_select(pool_query, self.pool_name)
+
 
         if len(this_pool_row) == 0:
             pool_write_query = """INSERT OR REPLACE INTO pools
@@ -187,6 +188,11 @@ class SQLitePool(Pool):
                 VALUES (?, ?, ?)"""
             self.execute_update(pool_write_query, self.pool_name, self.work_dir, self.log_dir)
 
+        else:
+            if self.work_dir == '':
+                self.work_dir = this_pool_row[0]['working_dir']
+            if self.log_dir == '':
+                self.log_dir = this_pool_row[0]['log_dir']
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
         self.conn.close()
@@ -198,7 +204,7 @@ class SQLitePool(Pool):
                 name text PRIMARY KEY,
                 pool_name text REFERENCES pools (name),
                 time_limit real,
-                node_limit integer,
+                cores integer,
                 time_last_submitted real,
                 status text
             )"""
@@ -306,11 +312,11 @@ class SQLitePool(Pool):
         """
 
         insert_taxi_query = """INSERT OR REPLACE INTO taxis
-            (name, pool_name, time_limit, node_limit, time_last_submitted, status)
+            (name, pool_name, time_limit, cores, time_last_submitted, status)
             VALUES (?, ?, ?, ?, ?, ?)
         """
         self.execute_update(insert_taxi_query, my_taxi.name, my_taxi.pool_name, my_taxi.time_limit, 
-            my_taxi.node_limit, my_taxi.time_last_submitted, my_taxi.status)
+            my_taxi.cores, my_taxi.time_last_submitted, my_taxi.status)
 
         return
 

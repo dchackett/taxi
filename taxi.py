@@ -15,11 +15,11 @@ class RunScriptTaskException(Exception):
 
 class Taxi(object):
 
-    def __init__(self, name=None, pool_name=None, time_limit=None, node_limit=None):
+    def __init__(self, name=None, pool_name=None, time_limit=None, cores=None):
         self.name = name
         self.pool_name = pool_name
         self.time_limit = time_limit
-        self.node_limit = node_limit
+        self.cores = cores
         self.time_last_submitted = None
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
@@ -28,7 +28,7 @@ class Taxi(object):
         eq = (self.name == other.name)
         eq = eq and (self.pool_name == other.pool_name)
         eq = eq and (self.time_limit == other.time_limit)
-        eq = eq and (self.node_limit == other.node_limit)
+        eq = eq and (self.cores == other.cores)
         eq = eq and (self.time_last_submitted == other.time_last_submitted)
         eq = eq and (self.start_time == other.start_time)
         eq = eq and (self.status == other.status)
@@ -43,7 +43,7 @@ class Taxi(object):
             self.name = taxi_dict['name']
             self.pool_name = taxi_dict['pool_name']
             self.time_limit = taxi_dict['time_limit']
-            self.node_limit = taxi_dict['node_limit']
+            self.cores = taxi_dict['cores']
             self.time_last_submitted = taxi_dict['time_last_submitted']
             self.status = taxi_dict['status']
         except KeyError:
@@ -55,9 +55,20 @@ class Taxi(object):
             print taxi_dict
             raise
 
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'pool_name': self.pool_name,
+            'time_limit': self.time_limit,
+            'cores': self.cores,
+            'time_last_submitted': self.time_last_submitted,
+            'start_time': self.start_time,
+            'status': self.status,
+        }
+
     def __repr__(self):
         return "Taxi<{},{},{},{},{},'{}'>".format(self.name, self.pool_name, self.time_limit,
-            self.node_limit, self.time_last_submitted, self.status)
+            self.cores, self.time_last_submitted, self.status)
 
 
     def execute_task(self, task):

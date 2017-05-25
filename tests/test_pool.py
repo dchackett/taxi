@@ -33,7 +33,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
     def test_write_tables(self):
         with self.test_pool:
             empty_taxis = self.test_pool.conn.execute("""SELECT name, pool_name, time_limit, time_last_submitted, 
-                status, node_limit FROM taxis""").fetchall()
+                status, cores FROM taxis""").fetchall()
             pools = map(dict, self.test_pool.conn.execute("""SELECT name, working_dir, log_dir FROM pools""").fetchall())
 
             self.assertItemsEqual(empty_taxis, [])
@@ -45,7 +45,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
     def test_read_write_taxi(self):
         with self.test_pool:
-            taxi_one = taxi.Taxi(time_limit=4000, node_limit=8, name="one")
+            taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
             taxi_one = self.test_pool.register_new_taxi(taxi_one)
 
             taxi_list = self.test_pool.get_all_taxis_in_pool()
@@ -55,7 +55,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
             self.assertEqual(taxi_one_return.name, "one")
             self.assertEqual(taxi_one_return.time_limit, taxi_one.time_limit)
-            self.assertEqual(taxi_one_return.node_limit, taxi_one.node_limit)
+            self.assertEqual(taxi_one_return.cores, taxi_one.cores)
             self.assertEqual(taxi_one_return.time_last_submitted, None)
             self.assertEqual(taxi_one_return.status, 'I')
 
@@ -73,6 +73,16 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
             self.assertEqual(len(pools), 2)
             self.assertEqual(pools[1]['name'], 'pool2')
 
+    def test_read_log_dirs(self):
+        dupe_pool_obj = SQLitePool(self.test_filename, 'test_pool')
+
+        with self.test_pool:
+            pass
+
+        with dupe_pool_obj:
+            self.assertEqual(dupe_pool_obj.work_dir, './tests/work/')
+            self.assertEqual(dupe_pool_obj.log_dir, './tests/log/')
+
 
 class TestSQLitePoolWithTaxis(TestSQLiteBase):
 
@@ -80,8 +90,8 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
         super(TestSQLitePoolWithTaxis, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000, node_limit=8, name="one")
-            self.taxi_two = taxi.Taxi(time_limit=9999, node_limit=1, name="two")
+            self.taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999, cores=1, name="two")
 
             self.taxi_one = self.test_pool.register_new_taxi(self.taxi_one)
             self.taxi_two = self.test_pool.register_new_taxi(self.taxi_two)
@@ -139,9 +149,9 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
         super(TestSQLitePoolQueueInteraction, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000., node_limit=8, name="one")
-            self.taxi_two = taxi.Taxi(time_limit=9999., node_limit=1, name="two")
-            self.taxi_three = taxi.Taxi(time_limit=4040., node_limit=8, name="three")
+            self.taxi_one = taxi.Taxi(time_limit=4000., cores=8, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999., cores=1, name="two")
+            self.taxi_three = taxi.Taxi(time_limit=4040., cores=8, name="three")
 
             self.taxi_one = self.test_pool.register_new_taxi(self.taxi_one)
             self.taxi_two = self.test_pool.register_new_taxi(self.taxi_two)
