@@ -6,13 +6,7 @@ import sys
 def mkdir_p(path):
     if not os.path.exists(path):
         os.makedirs(path)
-
-class CopyTaskException(Exception):
-    pass
-
-class RunScriptTaskException(Exception):
-    pass
-
+        
 class Taxi(object):
 
     def __init__(self, name=None, pool_name=None, time_limit=None, cores=None):
