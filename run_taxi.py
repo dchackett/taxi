@@ -10,6 +10,7 @@ import argparse
 import time
 
 import local_taxi
+import local_queue
 
 ## Utility functions
 def flush_output():
@@ -21,31 +22,29 @@ def flush_output():
 parser = argparse.ArgumentParser(description="Workflow taxi (NOTE: not intended to be called by user directly!)")
 
 parser.add_argument('--name', type=str, required=True, help='Taxi name (provided by shell wrapper).')
-parser.add_argument('--cpus', type=int, required=True, help='Number of CPUs to tell mpirun about (provided by shell wrapper).')
-parser.add_argument('--nodes', type=int, required=True, help='Number of nodes the taxi is running on (provided by shell wrapper).')
+parser.add_argument('--cores', type=int, required=True, help='Number of CPUs to tell mpirun about (provided by shell wrapper).')
+#parser.add_argument('--nodes', type=int, required=True, help='Number of nodes the taxi is running on (provided by shell wrapper).')
 parser.add_argument('--pool_path', type=str, required=True, help='Path of pool backend DB.')
 parser.add_argument('--pool_name', type=str, required=True, help='Name of pool this taxi is assigned to.')
 parser.add_argument('--dispatch_path', type=str, required=True, help='Path of dispatch backend DB.')
 parser.add_argument('--time',  type=float, required=True, help='Number of seconds in time budget.')
-parser.add_argument('--log_dir', type=str, required=True, help='Logs go here.')
-parser.add_argument('--work_dir', type=str, required=True, help='Working directory for taxi is here.')
+#parser.add_argument('--log_dir', type=str, required=True, help='Logs go here.')
+#parser.add_argument('--work_dir', type=str, required=True, help='Working directory for taxi is here.')
 #    parser.add_argument('--shell',  type=str, required=True, help='Path to wrapper shell script.')
 
 print sys.argv
 # TODO: shouldn't this work without the sys.argv explicit specification?
 parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..."
 
-taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time, node_limit=parg.nodes, pool_name=parg.pool_name)
+taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time, cores=parg.cores, pool_name=parg.pool_name)
 
 
 my_dispatch = dispatcher.SQLiteDispatcher(parg.dispatch_path)
 my_pool = pool.SQLitePool(
     db_path=parg.pool_path,
     pool_name=parg.pool_name,
-    work_dir=parg.work_dir,
-    log_dir=parg.log_dir,
 )
-my_queue = local_taxi.LocalQueue()
+my_queue = local_queue.LocalQueue()
 
 ## Record starting time
 taxi_obj.start_time = time.time()
@@ -123,6 +122,17 @@ while True:
 
 
     ## Execute task
+    if task['task_type'] == 'die':
+        ## "Die" is a special task
+        with my_dispatch:
+            task_run_time = time.time() - taxi_obj.task_start_time
+            my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
+
+        sys.exit(0)
+
+    
+
+
     failed_task = False
     try:
         taxi_obj.execute_task(task)
