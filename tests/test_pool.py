@@ -46,7 +46,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
     def test_read_write_taxi(self):
         with self.test_pool:
             taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
-            self.test_pool.register_new_taxi(taxi_one)
+            self.test_pool.register_taxi(taxi_one)
 
             taxi_list = self.test_pool.get_all_taxis_in_pool()
             self.assertEqual(len(taxi_list), 1)
@@ -93,8 +93,8 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
             self.taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
             self.taxi_two = taxi.Taxi(time_limit=9999, cores=1, name="two")
 
-            self.test_pool.register_new_taxi(self.taxi_one)
-            self.test_pool.register_new_taxi(self.taxi_two)
+            self.test_pool.register_taxi(self.taxi_one)
+            self.test_pool.register_taxi(self.taxi_two)
 
 
     def tearDown(self):
@@ -153,9 +153,9 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
             self.taxi_two = taxi.Taxi(time_limit=9999., cores=1, name="two")
             self.taxi_three = taxi.Taxi(time_limit=4040., cores=8, name="three")
 
-            self.test_pool.register_new_taxi(self.taxi_one)
-            self.test_pool.register_new_taxi(self.taxi_two)
-            self.test_pool.register_new_taxi(self.taxi_three)
+            self.test_pool.register_taxi(self.taxi_one)
+            self.test_pool.register_taxi(self.taxi_two)
+            self.test_pool.register_taxi(self.taxi_three)
 
             self.test_pool.update_taxi_status(self.taxi_three, 'H')
 

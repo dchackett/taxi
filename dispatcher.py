@@ -185,6 +185,7 @@ class Dispatcher(object):
     def initialize_new_job_pool(self, job_pool, priority_method='tree'):
         # If we are adding a new pool to an existing dispatcher, 
         # start enumerating task IDs at the end
+
         start_id = self._get_max_task_id()
         self._find_trees(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
@@ -271,6 +272,12 @@ class SQLiteDispatcher(Dispatcher):
             print "with arguments: "
             print query_args
             raise
+
+        return
+
+    def register_taxi(self, my_taxi, my_pool):
+        my_taxi.dispatch_path = self.db_path
+        my_pool.update_taxi_dispatch(my_taxi, self.db_path)
 
         return
 
@@ -411,6 +418,7 @@ class SQLiteDispatcher(Dispatcher):
                         task['priority'])
 
             self.execute_update(task_query, *task_values)
+            
         
     def _get_max_task_id(self):
         task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""

@@ -40,6 +40,7 @@ class Taxi(object):
             self.cores = taxi_dict['cores']
             self.time_last_submitted = taxi_dict['time_last_submitted']
             self.status = taxi_dict['status']
+            self.dispatch_path = taxi_dict['dispatch']
         except KeyError:
             print "Error: attempted to rebuild taxi from malformed dictionary:"
             print taxi_dict
@@ -50,7 +51,7 @@ class Taxi(object):
             raise
 
     def to_dict(self):
-        return {
+        self_dict = {
             'name': self.name,
             'pool_name': self.pool_name,
             'time_limit': self.time_limit,
@@ -59,6 +60,12 @@ class Taxi(object):
             'start_time': self.start_time,
             'status': self.status,
         }
+        if hasattr(self, 'pool_path'):
+            self_dict['pool_path'] = self.pool_path
+        if hasattr(self, 'dispatch_path'):
+            self_dict['dispatch_path'] = self.dispatch_path
+
+        return self_dict
 
     def __repr__(self):
         return "Taxi<{},{},{},{},{},'{}'>".format(self.name, self.pool_name, self.time_limit,
