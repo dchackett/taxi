@@ -91,7 +91,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test 'die' job
     def test_die(self):
-        test_job = jobs.DieJob(for_taxi=self.my_taxi.taxi_name)
+        test_job = jobs.DieJob(for_taxi=self.my_taxi.name)
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
             self.assertEqual(task_blob, None)
@@ -251,6 +251,36 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
 
     ## Test re-launch detection for idle taxis
+    def test_taxi_relaunch(self):
+        # Set up single copy task pool, registered to test1
+        test_job = jobs.CopyJob(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
+
+        with self.my_disp:
+            self.my_disp.initialize_new_job_pool([test_job])
+
+        # Add a second taxi to the pool and queue it
+        taxi_two = taxi.Taxi('test2', 'test_pool', 120, 1)
+        with self.my_pool:
+            self.my_pool.register_new_taxi(taxi_two)
+            self.my_pool.submit_taxi_to_queue(taxi_two, self.my_queue,
+                pool_path=self.pool_path, dispatch_path=self.disp_path)
+
+        # Run queue with the second, jobless taxi
+        with self.squeue:
+            self.squeue.run_next_job()
+
+        with self.my_pool:
+            pool_stat = self.my_pool.get_all_taxis_in_pool()
+            print "PS: ", pool_stat
+
+        with self.my_disp:
+            task_blob = self.my_disp.get_task_blob()
+            print "TB: ", task_blob
+
+        print os.listdir('./test_run')
+            
+
+
 
     ## Test work completion (no tasks pending)
 
