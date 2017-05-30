@@ -76,7 +76,7 @@ class LocalQueue(BatchQueue):
 
         if (len(res) == 0):
             return {
-                'status': None,
+                'status': 'X',
                 'job_number': None,
                 'running_time': None
             }
