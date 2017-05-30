@@ -24,6 +24,9 @@ class LocalQueue(BatchQueue):
     def __del__(self):
         self.conn.close()
 
+    def _delete_queue_db(self):
+        os.unlink(self.queue_db_path + "serial_queue.sqlite3")
+
     def _write_table_structure(self):
         create_queue_str = """
             CREATE TABLE IF NOT EXISTS queue (
@@ -31,9 +34,11 @@ class LocalQueue(BatchQueue):
                 job_name string,
                 status string,
                 taxi_args string,
-                start_time int DEFAULT -1,
-            )
-        """
+                start_time int DEFAULT -1
+            )"""
+        
+        with self.conn:
+            self.conn.execute(create_queue_str)
 
     def execute_select(self, query, *query_args):
         try:
@@ -65,15 +70,28 @@ class LocalQueue(BatchQueue):
 
         res = self.execute_select(taxi_status_query, '%' + taxi_name + '%')
 
+        if (len(res) > 1):
+            print "WARNING: non-unique taxi status returned by queue: {} entires".format(len(res))
+            print res
+
+        if (len(res) == 0):
+            return {
+                'status': None,
+                'job_number': None,
+                'running_time': None
+            }
+
+        res = res[0]
+
         if (res['status']) == 'R':
-            res['run_time'] = time.time() - res['start_time']
+            run_time = time.time() - res['start_time']
         else:
-            res['run_time'] = None
+            run_time = None
 
         return {
             'status': res['status'],
             'job_number': res['id'],
-            'running_time': res['run_time'],
+            'running_time': run_time,
         }
 
     def launch_taxi(self, taxi, pool_path, dispatch_path):
@@ -85,7 +103,7 @@ class LocalQueue(BatchQueue):
         taxi_dict['dispatch_path'] = dispatch_path
         key_arg_list = ['name', 'cores', 'pool_name', 'time_limit', 'dispatch_path', 'pool_path']
 
-        taxi_args = [ "--{}: {}".format(k, taxi_dict[k]) for k in key_arg_list ]
+        taxi_args = [ "--{} {}".format(k, taxi_dict[k]) for k in key_arg_list ]
         taxi_args_str = " ".join(taxi_args)
 
         self.execute_update(taxi_launch_query, taxi.name, 'Q', taxi_args_str)

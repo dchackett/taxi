@@ -3,7 +3,7 @@
 import taxi
 import dispatcher
 import pool
-import tasks
+import jobs
 import task_runners
 
 import sys
@@ -28,7 +28,7 @@ parser.add_argument('--cores', type=int, required=True, help='Number of CPUs to 
 parser.add_argument('--pool_path', type=str, required=True, help='Path of pool backend DB.')
 parser.add_argument('--pool_name', type=str, required=True, help='Name of pool this taxi is assigned to.')
 parser.add_argument('--dispatch_path', type=str, required=True, help='Path of dispatch backend DB.')
-parser.add_argument('--time',  type=float, required=True, help='Number of seconds in time budget.')
+parser.add_argument('--time_limit',  type=float, required=True, help='Number of seconds in time budget.')
 #parser.add_argument('--log_dir', type=str, required=True, help='Logs go here.')
 #parser.add_argument('--work_dir', type=str, required=True, help='Working directory for taxi is here.')
 #    parser.add_argument('--shell',  type=str, required=True, help='Path to wrapper shell script.')
@@ -37,7 +37,7 @@ print sys.argv
 # TODO: shouldn't this work without the sys.argv explicit specification?
 parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..."
 
-taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time, cores=parg.cores, pool_name=parg.pool_name)
+taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time_limit, cores=parg.cores, pool_name=parg.pool_name)
 
 
 my_dispatch = dispatcher.SQLiteDispatcher(parg.dispatch_path)
@@ -119,7 +119,7 @@ while True:
 
         # Otherwise, flag task for execution
         try:
-            my_dispatch.claim_task(taxi, task_id)
+            my_dispatch.claim_task(taxi_obj, task_id)
         except dispatcher.TaskClaimException, e:
             ## Race condition safeguard: skips and tries again if the task status has changed
             print str(e)
@@ -127,15 +127,20 @@ while True:
 
 
     ## Execute task
+    taxi_obj.task_start_time = time.time()
+    
     if task['task_type'] == 'die':
         ## "Die" is a special task
         with my_dispatch:
             task_run_time = time.time() - taxi_obj.task_start_time
             my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
 
+        with my_pool:
+            my_pool.update_taxi_status(taxi_obj, 'H')
+
         sys.exit(0)
 
-    # Alright, this is a little odd...
+    # Alright, this is a little odd-looking with dumps and loads in the same line...
     task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
 
     failed_task = False

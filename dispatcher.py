@@ -257,6 +257,7 @@ class SQLiteDispatcher(Dispatcher):
         try:
             with self.conn:
                 self.conn.execute(query, query_args)
+                self.conn.commit()
         except:
             print "Failed to execute query: "
             print query
@@ -336,10 +337,10 @@ class SQLiteDispatcher(Dispatcher):
         if by_taxi is not None:
             update_str += """, by_taxi=?"""
             values.append(self._taxi_name(by_taxi))
-        update_str += """WHERE id=?"""
+        update_str += """ WHERE id=?"""
         values.append(task_id)
 
-        self.execute_update(update_str, values)
+        self.execute_update(update_str, *values)
 
     def count_unresolved_dependencies(self, task, task_blob):
         """Looks at the status of all jobs in the job forest DB that 'task' depends upon.
@@ -365,33 +366,32 @@ class SQLiteDispatcher(Dispatcher):
                 N_failed += 1
         return N_unresolved, N_failed
         
-    def enough_time_for_task(self, taxi, task):
+    def enough_time_for_task(self, my_taxi, task):
         """Checks whether a taxi has enough time to complete the given task."""
 
-        elapsed_time = time.time() - taxi.start_time
-        time_remaining = taxi.time_limit - elapsed_time
+        elapsed_time = time.time() - my_taxi.start_time
+        time_remaining = my_taxi.time_limit - elapsed_time
 
         return time_remaining > task['req_time']
 
-    def claim_task(self, taxi, task_id):
+    def claim_task(self, my_taxi, task_id):
         """Attempt to claim task for a given taxi.  Fails if the status has been changed from pending."""
 
         task_status = self.check_task_status(task_id)
         if task_status != 'pending':
             raise TaskClaimException("Failed to claim task {}: status {}".format(task_id, task_status))
 
-        self.update_task(task_id=task_id, status='active', by_taxi=taxi.name)
+        self.update_task(task_id=task_id, status='active', by_taxi=my_taxi.name)
 
     def _populate_task_table(self):
         ## TODO: is there a more efficient way than generating N queries using a Python for loop?
 
         for task in self.task_pool:
             task_query = """INSERT OR REPLACE INTO tasks
-            (id, task_type, task_args, depends_on, status, for_taxi, is_recurring, req_time, priority)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+            (task_type, task_args, depends_on, status, for_taxi, is_recurring, req_time, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
 
-            task_values = (task['id'], 
-                        task['task_type'], 
+            task_values = (task['task_type'], 
                         json.dumps(task['task_args']) if task.has_key('task_args') else None,
                         json.dumps(task['depends_on']),
                         task['status'], 

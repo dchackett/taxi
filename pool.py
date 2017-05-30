@@ -76,24 +76,25 @@ class Pool(object):
             return (time.time() - last_submit) < self.thrash_delay
 
 
-    def submit_taxi_to_queue(self, my_taxi, queue):
+    def submit_taxi_to_queue(self, my_taxi, queue, **kwargs):
         # Don't submit hold/error status taxis
-        taxi_status = self.get_taxi(my_taxi).status
+        pool_taxi = self.get_taxi(my_taxi)
+        taxi_status = pool_taxi.status
         if (taxi_status in ('H', 'E')):
-            print "Warning: did not submit taxi {} due to status flag {}.".format(my_taxi, taxi_status)
+            print "Warning: did not submit taxi {} due to status flag {}.".format(pool_taxi, taxi_status)
             return
 
         if (self.check_for_thrashing(my_taxi)):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {}; set to hold.".format(my_taxi)
-            self.update_taxi_status(my_taxi, 'H')
+            print "Thrashing detected for taxi {}; set to hold.".format(pool_taxi)
+            self.update_taxi_status(pool_taxi, 'H')
             return
 
         try:
-            queue.launch_taxi(my_taxi)
+            queue.launch_taxi(pool_taxi, **kwargs)
         except:
             ## TO-DO: add some error handling here
-            self.update_taxi_status(my_taxi, 'E')
+            self.update_taxi_status(pool_taxi, 'E')
             raise
 
         self.update_taxi_last_submitted(my_taxi, time.time())
@@ -119,11 +120,16 @@ class Pool(object):
 
     def update_taxi_queue_status(self, my_taxi, queue):
         queue_status = queue.report_taxi_status(my_taxi)['status']
+        pool_status = self.get_taxi(my_taxi).status
+
         if queue_status in ('Q', 'R'):
-            self.update_taxi_status(my_taxi, queue_status)
-            return
+            if pool_status in ('E', 'H'):
+                # Hold and error status must be changed explicitly
+                return
+            else:
+                self.update_taxi_status(my_taxi, queue_status)
+                return
         elif queue_status == 'X':
-            pool_status = self.get_taxi(my_taxi).status
             if pool_status in ('E', 'H'):
                 return
             else:
@@ -243,6 +249,7 @@ class SQLitePool(Pool):
         try:
             with self.conn:
                 self.conn.execute(query, query_args)
+                self.conn.commit()
         except:
             print "Failed to execute query: "
             print query
@@ -297,7 +304,7 @@ class SQLitePool(Pool):
         if (my_taxi.name is None):
             raise ValueError("Cannot register taxi with unspecified name!")
         if (my_taxi.name in all_taxi_names):
-            raise Exception("Taxi {} already registered with pool {}!".format(my_taxi.name, self.pool_name))
+            raise RuntimeError("Taxi {} already registered with pool {}!".format(my_taxi.name, self.pool_name))
             
         my_taxi.pool_name = self.pool_name
         self._add_taxi_to_pool(my_taxi)

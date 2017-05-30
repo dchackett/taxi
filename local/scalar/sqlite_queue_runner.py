@@ -5,6 +5,7 @@
 
 import sqlite3
 import os
+import subprocess
 
 class SQLiteSerialQueue:
 
@@ -29,8 +30,17 @@ class SQLiteSerialQueue:
         """
         Run the first available job in the queue.
         """
-        queued_list = self.conn.query("""SELECT * FROM queue WHERE status = 'Q' ORDER BY id ASC;""").fetchall()
+        queued_list = self.conn.execute("""SELECT * FROM queue WHERE status = 'Q' ORDER BY id ASC;""").fetchall()
+        if len(queued_list) == 0:
+            print "Warning: attempted to execute with no jobs in queue!"
+            return
 
-        os.system("taxi.sh " + queued_list[0]['taxi_args'])
+        taxi_call = "./taxi.sh " + queued_list[0]['taxi_args']
+        batch_out, batch_err = subprocess.Popen(taxi_call, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
 
+        print "BO: ", batch_out
+        print "BE: ", batch_err
+
+        self.conn.execute("""DELETE FROM queue WHERE id = ?;""", (queued_list[0]['id'],))
+        self.conn.commit()
 

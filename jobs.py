@@ -34,6 +34,17 @@ class Job(object):
         else:
             self.compiled['depends_on'] = [d.job_id for d in self.depends_on]
 
+class DieJob(Job):
+    def __init_(self, req_time=0, **kwargs):
+        super(DieJob, self).__init__(req_time=req_time, **kwargs)
+
+    def compile(self):
+        super(DieJob, self).compile()
+
+        self.compiled.update({
+            'task_type': 'die',
+        })
+
 
 class CopyJob(Job):
     def __init__(self, src, dest, req_time=60, **kwargs):
