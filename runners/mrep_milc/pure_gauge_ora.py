@@ -26,6 +26,8 @@ pure_gauge_ora_arg_list = [
     'loadg',        ## Path of gauge configuration to load from (or None for fresh start.)
     'saveg',        ## Path of gauge configuration to save to
     'fout',         ## Path of filename to write Monte Carlo output to
+    'label',        ## Text label for the ensemble
+    'start_traj',   ## Trajectory number for starting config
 ]
 
 # Structure of input file - see build_input_string() below
@@ -53,21 +55,45 @@ no_gauge_fix
 EOF
 """
 
+def pure_gauge_ora_ens_name(Ns, Nt, beta, label):
+    return "{Ns}_{Nt}_{beta}_{label}".format(Ns, Nt, beta, label)
+
+
 class PureGaugeORAJob(jobs.Job):
     def __init__(self, req_time=0, starter=None, **kwargs):
         super(PureGaugeORAJob, self).__init__(req_time=req_time, **kwargs)
 
+        for arg in pure_gauge_ora_arg_list:
+            # Some arguments are not intended to be passed to the constructor (or are optional)
+            if arg in ('loadg', 'saveg', 'fout', 'start_traj'):
+                continue
+            try:
+                setattr(self, arg, kwargs[arg])
+            except:
+                raise AttributeError("Missing PureGaugeORAJob argument: {}".format(arg))
+
         # Starter input verification
         if starter is None:
             self.loadg = None
+            self.start_traj = 0
         elif isinstance(starter, PureGaugeORAJob):
             self.loadg = starter.saveg
+            self.start_traj = starter.final_traj
         elif isinstance(starter, str):
             assert os.path.exists(starter)
             self.loadg = starter
+            try:
+                self.start_traj = kwargs['start_traj']
+            except:
+                raise AttributeError("Must specify start_traj with starter as file path!")
         else:
             raise TypeError("Inappropriate starter type: {}".format(type(starter)))
 
+        self.final_traj = self.start_traj + self.ntraj
+
+        self.ensemble_name = pure_gauge_ora_ens_name(self.Ns, self.Nt, self.beta, self.label)
+        self.saveg = "Gauge_" + self.ensemble_name + "_{}".format(self.final_traj)
+        self.fout = "out_" + self.ensemble_name + "_{}".format(self.final_traj)
 
     def compile(self):
         super(PureGaugeORAJob, self).compile()
@@ -83,7 +109,7 @@ class PureGaugeORARunner(task_runners.TaskRunner):
         self.binary = local_taxi.pure_gauge_ora_binary
 
         for arg in pure_gauge_ora_arg_list:
-            setattr(self, arg, kwargs[arg])
+            setattr(self, arg, kwargs.get(arg, None))
 
         ## Sanitize all paths
         self.loadg = task_runners.sanitized_path(kwargs['loadg'])
@@ -108,9 +134,6 @@ class PureGaugeORARunner(task_runners.TaskRunner):
         input_str = pure_gauge_ora_input_template.format(**input_dict)
 
         return input_str
-
-
-        
 
     def verify_output(self):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
@@ -155,7 +178,18 @@ class PureGaugeORARunner(task_runners.TaskRunner):
 
 
     def execute(self):
-        super(PureGaugeORARunner, self).execute()
+        if self.use_mpi:
+            exec_str = local_taxi.mpirun_str.format(self.cores)
+        else:
+            exec_str = "./"
+
+        input_str = self.build_input_string()
+
+        exec_str += self.binary + " << EOF >> {fout}\n".format(fout=self.fout)
+        exec_str += input_str
+
+        os.system(exec_str)
+
         self.verify_output()
 
 
