@@ -8,6 +8,8 @@ import platform
 
 import local_taxi
 
+import runners.flow as flow
+
 ## local_taxi should specify:
 # - "pure_gauge_ora_binary"
 
@@ -21,11 +23,12 @@ pure_gauge_ora_arg_list = [
     'ntraj',        ## Number of trajectories to run (after warmup) in total
     'warms',        ## Number of warmup trajectories to run
     'seed',         ## Seed for random number generator
-    'loadg',        ## Path of gauge configuration to load from (None for fresh start.)
+    'loadg',        ## Path of gauge configuration to load from (or None for fresh start.)
     'saveg',        ## Path of gauge configuration to save to
     'fout',         ## Path of filename to write Monte Carlo output to
 ]
 
+# Structure of input file - see build_input_string() below
 pure_gauge_ora_input_template = """
 prompt 0
 nx {Ns}
@@ -51,8 +54,20 @@ EOF
 """
 
 class PureGaugeORAJob(jobs.Job):
-    def __init__(self, req_time=0, **kwargs):
+    def __init__(self, req_time=0, starter=None, **kwargs):
         super(PureGaugeORAJob, self).__init__(req_time=req_time, **kwargs)
+
+        # Starter input verification
+        if starter is None:
+            self.loadg = None
+        elif isinstance(starter, PureGaugeORAJob):
+            self.loadg = starter.saveg
+        elif isinstance(starter, str):
+            assert os.path.exists(starter)
+            self.loadg = starter
+        else:
+            raise TypeError("Inappropriate starter type: {}".format(type(starter)))
+
 
     def compile(self):
         super(PureGaugeORAJob, self).compile()
@@ -142,3 +157,59 @@ class PureGaugeORARunner(task_runners.TaskRunner):
     def execute(self):
         super(PureGaugeORARunner, self).execute()
         self.verify_output()
+
+
+## Helper functions
+### Pure gauge stream-maker convenience functions
+def make_ora_job_stream(Ns, Nt, beta,
+                        N_configs,
+                        starter, req_time,
+                        nsteps=4, qhb_steps=1,
+                        start_count=0, N_traj=100, warms=0,
+                        label='1',
+                        streamseed=None, seeds=None,
+                        ora_class=PureGaugeORAJob):
+
+    assert issubclass(ora_class, PureGaugeORAJob), "hmc_class must be an PureGaugeORAJob or a subclass thereof, not {ora}".format(ora=str(ora_class))
+    
+    # Randomly generate a different seed for each hmc run
+    if streamseed is None:
+        streamseed = hash((Ns, Nt, beta, label))
+    seed(streamseed%10000)
+    
+    ora_stream = []
+    for cc, count in enumerate(range(start_count, start_count+N_configs)):
+        if seeds is None:        
+            job_seed = randint(0, 9999)
+        else:
+            job_seed = seeds[cc]
+            
+        new_job = ora_class(Ns=Ns, Nt=Nt, beta=beta,
+                         label=label, count=count, req_time=req_time, N_traj=N_traj,
+                         nsteps=nsteps, qhb_steps=qhb_steps, warms=warms,
+                         starter=starter, seed=job_seed)
+        
+        if isinstance(starter, PureGaugeORAJob):
+            new_job.depends_on.append(starter)
+        starter = new_job
+        ora_stream.append(new_job)
+        
+        warms = 0 # Only do warmups at beginning of stream
+        
+    # Let the first job know it's the beginning of a new branch/sub-trunk
+    ora_stream[0].branch_root = True
+        
+    return ora_stream        
+
+
+def flow_jobs_for_ora_jobs(ora_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
+    flow_jobs = []
+    for ora_job in ora_stream:
+        if not isinstance(ora_job, PureGaugeORAJob):
+            continue
+        if ora_job.count >= start_at_count:
+            new_job = flow.FileFlowJob(ora_job.saveg, req_time=req_time,
+                        tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon)
+            new_job.depends_on = [ora_job]
+            flow_jobs.append(new_job)
+    return flow_jobs
