@@ -81,20 +81,20 @@ class Pool(object):
         pool_taxi = self.get_taxi(my_taxi)
         taxi_status = pool_taxi.status
         if (taxi_status in ('H', 'E')):
-            print "Warning: did not submit taxi {} due to status flag {}.".format(pool_taxi, taxi_status)
+            print "Warning: did not submit taxi {} due to status flag {}.".format(my_taxi, taxi_status)
             return
 
         if (self.check_for_thrashing(my_taxi)):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {}; set to hold.".format(pool_taxi)
-            self.update_taxi_status(pool_taxi, 'H')
+            print "Thrashing detected for taxi {}; set to hold.".format(my_taxi)
+            self.update_taxi_status(my_taxi, 'H')
             return
 
         try:
-            queue.launch_taxi(pool_taxi, **kwargs)
+            queue.launch_taxi(my_taxi, **kwargs)
         except:
             ## TO-DO: add some error handling here
-            self.update_taxi_status(pool_taxi, 'E')
+            self.update_taxi_status(my_taxi, 'E')
             raise
 
         self.update_taxi_last_submitted(my_taxi, time.time())
@@ -212,7 +212,8 @@ class SQLitePool(Pool):
                 time_limit real,
                 cores integer,
                 time_last_submitted real,
-                status text
+                status text,
+                dispatch text
             )"""
         create_pool_str = """
             CREATE TABLE IF NOT EXISTS pools (
@@ -233,6 +234,8 @@ class SQLitePool(Pool):
         """
         new_taxi = taxi.Taxi()
         new_taxi.rebuild_from_dict(db_taxi)
+        new_taxi.pool_path = self.db_path
+
         return new_taxi
 
 
@@ -294,21 +297,31 @@ class SQLitePool(Pool):
 
         return
 
-    def register_new_taxi(self, my_taxi):
+    def update_taxi_dispatch(self, my_taxi, dispatch_path):
+        taxi_name = self._taxi_name(my_taxi)
+
+        update_query = """UPDATE taxis SET dispatch = ? WHERE name = ?"""
+        self.execute_update(update_query, dispatch_path, taxi_name)
+
+    def register_taxi(self, my_taxi):
         """
-        Register a new taxi with the pool.
+        Register a taxi with the pool.  (Adds to the pool if the taxi is new;
+        otherwise, sets taxi pool attributes.)
         """
-        taxi_name_query = """SELECT name FROM taxis;"""
-        all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
+        my_taxi.pool_name = self.pool_name
+        my_taxi.pool_path = self.db_path
 
         if (my_taxi.name is None):
             raise ValueError("Cannot register taxi with unspecified name!")
+
+        taxi_name_query = """SELECT name FROM taxis;"""
+        all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
+
         if (my_taxi.name in all_taxi_names):
-            raise RuntimeError("Taxi {} already registered with pool {}!".format(my_taxi.name, self.pool_name))
-            
-        my_taxi.pool_name = self.pool_name
-        my_taxi.pool_path = self.db_path
-        self._add_taxi_to_pool(my_taxi)
+            # Already registered in pool DB
+            return
+        else:
+            self._add_taxi_to_pool(my_taxi)
 
     def _add_taxi_to_pool(self, my_taxi):
         """
