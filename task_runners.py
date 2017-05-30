@@ -4,6 +4,9 @@ import os
 #import local_taxi
 
 def sanitized_path(path):
+    if path is None:
+        return None
+
     return "".join([c for c in path if c.isalpha() or c.isdigit() or c==' ' or c=='_' or c=='.' or c=='/']).rstrip()
 
 def runner_rebuilder_factory():
