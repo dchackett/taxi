@@ -45,8 +45,6 @@ class TaskRunner(object):
         return ""
 
     def execute(self):
-        print "EXECUTE"
-        print self
         if self.use_mpi:
             exec_str = local_taxi.mpirun_str.format(self.cores)
         else:
@@ -60,7 +58,6 @@ class TaskRunner(object):
 class CopyRunner(TaskRunner):
 
     def __init__(self, **kwargs):
-        print "KEYS ", kwargs.keys()
         for arg in ['src', 'dest']:
             assert arg in kwargs.keys()
 
