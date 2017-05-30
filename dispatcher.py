@@ -59,7 +59,7 @@ class Dispatcher(object):
 
         raise NotImplementedError
     
-    def update_task(self, task_id, status, run_time=None, by_taxi=None):
+    def update_task(self, task_id, status, start_time=None, run_time=None, by_taxi=None):
         """Change the status of task with task_id in job forest DB.  For claiming
         task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
         used to record runtime and update status simultaneously (one less DB interaction)."""
@@ -165,24 +165,30 @@ class Dispatcher(object):
             raise ValueError("Invalid choice of priority assignment method: {}".format(priority_method))
 
 
-    def _compile(self, job_pool):
+    def _compile(self, job_pool, start_id):
         # Give each job an integer id
         for jj, job in enumerate(job_pool):
-            job.job_id = jj
-            
+            job.job_id = jj + start_id + 1
+
         # Tell all jobs to compile themselves
         for job in job_pool:
             job.compile()
-            
+
         self.task_pool = [job.compiled for job in job_pool]
 
     def _populate_task_table(self):
         raise NotImplementedError
 
+    def _get_max_task_id(self):
+        raise NotImplementedError
+
     def initialize_new_job_pool(self, job_pool, priority_method='tree'):
+        # If we are adding a new pool to an existing dispatcher, 
+        # start enumerating task IDs at the end
+        start_id = self._get_max_task_id()
         self._find_trees(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
-        self._compile(job_pool)
+        self._compile(job_pool, start_id)
         self._populate_task_table()
 
 
@@ -235,6 +241,7 @@ class SQLiteDispatcher(Dispatcher):
                 by_taxi text,
                 is_recurring bool,
                 req_time integer DEFAULT 0,
+                start_time real DEFAULT -1,
                 run_time real DEFAULT -1,
                 priority integer DEFAULT -1
             )"""
@@ -267,7 +274,7 @@ class SQLiteDispatcher(Dispatcher):
 
         return
 
-    def get_task_blob(self, my_taxi, include_complete=False):
+    def get_task_blob(self, my_taxi=None, include_complete=False):
         """Get all incomplete tasks pertinent to this taxi (or to all taxis.)"""
 
         if (my_taxi is None):
@@ -324,13 +331,16 @@ class SQLiteDispatcher(Dispatcher):
         return dict(task_res[0])['status']
         
    
-    def update_task(self, task_id, status, run_time=None, by_taxi=None):
+    def update_task(self, task_id, status, start_time=None, run_time=None, by_taxi=None):
         """Change the status of task with task_id in job forest DB.  For claiming
         task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
         used to record runtime and update status simultaneously (one less DB interaction)."""
 
         update_str = """UPDATE tasks SET status=?"""
         values = [status]
+        if start_time is not None:
+            update_str += """, start_time=?"""
+            values.append(start_time)
         if run_time is not None:
             update_str += """, run_time=?"""
             values.append(run_time)
@@ -402,4 +412,12 @@ class SQLiteDispatcher(Dispatcher):
 
             self.execute_update(task_query, *task_values)
         
+    def _get_max_task_id(self):
+        task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""
+        max_id_query = self.execute_select(task_id_query)
+
+        if len(max_id_query) == 0:
+            return 0
+        else:
+            return max_id_query[0]
 
