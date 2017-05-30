@@ -3,8 +3,9 @@ import os
 
 ### Job classes
 class Job(object):
-    def __init__(self, req_time=0, **kwargs):
+    def __init__(self, req_time=0, for_taxi=None, **kwargs):
         self.req_time = req_time
+        self.for_taxi = for_taxi
         self.status = 'pending'
         self.is_recurring = False
 
@@ -26,6 +27,7 @@ class Job(object):
             'status'    :   self.status,
             'is_recurring': self.is_recurring,
             'priority':     self.priority,
+            'for_taxi':     self.for_taxi,
         }
         
         # Get dependencies in job_id format

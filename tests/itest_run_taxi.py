@@ -51,15 +51,17 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         self.pool_ld = './test_run/pool/log'
         self.my_pool = pool.SQLitePool(self.pool_path, 'test_pool', self.pool_wd, self.pool_ld)
 
-        with self.my_pool:
-            self.my_pool.register_new_taxi(self.my_taxi)
-
         ## Set up test dispatch
         self.disp_path = './test_run/test-disp.sqlite'
         self.my_disp = dispatcher.SQLiteDispatcher(self.disp_path)
 
         with self.my_disp:
             pass
+        
+        ## Registration
+        with self.my_pool:
+            self.my_pool.register_taxi(self.my_taxi)
+            self.my_disp.register_taxi(self.my_taxi, self.my_pool)
 
 
     def tearDown(self):
@@ -86,8 +88,10 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     def test_reregister_taxi(self):
         with self.my_pool:
-            with self.assertRaises(RuntimeError):
-                self.my_pool.register_new_taxi(self.my_taxi)
+            self.my_pool.register_taxi(self.my_taxi)
+            pool_stat = self.my_pool.get_all_taxis_in_pool()
+
+        self.assertEqual(len(pool_stat), 1)
 
     ## Test 'die' job
     def test_die(self):
@@ -102,8 +106,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(len(task_blob.keys()), 1)
 
         with self.my_pool:
-            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue, 
-                pool_path=self.pool_path, dispatch_path=self.disp_path)
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
 
         queue_stat = self.my_queue.report_taxi_status(self.my_taxi)
         self.assertEqual(queue_stat['status'], 'Q')
@@ -146,8 +149,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.my_pool.update_taxi_status(self.my_taxi, 'H')
 
         with self.my_pool:
-            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue,
-                pool_path=self.pool_path, dispatch_path=self.disp_path)
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
 
             self.assertEqual(self.my_pool.get_taxi(self.my_taxi).status, 'H')
 
@@ -179,8 +181,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.my_disp.initialize_new_job_pool([test_job])
 
         with self.my_pool:
-            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue,
-                pool_path=self.pool_path, dispatch_path=self.disp_path)
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
 
         with self.squeue:
             self.squeue.run_next_job()
@@ -224,8 +225,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
         
         with self.my_pool:
-            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue,
-                pool_path=self.pool_path, dispatch_path=self.disp_path)
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
 
         with self.squeue:
             self.squeue.run_next_job()
@@ -261,26 +261,51 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         # Add a second taxi to the pool and queue it
         taxi_two = taxi.Taxi('test2', 'test_pool', 120, 1)
         with self.my_pool:
-            self.my_pool.register_new_taxi(taxi_two)
-            self.my_pool.submit_taxi_to_queue(taxi_two, self.my_queue,
-                pool_path=self.pool_path, dispatch_path=self.disp_path)
+            self.my_pool.register_taxi(taxi_two)
+            self.my_disp.register_taxi(taxi_two, self.my_pool)
+            self.my_pool.submit_taxi_to_queue(taxi_two, self.my_queue)
+
+        with self.my_pool:
+            pool_stat = self.my_pool.get_all_taxis_in_pool()
 
         # Run queue with the second, jobless taxi
         with self.squeue:
             self.squeue.run_next_job()
 
+        # After one step, the second taxi should be held, the first still idle
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
-            print "PS: ", pool_stat
+            self.assertEqual(pool_stat[0].status, 'I')
+            self.assertEqual(pool_stat[1].status, 'H')
 
+        # The first taxi should now be queued into the 'batch' system
+        qstat = self.my_queue.report_taxi_status(self.my_taxi)
+        self.assertEqual(qstat['job_number'], 2)
+
+        # And the copy task should still be unfinished
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob()
-            print "TB: ", task_blob
+            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=False)
+            self.assertEqual(len(task_blob), 1)
 
-        print os.listdir('./test_run')
-            
+        # Step into the queue one more time
+        with self.squeue:
+            self.squeue.run_next_job()
 
+        # Now both taxis should be held
+        with self.my_pool:
+            pool_stat = self.my_pool.get_all_taxis_in_pool()
+            self.assertEqual(pool_stat[0].status, 'H')
+            self.assertEqual(pool_stat[1].status, 'H')
 
+        # The task should be finished
+        with self.my_disp:
+            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
+            self.assertEqual(len(task_blob), 1)
+            self.assertEqual(task_blob[1]['status'], 'complete')
+
+        # And the destination file should exist
+        files = os.listdir('./test_run')
+        self.assertTrue(self.dst_files[0].split('/')[-1] in files)
 
     ## Test work completion (no tasks pending)
 

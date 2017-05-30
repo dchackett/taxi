@@ -94,13 +94,11 @@ class LocalQueue(BatchQueue):
             'running_time': run_time,
         }
 
-    def launch_taxi(self, taxi, pool_path, dispatch_path):
+    def launch_taxi(self, taxi):
         taxi_launch_query = """INSERT INTO queue
             (job_name, status, taxi_args) VALUES (?, ?, ?);"""
 
         taxi_dict = taxi.to_dict()
-        taxi_dict['pool_path'] = pool_path
-        taxi_dict['dispatch_path'] = dispatch_path
         key_arg_list = ['name', 'cores', 'pool_name', 'time_limit', 'dispatch_path', 'pool_path']
 
         taxi_args = [ "--{} {}".format(k, taxi_dict[k]) for k in key_arg_list ]

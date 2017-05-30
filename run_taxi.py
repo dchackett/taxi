@@ -38,7 +38,7 @@ print sys.argv
 # TODO: shouldn't this work without the sys.argv explicit specification?
 parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..."
 
-taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time_limit, cores=parg.cores, pool_name=parg.pool_name)
+taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time_limit, cores=parg.cores)
 
 
 my_dispatch = dispatcher.SQLiteDispatcher(parg.dispatch_path)
@@ -47,6 +47,10 @@ my_pool = pool.SQLitePool(
     pool_name=parg.pool_name,
 )
 my_queue = local_queue.LocalQueue()
+
+with my_pool:
+    my_pool.register_taxi(taxi_obj)
+    my_dispatch.register_taxi(taxi_obj, my_pool)
 
 ## Decoding for runner objects; relevant TaskRunner subclasses
 ## should be imported in local_taxi above!
@@ -147,7 +151,6 @@ while True:
 
     # Alright, this is a little odd-looking with dumps and loads in the same line...
     task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
-    print "task_obj ", task_obj
 
     failed_task = False
     try:
