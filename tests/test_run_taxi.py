@@ -44,7 +44,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         self.squeue = qrun.SQLiteSerialQueue()
 
         ## Set up test pool
-        self.my_taxi = taxi.Taxi('test1', 'test_pool', 60, 1)
+        self.my_taxi = taxi.Taxi('test1', 'test_pool', 120, 1)
 
         self.pool_path = './test_run/test-pool.sqlite'
         self.pool_wd = './test_run/pool'
@@ -57,11 +57,6 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         ## Set up test dispatch
         self.disp_path = './test_run/test-disp.sqlite'
         self.my_disp = dispatcher.SQLiteDispatcher(self.disp_path)
-
-        # init_job_pool = [ jobs.CopyJob(self.src_files[0], self.dst_files[0]) ]
-
-        # with self.my_disp:
-        #     self.my_disp.initialize_new_job_pool(init_job_pool)
 
         with self.my_disp:
             pass
@@ -114,34 +109,26 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         self.assertEqual(queue_stat['status'], 'Q')
         self.assertEqual(queue_stat['running_time'], None)
 
-
-        ## Check the aftermath; first, queue should be empty now
-        queue_stat = self.my_queue.report_taxi_status(self.my_taxi)
-        print "QSTAT: ", queue_stat
-
         ## Manually trigger the queue - wouldn't be needed with a real queueing system
         with self.squeue:
             self.squeue.run_next_job()
             
         ## Check the aftermath; first, queue should be empty now
         queue_stat = self.my_queue.report_taxi_status(self.my_taxi)
-        print "QSTAT: ", queue_stat
-        self.assertEqual(queue_stat['status'], None)
+        self.assertEqual(queue_stat['status'], 'X')
 
 
         ## Second, taxi should be held and show recent execution
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
-            print "PSTAT: ", pool_stat
             self.assertEqual(len(pool_stat), 1)
             self.assertEqual(pool_stat[0].status, 'H')
-            self.assertLess(pool_stat[0].time_last_submitted - time.time(), 60.0)
+            self.assertLess(time.time() - pool_stat[0].time_last_submitted, 60.0)
 
 
         ## Third, 'die' task should be complete
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
-            print "TB: ", task_blob
             self.assertEqual(task_blob[1]['task_type'], 'die')
             self.assertEqual(task_blob[1]['status'], 'complete')
             self.assertGreater(task_blob[1]['run_time'], 0.0)
@@ -181,11 +168,89 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test single copy job, round-trip
     def test_single_copy(self):
-        pass
 
-    ## Test two copy jobs, with dependency
+        ## Target file shouldn't exist yet
+        files = os.listdir('./test_run')
+        self.assertFalse(self.dst_files[0].split('/')[-1] in files)
 
-    ## Test re-launch detection after job
+        test_job = jobs.CopyJob(self.src_files[0], self.dst_files[0])
+
+        with self.my_disp:
+            self.my_disp.initialize_new_job_pool([test_job])
+
+        with self.my_pool:
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue,
+                pool_path=self.pool_path, dispatch_path=self.disp_path)
+
+        with self.squeue:
+            self.squeue.run_next_job()
+
+        ## Check for successful copy
+        files = os.listdir('./test_run')
+        self.assertTrue(self.dst_files[0].split('/')[-1] in files)
+
+        ## Check for correct pool status
+        with self.my_pool:
+            self.my_pool.update_all_taxis_queue_status(self.my_queue)
+            pool_stat = self.my_pool.get_all_taxis_in_pool()
+            self.assertEqual(pool_stat[0].status, 'H')
+            self.assertLess(time.time() - pool_stat[0].time_last_submitted, 60.0)
+
+        ## Check for correct dispatcher status
+        with self.my_disp:
+            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
+            self.assertEqual(len(task_blob), 1)
+            self.assertEqual(task_blob.values()[0]['status'], 'complete')
+            self.assertEqual(task_blob.values()[0]['task_type'], 'CopyRunner')
+
+
+    ## Test multiple copy jobs, with dependency
+    def test_copy_with_dependency(self):
+
+        files = os.listdir('./test_run')
+        for i in range(3):
+            self.assertFalse(self.dst_files[i].split('/')[-1] in files)
+
+        job_pool = []
+        for i in range(3):
+            job_pool.append(jobs.CopyJob(self.src_files[i], self.dst_files[i]))
+
+        job_pool[1].depends_on = [job_pool[0]]
+        job_pool[2].depends_on = [job_pool[0], job_pool[1]]
+        job_pool.reverse()  ## Reversing so the execution order doesn't trivially match the dependency
+
+        with self.my_disp:
+            self.my_disp.initialize_new_job_pool(job_pool)
+            task_blob = self.my_disp.get_task_blob(self.my_taxi)
+        
+        with self.my_pool:
+            self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue,
+                pool_path=self.pool_path, dispatch_path=self.disp_path)
+
+        with self.squeue:
+            self.squeue.run_next_job()
+
+        ## Check for successful copy of both files
+        files = os.listdir('./test_run')
+        for i in range(3):
+            self.assertTrue(self.dst_files[i].split('/')[-1] in files)
+
+        ## Check that execution happened in the expected order
+        ## TODO: Currently done based on filesystem info; should we store start_time for tasks, as well?
+        with self.my_disp:
+            task_blob = self.my_disp.get_task_blob(include_complete=True)
+            for task in task_blob.values():
+                self.assertEqual(task['status'], 'complete')
+
+            # Should have run in reverse order, since we reversed the job pool above
+            self.assertGreater(task_blob[1]['start_time'], task_blob[2]['start_time'])
+            self.assertGreater(task_blob[2]['start_time'], task_blob[3]['start_time'])
+
+
+
+
+
+    ## Test re-launch detection for idle taxis
 
     ## Test work completion (no tasks pending)
 
@@ -194,6 +259,8 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
     ## Test attempting to run a previously failed task
 
     ## Test attempting to run an unresolved dependency
+
+    ## Test attempting to run with insufficient time to complete
 
 
 

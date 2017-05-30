@@ -9,6 +9,7 @@ import task_runners
 import sys
 import argparse
 import time
+import json
 
 import local_taxi
 import local_queue
@@ -70,8 +71,11 @@ while True:
         found_ready_task = False
 
         # Order tasks in blob by priority
-        task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=dispatcher.task_priority_sort) ]
-
+        if (task_blob is None) or (len(task_blob) == 0):
+            task_priority_ids = []
+        else:
+            task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=dispatcher.task_priority_sort) ]
+ 
         for task_id in task_priority_ids:
             task = task_blob[task_id]
 
@@ -127,12 +131,13 @@ while True:
 
 
     ## Execute task
-    taxi_obj.task_start_time = time.time()
+    task_start_time = time.time()
+    print "EXECUTING TASK ", task
     
     if task['task_type'] == 'die':
         ## "Die" is a special task
         with my_dispatch:
-            task_run_time = time.time() - taxi_obj.task_start_time
+            task_run_time = time.time() - task_start_time
             my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
 
         with my_pool:
@@ -142,6 +147,7 @@ while True:
 
     # Alright, this is a little odd-looking with dumps and loads in the same line...
     task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
+    print "task_obj ", task_obj
 
     failed_task = False
     try:
@@ -150,10 +156,11 @@ while True:
         ## TODO: some exception logging here?
         ## Record task as failed
         failed_task = True
+        raise
 
     ## Record exit status, time taken, etc.
     taxi_obj.task_finish_time = time.time()
-    task_run_time = taxi_obj.task_finish_time - taxi_obj.task_start_time
+    task_run_time = taxi_obj.task_finish_time - task_start_time
 
     if failed_task:
         task_status = 'failed'
@@ -164,8 +171,6 @@ while True:
             task_status = 'complete'
 
     with my_dispatch:
-        my_dispatch.update_task(task['id'], task_status, run_time=task_run_time, by_taxi=taxi_obj)
-
-
+        my_dispatch.update_task(task['id'], task_status, start_time=task_start_time, run_time=task_run_time, by_taxi=taxi_obj)
 
     
