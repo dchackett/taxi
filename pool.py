@@ -307,9 +307,8 @@ class SQLitePool(Pool):
             raise RuntimeError("Taxi {} already registered with pool {}!".format(my_taxi.name, self.pool_name))
             
         my_taxi.pool_name = self.pool_name
+        my_taxi.pool_path = self.db_path
         self._add_taxi_to_pool(my_taxi)
-
-        return my_taxi
 
     def _add_taxi_to_pool(self, my_taxi):
         """
