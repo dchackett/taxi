@@ -42,6 +42,8 @@ class TaskRunner(object):
         return ""
 
     def execute(self):
+        print "EXECUTE"
+        print self
         if self.use_mpi:
             exec_str = local_taxi.mpirun_str.format(self.cores)
         else:
@@ -55,25 +57,26 @@ class TaskRunner(object):
 class CopyRunner(TaskRunner):
 
     def __init__(self, **kwargs):
-        for arg in ['src', 'dst']:
+        print "KEYS ", kwargs.keys()
+        for arg in ['src', 'dest']:
             assert arg in kwargs.keys()
 
         self.binary = "rsync -Paz"
 
         self.src = kwargs['src']
-        self.dst = kwargs['dst']
+        self.dest = kwargs['dest']
 
         # Sanitize file paths
         assert isinstance(self.src, basestring)
-        assert isinstance(self.dst, basestring)
+        assert isinstance(self.dest, basestring)
 
         self.src = sanitized_path(self.src)
-        self.dst = sanitized_path(self.dst)
+        self.dest = sanitized_path(self.dest)
 
         self.use_mpi = False
 
     def build_input_string(self):
-        return "{} {}".format(self.src, self.dst)
+        return "{} {}".format(self.src, self.dest)
 
 
 

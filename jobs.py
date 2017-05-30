@@ -58,7 +58,7 @@ class CopyJob(Job):
         super(CopyJob, self).compile()
         
         self.compiled.update({
-                'task_type' : 'copy',
+                'task_type' : 'CopyRunner',
                 'task_args' : {
                     'src' : self.src,
                     'dest' : self.dest

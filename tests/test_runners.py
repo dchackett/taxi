@@ -11,15 +11,15 @@ from task_runners import *
 class TestBaseTaskRunner(unittest.TestCase):
     
     def test_json_rebuild(self):
-        json_one = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dst': 'xyz'} })
-        json_two = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dst': 'xyz', 'bad_arg': 4} })
+        json_one = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dest': 'xyz'} })
+        json_two = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': 'abc', 'dest': 'xyz', 'bad_arg': 4} })
         json_three = json.dumps({'task_type': 'FakeRunner'})
 
         runner_parser = runner_rebuilder_factory()
 
         obj_one = json.loads(json_one, object_hook=runner_parser)
         self.assertTrue(isinstance(obj_one, CopyRunner))
-        self.assertEqual(obj_one.dst, 'xyz')
+        self.assertEqual(obj_one.dest, 'xyz')
 
         obj_two = json.loads(json_two, object_hook=runner_parser)
         self.assertTrue(isinstance(obj_two, CopyRunner))
@@ -34,7 +34,7 @@ class TestCopyRunner(unittest.TestCase):
 
     def setUp(self):
         self.src = 'test_file_abc'
-        self.dst = 'test_file_xyz'
+        self.dest = 'test_file_xyz'
 
         self.runner_parser = runner_rebuilder_factory()
 
@@ -42,15 +42,15 @@ class TestCopyRunner(unittest.TestCase):
 
     def tearDown(self):
         os.remove(self.src)
-        os.remove(self.dst)
+        os.remove(self.dest)
 
     def test_copy(self):
-        json_copy = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': self.src, 'dst': self.dst } })
+        json_copy = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': self.src, 'dest': self.dest } })
 
         copy_run = json.loads(json_copy, object_hook=self.runner_parser)
         copy_run.execute()
 
-        self.assertTrue(os.path.exists(self.dst))
+        self.assertTrue(os.path.exists(self.dest))
 
 
 if __name__ == '__main__':
