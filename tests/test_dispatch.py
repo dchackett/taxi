@@ -14,7 +14,6 @@ class TestSQLiteBase(unittest.TestCase):
         self.test_dispatch = SQLiteDispatcher(self.test_filename)
 
     def tearDown(self):
-#        pass
         os.unlink(self.test_filename)
     
 
@@ -51,7 +50,6 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             self.test_dispatch.initialize_new_job_pool(test_job_pool)
 
             task_blob = self.test_dispatch.get_task_blob(None, include_complete=True)
-            print task_blob
             read_task = task_blob[1]
             read_task_two = task_blob[2]
 
