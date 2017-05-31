@@ -1,0 +1,9 @@
+include src/taxi/*.py
+include src/taxi/local/*.py
+graft src/taxi/runners
+graft src/taxi/tools
+
+graft examples
+graft tests
+
+global-exclude *.py[cod] __pycache__

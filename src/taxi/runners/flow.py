@@ -130,4 +130,5 @@ class FlowRunner(taxi.jobs.TaskRunner):
 
         self.verify_output()
 
-class FileFlowRunner(FlowRunner)
+class FileFlowRunner(FlowRunner):
+    pass
