@@ -3,11 +3,12 @@
 *.egg-info
 build
 bin
+dist
+test_run
 
-src/taxi/local_taxi.py
-src/taxi/local_util.py
-src/taxi/taxi.sh
-src/taxi/sqlite_queue_runner.py
+src/taxi/local/local_taxi.py
+src/taxi/local/local_queue.py
+src/taxi/local/sqlite_queue_runner.py
 
 .vscode
 .eggs
