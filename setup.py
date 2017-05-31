@@ -8,7 +8,7 @@ import os
 import shutil
 import errno
     
-machine_list = ['scalar']
+machine_list = ['scalar', 'cu_hep']
 
 class LocalizeCommand(distutils.cmd.Command):
     """Custom command that localizes Taxi install for a particular machine."""
