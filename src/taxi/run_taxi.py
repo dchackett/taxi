@@ -5,6 +5,10 @@ import taxi.dispatcher
 import taxi.pool
 import taxi.jobs
 
+## All runners to be used must be imported here as well!
+import taxi.runners.flow
+import taxi.runners.mrep_milc.pure_gauge_ora
+
 import sys
 import argparse
 import time
@@ -151,7 +155,7 @@ while True:
 
     failed_task = False
     try:
-        task_obj.execute()
+        task_obj.execute(cores=taxi_obj.cores)
     except:
         ## TODO: some exception logging here?
         ## Record task as failed

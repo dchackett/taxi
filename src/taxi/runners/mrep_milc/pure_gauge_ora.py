@@ -7,6 +7,8 @@ import taxi.runners.flow as flow
 import os, sys
 import platform
 
+from random import seed, randint
+
 ## local_taxi should specify:
 # - "pure_gauge_ora_binary"
 
@@ -53,7 +55,7 @@ EOF
 """
 
 def pure_gauge_ora_ens_name(Ns, Nt, beta, label):
-    return "{Ns}_{Nt}_{beta}_{label}".format(Ns, Nt, beta, label)
+    return "{Ns}_{Nt}_{beta}_{label}".format(Ns=Ns, Nt=Nt, beta=beta, label=label)
 
 
 class PureGaugeORAJob(taxi.jobs.Job):
@@ -92,12 +94,22 @@ class PureGaugeORAJob(taxi.jobs.Job):
         self.saveg = "Gauge_" + self.ensemble_name + "_{}".format(self.final_traj)
         self.fout = "out_" + self.ensemble_name + "_{}".format(self.final_traj)
 
+    def to_dict(self):
+        ret_dict = {}
+        for k in pure_gauge_ora_arg_list:
+            try:
+                ret_dict[k] = getattr(self, k)
+            except AttributeError:
+                ret_dict[k] = None
+        
+        return ret_dict
+
     def compile(self):
         super(PureGaugeORAJob, self).compile()
 
         self.compiled.update({
             'task_type': 'PureGaugeORARunner',
-            'task_args': { k: getattr(self, k, default=None) for k in pure_gauge_ora_arg_list },
+            'task_args': self.to_dict(),
         })
 
 
@@ -114,7 +126,14 @@ class PureGaugeORARunner(taxi.jobs.TaskRunner):
         self.fout = taxi.jobs.sanitized_path(kwargs['fout'])
 
     def to_dict(self):
-        return { k: getattr(self, k, default=None) for k in pure_gauge_ora_arg_list }
+        ret_dict = {}
+        for k in pure_gauge_ora_arg_list:
+            try:
+                ret_dict[k] = getattr(self, k)
+            except AttributeError:
+                ret_dict[k] = None
+        
+        return ret_dict
 
     def build_input_string(self):
         input_dict = self.to_dict()
@@ -163,8 +182,10 @@ class PureGaugeORARunner(taxi.jobs.TaskRunner):
                 elif line.startswith("exit: "):
                     count_exit += 1     
                     
-        if count_gmes < self.ntraj:
-            print "HMC ok check fails: Not enough GMES in " + self.fout + " %d/%d"%(self.ntraj, count_gmes)
+        expect_gmes = self.ntraj / self.tpm
+        
+        if count_gmes < expect_gmes:
+            print "HMC ok check fails: Not enough GMES in " + self.fout + " %d/%d"%(count_gmes, expect_gmes)
             raise RuntimeError
             
         if count_exit < 1:
@@ -174,9 +195,9 @@ class PureGaugeORARunner(taxi.jobs.TaskRunner):
         return        
 
 
-    def execute(self):
-        if self.use_mpi:
-            exec_str = local_taxi.mpirun_str.format(self.cores)
+    def execute(self, cores):
+        if local_taxi.use_mpi:
+            exec_str = local_taxi.mpirun_str.format(cores)
         else:
             exec_str = "./"
 
@@ -197,7 +218,7 @@ def make_ora_job_stream(Ns, Nt, beta,
                         starter, req_time,
                         nsteps=4, qhb_steps=1,
                         start_count=0, ntraj=100, warms=0,
-                        label='1',
+                        label='1', tpm=10,
                         streamseed=None, seeds=None,
                         ora_class=PureGaugeORAJob):
 
@@ -218,7 +239,7 @@ def make_ora_job_stream(Ns, Nt, beta,
         new_job = ora_class(Ns=Ns, Nt=Nt, beta=beta,
                          label=label, count=count, req_time=req_time, ntraj=ntraj,
                          nsteps=nsteps, qhb_steps=qhb_steps, warms=warms,
-                         starter=starter, seed=job_seed)
+                         starter=starter, seed=job_seed, tpm=tpm)
         
         if isinstance(starter, PureGaugeORAJob):
             new_job.depends_on.append(starter)

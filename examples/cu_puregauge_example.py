@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import taxi
+import taxi.pool
+import taxi.dispatcher
 import taxi.runners.flow as run_flow
 import taxi.runners.mrep_milc.pure_gauge_ora as run_pg_ora
 
@@ -33,7 +35,7 @@ hmc_pool = seed_stream + fork_stream
 flow_pool = run_flow.flow_jobs_for_hmc_jobs(hmc_pool,
     req_time=60,
     tmax=1,
-    start_at_count=2
+    start_at_traj=200
 )
 
 job_pool = hmc_pool + flow_pool
@@ -51,12 +53,12 @@ for i in range(2):
 
 ## Set up pool and dispatch
 ## TODO: this feels like it could be condensed into a single convenience function
-base_path = "/Users/eneil/taxi-test"
-pool_path = base_path + "test-pool.sqlite"
+base_path = "/usr/users/eneil/taxi-test"
+pool_path = base_path + "/test-pool.sqlite"
 pool_wd = base_path + "/pool/"
 pool_ld = base_path + "/pool/log"
 
-disp_path = base_path + "test-disp.sqlite"
+disp_path = base_path + "/test-disp.sqlite"
 
 my_pool = taxi.pool.SQLitePool(pool_path, pool_name, pool_wd, pool_ld)
 my_disp = taxi.dispatcher.SQLiteDispatcher(disp_path)

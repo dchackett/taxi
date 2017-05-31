@@ -5,6 +5,7 @@
 import os
 import subprocess
 import re
+import time
 
 from taxi.batch_queue import *
 from taxi import mkdir_p
@@ -29,7 +30,7 @@ class LocalQueue(BatchQueue):
             taxi_job_number = re.findall("job_number:\W+(\d+)", qout)
 
             usage_lines = re.findall("usage:", qout)
-            if len(usage_line == 0):
+            if len(usage_lines) == 0:
                 taxi_status = 'Q'
             else:
                 taxi_status = 'R'

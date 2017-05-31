@@ -58,17 +58,30 @@ class FlowJob(taxi.jobs.Job):
     def generate_outfilename(self):
         self.fout = "flow_" + self.ensemble_name + "_{}".format(self.traj)
         
+    def to_dict(self):
+        ## Methods like this are starting to look like trying to be too clever with
+        ## 'automatic' keyword specification from a list...maybe they should be removed.
+        ret_dict = {}
+        for k in flow_arg_list:
+            try:
+                ret_dict[k] = getattr(self, k)
+            except AttributeError:
+                ret_dict[k] = None
+        
+        return ret_dict
+
+
     def compile(self):
         super(FlowJob, self).compile()
 
         # Package in to JSON forest format
         self.compiled.update({
             'task_type' : None, ## abstract task
-            'task_args': { k: getattr(self, k, default=None) for k in flow_arg_list },
+            'task_args': self.to_dict(),
         })
 
 class FileFlowJob(FlowJob):
-    def __init__(self, **kwargs):
+    def __init__(self, req_time, **kwargs):
         for arg in flow_arg_list:
             setattr(self, arg, kwargs.get(arg, None))
 
@@ -78,8 +91,7 @@ class FileFlowJob(FlowJob):
                 setattr(self, param, parsed_params[param])
 
         # Call superconstructor
-        super(FileFlowJob, self).__init__(req_time=self.req_time, tmax=self.tmax, minE=self.minE,
-                                          mindE=self.mindE, epsilon=self.epsilon, **kwargs)
+        super(FileFlowJob, self).__init__(req_time=req_time, **kwargs)
     
     def parse_params_from_loadg(self):
         # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
@@ -91,8 +103,17 @@ class FileFlowJob(FlowJob):
                 'ensemble_name' : '_'.join(words[1:-1]),
         }
 
+    def compile(self):
+        super(FlowJob, self).compile()
+
+        # Package in to JSON forest format
+        self.compiled.update({
+            'task_type' : 'FileFlowRunner', ## abstract task
+            'task_args': self.to_dict(),
+        })
+
 class HMCAuxFlowJob(FlowJob):
-    def __init__(self, hmc_job, **kwargs):
+    def __init__(self, hmc_job, req_time, **kwargs):
         for arg in flow_arg_list:
             setattr(self, arg, kwargs.get(arg, None))
 
@@ -100,14 +121,21 @@ class HMCAuxFlowJob(FlowJob):
 
         self.Ns = hmc_job.Ns
         self.Nt = hmc_job.Nt
-        self.traj = hmc_job.traj
+        self.traj = hmc_job.final_traj
         self.ensemble_name = hmc_job.ensemble_name
 
         self.loadg = hmc_job.saveg
 
-        super(HMCAuxFlowJob, self).__init__(req_time=self.req_time, tmax=self.tmax, minE=self.minE,
-            mindE=self.mindE, epsilon=self.epsilon, **kwargs)
+        super(HMCAuxFlowJob, self).__init__(req_time=req_time, **kwargs)
 
+    def compile(self):
+        super(FlowJob, self).compile()
+
+        # Package in to JSON forest format
+        self.compiled.update({
+            'task_type' : 'HMCAuxFlowRunner', ## abstract task
+            'task_args': self.to_dict(),
+        })
 
     
 
@@ -124,7 +152,16 @@ class FlowRunner(taxi.jobs.TaskRunner):
 
 
     def to_dict(self):
-        return { k: getattr(self, k, default=None) for k in flow_arg_list }
+        ## Methods like this are starting to look like trying to be too clever with
+        ## 'automatic' keyword specification from a list...maybe they should be removed.
+        ret_dict = {}
+        for k in flow_arg_list:
+            try:
+                ret_dict[k] = getattr(self, k)
+            except AttributeError:
+                ret_dict[k] = None
+        
+        return ret_dict
 
     def build_input_string(self):
         input_dict = self.to_dict()
@@ -134,9 +171,9 @@ class FlowRunner(taxi.jobs.TaskRunner):
     def verify_output(self):
         pass
 
-    def execute(self):
-        if self.use_mpi:
-            exec_str = local_taxi.mpirun_str.format(self.cores)
+    def execute(self, cores):
+        if local_taxi.use_mpi:
+            exec_str = local_taxi.mpirun_str.format(cores)
         else:
             exec_str = "./"
 
@@ -156,13 +193,13 @@ class FileFlowRunner(FlowRunner):
 class HMCAuxFlowRunner(FlowRunner):
     pass
 
-def flow_jobs_for_hmc_jobs(hmc_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
+def flow_jobs_for_hmc_jobs(hmc_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_traj=10):
     flow_jobs = []
     for hmc_job in hmc_stream:
         ## TODO: "HMCJob" superclass isn't used at the moment.
         # if not isinstance(hmc_job, HMCJob):
         #     continue
-        if hmc_job.count >= start_at_count:
-            flow_jobs.append(HMCAuxFlowJob(hmc_job, req_time=req_time,
+        if hmc_job.final_traj >= start_at_traj:
+            flow_jobs.append(HMCAuxFlowJob(hmc_job, req_time,
                                            tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon))
     return flow_jobs

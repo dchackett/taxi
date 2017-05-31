@@ -88,9 +88,9 @@ class TaskRunner(object):
     def build_input_string(self):
         return ""
 
-    def execute(self):
+    def execute(self, cores):
         if self.use_mpi:
-            exec_str = local_taxi.mpirun_str.format(self.cores)
+            exec_str = local_taxi.mpirun_str.format(cores)
         else:
             exec_str = ""
 
