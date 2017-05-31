@@ -1,6 +1,11 @@
 *~
 *.pyc
+*.egg-info
+build
 
-local_taxi.py
-local_util.py
-taxi.sh
+src/taxi/local_taxi.py
+src/taxi/local_util.py
+src/taxi/taxi.sh
+
+.vscode
+.eggs
