@@ -90,6 +90,25 @@ class FileFlowJob(FlowJob):
                 'traj': int(words[-1]),
                 'ensemble_name' : '_'.join(words[1:-1]),
         }
+
+class HMCAuxFlowJob(FlowJob):
+    def __init__(self, hmc_job, **kwargs):
+        for arg in flow_arg_list:
+            setattr(self, arg, kwargs.get(arg, None))
+
+        self.depends_on = [hmc_job]
+
+        self.Ns = hmc_job.Ns
+        self.Nt = hmc_job.Nt
+        self.traj = hmc_job.traj
+        self.ensemble_name = hmc_job.ensemble_name
+
+        self.loadg = hmc_job.saveg
+
+        super(HMCAuxFlowJob, self).__init__(req_time=self.req_time, tmax=self.tmax, minE=self.minE,
+            mindE=self.mindE, epsilon=self.epsilon, **kwargs)
+
+
     
 
 
@@ -130,5 +149,20 @@ class FlowRunner(taxi.jobs.TaskRunner):
 
         self.verify_output()
 
+## Runner stubs needed for the job-->runner factory to find them, even though functionality is identical
 class FileFlowRunner(FlowRunner):
     pass
+
+class HMCAuxFlowRunner(FlowRunner):
+    pass
+
+def flow_jobs_for_hmc_jobs(hmc_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
+    flow_jobs = []
+    for hmc_job in hmc_stream:
+        ## TODO: "HMCJob" superclass isn't used at the moment.
+        # if not isinstance(hmc_job, HMCJob):
+        #     continue
+        if hmc_job.count >= start_at_count:
+            flow_jobs.append(HMCAuxFlowJob(hmc_job, req_time=req_time,
+                                           tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon))
+    return flow_jobs

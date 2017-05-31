@@ -196,7 +196,7 @@ def make_ora_job_stream(Ns, Nt, beta,
                         N_configs,
                         starter, req_time,
                         nsteps=4, qhb_steps=1,
-                        start_count=0, N_traj=100, warms=0,
+                        start_count=0, ntraj=100, warms=0,
                         label='1',
                         streamseed=None, seeds=None,
                         ora_class=PureGaugeORAJob):
@@ -216,7 +216,7 @@ def make_ora_job_stream(Ns, Nt, beta,
             job_seed = seeds[cc]
             
         new_job = ora_class(Ns=Ns, Nt=Nt, beta=beta,
-                         label=label, count=count, req_time=req_time, N_traj=N_traj,
+                         label=label, count=count, req_time=req_time, ntraj=ntraj,
                          nsteps=nsteps, qhb_steps=qhb_steps, warms=warms,
                          starter=starter, seed=job_seed)
         
