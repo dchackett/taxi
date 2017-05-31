@@ -12,3 +12,4 @@ src/taxi/local/sqlite_queue_runner.py
 
 .vscode
 .eggs
+.tox
