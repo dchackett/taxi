@@ -1,4 +1,8 @@
+__version__ = '0.2.0'
+
 import os
+
+
 
 def mkdir_p(path):
     if not os.path.exists(path):
