@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-#import local_taxi
 
 def sanitized_path(path):
     if path is None:

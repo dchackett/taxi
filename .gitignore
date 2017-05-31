@@ -2,10 +2,12 @@
 *.pyc
 *.egg-info
 build
+bin
 
 src/taxi/local_taxi.py
 src/taxi/local_util.py
 src/taxi/taxi.sh
+src/taxi/sqlite_queue_runner.py
 
 .vscode
 .eggs
