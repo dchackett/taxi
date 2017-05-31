@@ -21,8 +21,6 @@ class FailRunner(taxi.jobs.TaskRunner):
     def execute(self):
         raise BaseException
 
-
-
 class TestScalarRunTaxiIntegration(unittest.TestCase):
     ## Integration testing: run_taxi using the "scalar" localization and simple tasks.
 
