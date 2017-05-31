@@ -35,7 +35,7 @@ class SQLiteSerialQueue:
             print "Warning: attempted to execute with no jobs in queue!"
             return
 
-        taxi_call = "./taxi.sh " + queued_list[0]['taxi_args']
+        taxi_call = "taxi.sh " + queued_list[0]['taxi_args']
         batch_out, batch_err = subprocess.Popen(taxi_call, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
 
         print "BO: ", batch_out

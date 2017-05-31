@@ -10,8 +10,8 @@ import argparse
 import time
 import json
 
-import taxi.local_taxi as local_taxi
-import taxi.local_queue as local_queue
+import taxi.local.local_taxi as local_taxi
+import taxi.local.local_queue as local_queue
 
 ## Utility functions
 def flush_output():

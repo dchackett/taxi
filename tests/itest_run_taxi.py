@@ -6,18 +6,18 @@ import os
 import sqlite3
 import time
 
-import task_runners
-import jobs
-import pool
-import dispatcher
+import taxi.jobs
+import taxi.pool
+import taxi.dispatcher
 import taxi
 
-import local.scalar.local_queue as local_queue
-import local.scalar.local_taxi as local_taxi
-import local.scalar.sqlite_queue_runner as qrun
+## Note: 'scalar' localization is required
+import taxi.local.local_queue as local_queue
+import taxi.local.local_taxi as local_taxi
+import taxi.local.sqlite_queue_runner as qrun
 
 ## TaskRunner that always fails, for testing purposes
-class FailRunner(task_runners.TaskRunner):
+class FailRunner(taxi.jobs.TaskRunner):
     def execute(self):
         raise BaseException
 
@@ -49,11 +49,11 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         self.pool_path = './test_run/test-pool.sqlite'
         self.pool_wd = './test_run/pool'
         self.pool_ld = './test_run/pool/log'
-        self.my_pool = pool.SQLitePool(self.pool_path, 'test_pool', self.pool_wd, self.pool_ld)
+        self.my_pool = taxi.pool.SQLitePool(self.pool_path, 'test_pool', self.pool_wd, self.pool_ld)
 
         ## Set up test dispatch
         self.disp_path = './test_run/test-disp.sqlite'
-        self.my_disp = dispatcher.SQLiteDispatcher(self.disp_path)
+        self.my_disp = taxi.dispatcher.SQLiteDispatcher(self.disp_path)
 
         with self.my_disp:
             pass
@@ -95,7 +95,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test 'die' job
     def test_die(self):
-        test_job = jobs.DieJob(for_taxi=self.my_taxi.name)
+        test_job = taxi.jobs.DieJob(for_taxi=self.my_taxi.name)
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
             self.assertEqual(task_blob, None)
@@ -141,7 +141,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test taxi hold by user
     def test_user_hold(self):
-        test_job = jobs.CopyJob(self.src_files[0], self.dst_files[0])
+        test_job = taxi.jobs.CopyJob(self.src_files[0], self.dst_files[0])
         with self.my_disp:
             self.my_disp.initialize_new_job_pool([test_job])
         
@@ -175,7 +175,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         files = os.listdir('./test_run')
         self.assertFalse(self.dst_files[0].split('/')[-1] in files)
 
-        test_job = jobs.CopyJob(self.src_files[0], self.dst_files[0])
+        test_job = taxi.jobs.CopyJob(self.src_files[0], self.dst_files[0])
 
         with self.my_disp:
             self.my_disp.initialize_new_job_pool([test_job])
@@ -214,7 +214,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         job_pool = []
         for i in range(3):
-            job_pool.append(jobs.CopyJob(self.src_files[i], self.dst_files[i]))
+            job_pool.append(taxi.jobs.CopyJob(self.src_files[i], self.dst_files[i]))
 
         job_pool[1].depends_on = [job_pool[0]]
         job_pool[2].depends_on = [job_pool[0], job_pool[1]]
@@ -253,7 +253,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
     ## Test re-launch detection for idle taxis
     def test_taxi_relaunch(self):
         # Set up single copy task pool, registered to test1
-        test_job = jobs.CopyJob(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
+        test_job = taxi.jobs.CopyJob(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
 
         with self.my_disp:
             self.my_disp.initialize_new_job_pool([test_job])

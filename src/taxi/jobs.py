@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import taxi.local.local_taxi as local_taxi
 
 # Helper function
 def sanitized_path(path):

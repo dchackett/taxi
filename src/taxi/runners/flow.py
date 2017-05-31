@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
-import task_runners
-import jobs
+import taxi.jobs
+import taxi.local.local_taxi as local_taxi
 
 import os, sys
 import platform
-
-import local_taxi
 
 ## local_taxi should specify:
 # - "flow_binary"
@@ -40,7 +38,7 @@ forget
 EOF
 """
 
-class FlowJob(jobs.Job):
+class FlowJob(taxi.jobs.Job):
     def __init__(self, req_time, tmax, minE=0, mindE=0.0, epsilon=0.1, **kwargs):
         super(FlowJob, self).__init__(req_time=req_time, **kwargs)
 
@@ -95,7 +93,7 @@ class FileFlowJob(FlowJob):
     
 
 
-class FlowRunner(task_runners.TaskRunner):
+class FlowRunner(taxi.jobs.TaskRunner):
     def __init__(self, **kwargs):
         self.binary = local_taxi.flow_binary
 
@@ -103,7 +101,7 @@ class FlowRunner(task_runners.TaskRunner):
             setattr(self, arg, kwargs.get(arg, None))
 
         ## Sanitize paths
-        self.loadg = task_runners.sanitized_path(self.loadg)
+        self.loadg = taxi.jobs.sanitized_path(self.loadg)
 
 
     def to_dict(self):

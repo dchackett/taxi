@@ -6,7 +6,7 @@
 import sqlite3
 import os
 
-from batch_queue import *
+from taxi.batch_queue import *
 from taxi import mkdir_p
 
 class LocalQueue(BatchQueue):

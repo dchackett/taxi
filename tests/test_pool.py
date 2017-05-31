@@ -5,8 +5,8 @@ import mock
 import os
 import sqlite3
 
-from pool import *
-from batch_queue import *
+from taxi.pool import *
+from taxi.batch_queue import *
 
 class TestSQLiteBase(unittest.TestCase):
     def setUp(self):

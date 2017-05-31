@@ -6,7 +6,7 @@ import os
 import sqlite3
 import json
 
-from task_runners import *
+from taxi.jobs import *
 
 class TestBaseTaskRunner(unittest.TestCase):
     

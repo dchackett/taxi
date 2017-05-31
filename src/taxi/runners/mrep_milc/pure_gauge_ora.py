@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 
-import task_runners
-import jobs
+import taxi.jobs
+import taxi.local.local_taxi as local_taxi
+import taxi.runners.flow as flow
 
 import os, sys
 import platform
-
-import local_taxi
-
-import runners.flow as flow
 
 ## local_taxi should specify:
 # - "pure_gauge_ora_binary"
@@ -59,7 +56,7 @@ def pure_gauge_ora_ens_name(Ns, Nt, beta, label):
     return "{Ns}_{Nt}_{beta}_{label}".format(Ns, Nt, beta, label)
 
 
-class PureGaugeORAJob(jobs.Job):
+class PureGaugeORAJob(taxi.jobs.Job):
     def __init__(self, req_time=0, starter=None, **kwargs):
         super(PureGaugeORAJob, self).__init__(req_time=req_time, **kwargs)
 
@@ -104,7 +101,7 @@ class PureGaugeORAJob(jobs.Job):
         })
 
 
-class PureGaugeORARunner(task_runners.TaskRunner):
+class PureGaugeORARunner(taxi.jobs.TaskRunner):
     def __init__(self, **kwargs):
         self.binary = local_taxi.pure_gauge_ora_binary
 
@@ -112,9 +109,9 @@ class PureGaugeORARunner(task_runners.TaskRunner):
             setattr(self, arg, kwargs.get(arg, None))
 
         ## Sanitize all paths
-        self.loadg = task_runners.sanitized_path(kwargs['loadg'])
-        self.saveg = task_runners.sanitized_path(kwargs['saveg'])
-        self.fout = task_runners.sanitized_path(kwargs['fout'])
+        self.loadg = taxi.jobs.sanitized_path(kwargs['loadg'])
+        self.saveg = taxi.jobs.sanitized_path(kwargs['saveg'])
+        self.fout = taxi.jobs.sanitized_path(kwargs['fout'])
 
     def to_dict(self):
         return { k: getattr(self, k, default=None) for k in pure_gauge_ora_arg_list }

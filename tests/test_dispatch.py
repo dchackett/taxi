@@ -5,8 +5,8 @@ import mock
 import os
 import sqlite3
 
-from dispatcher import *
-from jobs import *
+from taxi.dispatcher import *
+from taxi.jobs import *
 
 class TestSQLiteBase(unittest.TestCase):
     def setUp(self):
