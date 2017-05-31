@@ -6,7 +6,7 @@ import os
 
 import taxi
 import time
-import batch_queue
+import taxi.batch_queue as batch_queue
 
 def mkdir_p(path):
     if not os.path.exists(path):

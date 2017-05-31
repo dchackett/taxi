@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 
 import taxi
-import dispatcher
-import pool
-import jobs
-import task_runners
+import taxi.dispatcher
+import taxi.pool
+import taxi.jobs
 
 import sys
 import argparse
 import time
 import json
 
-import local_taxi
-import local_queue
+import taxi.local_taxi as local_taxi
+import taxi.local_queue as local_queue
 
 ## Utility functions
 def flush_output():
@@ -25,14 +24,12 @@ parser = argparse.ArgumentParser(description="Workflow taxi (NOTE: not intended 
 
 parser.add_argument('--name', type=str, required=True, help='Taxi name (provided by shell wrapper).')
 parser.add_argument('--cores', type=int, required=True, help='Number of CPUs to tell mpirun about (provided by shell wrapper).')
-#parser.add_argument('--nodes', type=int, required=True, help='Number of nodes the taxi is running on (provided by shell wrapper).')
 parser.add_argument('--pool_path', type=str, required=True, help='Path of pool backend DB.')
 parser.add_argument('--pool_name', type=str, required=True, help='Name of pool this taxi is assigned to.')
 parser.add_argument('--dispatch_path', type=str, required=True, help='Path of dispatch backend DB.')
 parser.add_argument('--time_limit',  type=float, required=True, help='Number of seconds in time budget.')
 #parser.add_argument('--log_dir', type=str, required=True, help='Logs go here.')
 #parser.add_argument('--work_dir', type=str, required=True, help='Working directory for taxi is here.')
-#    parser.add_argument('--shell',  type=str, required=True, help='Path to wrapper shell script.')
 
 print sys.argv
 # TODO: shouldn't this work without the sys.argv explicit specification?
@@ -41,8 +38,8 @@ parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..
 taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time_limit, cores=parg.cores)
 
 
-my_dispatch = dispatcher.SQLiteDispatcher(parg.dispatch_path)
-my_pool = pool.SQLitePool(
+my_dispatch = taxi.dispatcher.SQLiteDispatcher(parg.dispatch_path)
+my_pool = taxi.pool.SQLitePool(
     db_path=parg.pool_path,
     pool_name=parg.pool_name,
 )
@@ -54,7 +51,7 @@ with my_pool:
 
 ## Decoding for runner objects; relevant TaskRunner subclasses
 ## should be imported in local_taxi above!
-runner_decoder = task_runners.runner_rebuilder_factory()
+runner_decoder = taxi.jobs.runner_rebuilder_factory()
 
 ## Record starting time
 taxi_obj.start_time = time.time()
@@ -78,7 +75,7 @@ while True:
         if (task_blob is None) or (len(task_blob) == 0):
             task_priority_ids = []
         else:
-            task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=dispatcher.task_priority_sort) ]
+            task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
  
         for task_id in task_priority_ids:
             task = task_blob[task_id]
@@ -128,7 +125,7 @@ while True:
         # Otherwise, flag task for execution
         try:
             my_dispatch.claim_task(taxi_obj, task_id)
-        except dispatcher.TaskClaimException, e:
+        except taxi.dispatcher.TaskClaimException, e:
             ## Race condition safeguard: skips and tries again if the task status has changed
             print str(e)
             continue
