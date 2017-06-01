@@ -48,7 +48,7 @@ class TestCopyRunner(unittest.TestCase):
         json_copy = json.dumps({'task_type': 'CopyRunner', 'task_args': {'src': self.src, 'dest': self.dest } })
 
         copy_run = json.loads(json_copy, object_hook=self.runner_parser)
-        copy_run.execute()
+        copy_run.execute(cores=1)
 
         self.assertTrue(os.path.exists(self.dest))
 
