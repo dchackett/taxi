@@ -81,7 +81,7 @@ class FlowJob(taxi.jobs.Job):
         })
 
 class FileFlowJob(FlowJob):
-    def __init__(self, req_time, **kwargs):
+    def __init__(self, req_time, tmax, **kwargs):
         for arg in flow_arg_list:
             setattr(self, arg, kwargs.get(arg, None))
 
@@ -91,7 +91,7 @@ class FileFlowJob(FlowJob):
                 setattr(self, param, parsed_params[param])
 
         # Call superconstructor
-        super(FileFlowJob, self).__init__(req_time=req_time, **kwargs)
+        super(FileFlowJob, self).__init__(req_time=req_time, tmax=tmax, **kwargs)
     
     def parse_params_from_loadg(self):
         # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
@@ -113,7 +113,7 @@ class FileFlowJob(FlowJob):
         })
 
 class HMCAuxFlowJob(FlowJob):
-    def __init__(self, hmc_job, req_time, **kwargs):
+    def __init__(self, hmc_job, req_time, tmax, **kwargs):
         for arg in flow_arg_list:
             setattr(self, arg, kwargs.get(arg, None))
 
@@ -126,7 +126,7 @@ class HMCAuxFlowJob(FlowJob):
 
         self.loadg = hmc_job.saveg
 
-        super(HMCAuxFlowJob, self).__init__(req_time=req_time, **kwargs)
+        super(HMCAuxFlowJob, self).__init__(tmax=tmax, req_time=req_time, **kwargs)
 
     def compile(self):
         super(FlowJob, self).compile()

@@ -253,15 +253,3 @@ def make_ora_job_stream(Ns, Nt, beta,
         
     return ora_stream        
 
-
-def flow_jobs_for_ora_jobs(ora_stream, req_time, tmax, minE=0, mindE=0, epsilon=.01, start_at_count=10):
-    flow_jobs = []
-    for ora_job in ora_stream:
-        if not isinstance(ora_job, PureGaugeORAJob):
-            continue
-        if ora_job.count >= start_at_count:
-            new_job = flow.FileFlowJob(ora_job.saveg, req_time=req_time,
-                        tmax=tmax, minE=minE, mindE=mindE, epsilon=epsilon)
-            new_job.depends_on = [ora_job]
-            flow_jobs.append(new_job)
-    return flow_jobs
