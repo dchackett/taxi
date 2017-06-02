@@ -70,7 +70,12 @@ class LocalizeCommand(distutils.cmd.Command):
 setuptools.setup(
     name='taxi',
     version='0.2',
+
     cmdclass={
         'localize': LocalizeCommand,
-    }
+    },
+
+    # Find package in src/taxi
+    package_dir={'':'src'},
+    packages=setuptools.find_packages('src')
 )
