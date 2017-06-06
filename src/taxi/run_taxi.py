@@ -131,83 +131,33 @@ if __name__ == '__main__':
 
         ## Check with dispatch for tasks to execute
         with my_dispatch:
-            task_blob = my_dispatch.get_task_blob(taxi_obj)
-
-            N_pending_tasks = 0
-            found_ready_task = False
-
-            # Order tasks in blob by priority
-            if (task_blob is None) or (len(task_blob) == 0):
-                task_priority_ids = []
-            else:
-                task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
-    
-            for task_id in task_priority_ids:
-                task = task_blob[task_id]
-
-                # Only try to do pending tasks
-                if task['status'] != 'pending':
-                    continue
-                
-                N_pending_tasks += 1
-                    
-                # Check whether task is ready to go
-                N_unresolved, N_failed = my_dispatch.count_unresolved_dependencies(task=task, task_blob=task_blob)
-                sufficient_time = my_dispatch.enough_time_for_task(taxi_obj, task)
-                
-                # Look deeper in priority list if task not ready
-                if N_unresolved > 0 or not sufficient_time:
-                    continue
-                
-                # Task ready; stop looking for new task to run
-                found_ready_task = True
-                break
-
-
-            # If there are no tasks, finish up
-            if N_pending_tasks == 0:
-                print "WORK COMPLETE: no tasks pending"
-                ## TODO: I think this will break both the with: and the outer while True:,
-                ## but add a test case!
-
-                # No work to be done, so place the taxi on hold
-                with my_pool:
-                    my_pool.update_taxi_status(taxi_obj, 'H')
-
-                break
-            if not found_ready_task:
-                ## TODO: we could add another status code that puts the taxi to sleep,
-                ## but allows it to restart after some amount of time...
-                ## Either that, or another script somewhere that checks the Pool
-                ## and un-holds taxis that were waiting for dependencies to resolved
-                ## once it sees that it's happened.
-                ## Also need to be wary of interaction with insufficient time check,
-                ## which we should maybe track separately.
-
-                print "WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks
-                break
-
-            # Otherwise, flag task for execution
             try:
-                my_dispatch.claim_task(taxi_obj, task_id)
+                my_dispatch.get_task_to_run(taxi_obj)
             except taxi.dispatcher.TaskClaimException, e:
                 ## Race condition safeguard: skips and tries again if the task status has changed
                 print str(e)
                 continue
 
-
         ## Execute task
         task_start_time = time.time()
         print "EXECUTING TASK ", task
-        
+
+        special_task_status_flag = None
+
         if task['task_type'] == 'die':
-            ## "Die" is a special task
+            ## "Die" kills the taxi and puts it on hold in the pool
+            special_task_status_flag = 'H'
+        elif task['task_type'] == 'sleep':
+            ## "Sleep" kills the taxi temporarily, until another taxi or launch script restarts it
+            special_task_status_flag = 'I'
+
+        if special_task_status_flag:
             with my_dispatch:
                 task_run_time = time.time() - task_start_time
                 my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
-
+                
             with my_pool:
-                my_pool.update_taxi_status(taxi_obj, 'H')
+                my_pool.update_taxi_status(taxi_obj, special_task_status_flag)
 
             sys.exit(0)
 
@@ -221,7 +171,6 @@ if __name__ == '__main__':
             ## TODO: some exception logging here?
             ## Record task as failed
             failed_task = True
-            raise
 
         ## Record exit status, time taken, etc.
         taxi_obj.task_finish_time = time.time()
@@ -237,4 +186,3 @@ if __name__ == '__main__':
 
         with my_dispatch:
             my_dispatch.update_task(task['id'], task_status, start_time=task_start_time, run_time=task_run_time, by_taxi=taxi_obj)
-
