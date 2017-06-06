@@ -8,11 +8,6 @@ import taxi
 import time
 import taxi.batch_queue as batch_queue
 
-def mkdir_p(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
 class Pool(object):
 
     taxi_status_codes = [
@@ -178,7 +173,7 @@ class SQLitePool(Pool):
 
         self.backup_cwd = os.getcwd() # backup current directory
         if not os.path.exists(os.path.abspath(self.work_dir)):
-            mkdir_p(os.path.abspath(self.work_dir)) # Dig out working directory if it doesn't exist
+            taxi.mkdir_p(os.path.abspath(self.work_dir)) # Dig out working directory if it doesn't exist
         os.chdir(os.path.abspath(self.work_dir)) # move to desired working directory
 
         self.write_table_structure()
