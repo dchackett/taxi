@@ -139,7 +139,7 @@ if __name__ == '__main__':
                 continue
 
         ## Execute task
-        task_start_time = time.time()
+        taxi_obj.task_start_time = time.time()
         print "EXECUTING TASK ", task
 
         special_task_status_flag = None
@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
         if special_task_status_flag:
             with my_dispatch:
-                task_run_time = time.time() - task_start_time
+                task_run_time = time.time() - taxi_obj.task_start_time
                 my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
                 
             with my_pool:
@@ -163,26 +163,21 @@ if __name__ == '__main__':
 
         # Alright, this is a little odd-looking with dumps and loads in the same line...
         task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
-
-        failed_task = False
+        
+        # TODO: This line may not be necessary, depending on how runner_decoder works
+        # in future updates...
+        task_obj.job_id = task['id']    
+        
         try:
             task_obj.execute(cores=taxi_obj.cores)
         except:
             ## TODO: some exception logging here?
             ## Record task as failed
-            failed_task = True
+            task_obj.status = 'failed'
 
         ## Record exit status, time taken, etc.
         taxi_obj.task_finish_time = time.time()
-        task_run_time = taxi_obj.task_finish_time - task_start_time
-
-        if failed_task:
-            task_status = 'failed'
-        else:
-            if (task['is_recurring']):
-                task_status = 'pending'
-            else:
-                task_status = 'complete'
 
         with my_dispatch:
-            my_dispatch.update_task(task['id'], task_status, start_time=task_start_time, run_time=task_run_time, by_taxi=taxi_obj)
+            my_dispatch.finalize_task_run(taxi_obj, task_obj)
+

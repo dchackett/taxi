@@ -162,6 +162,23 @@ class Dispatcher(object):
 
         return task
 
+    def finalize_task_run(self, my_taxi, task):
+        task_run_time = my_taxi.task_finish_time - my_taxi.task_start_time
+
+        if task_obj.status == 'failed':
+            task_status = 'failed'
+        else:
+            if (task['is_recurring']):
+                task_status = 'pending'
+            else:
+                task_status = 'complete'
+
+        self.update_task(task_obj.job_id, task_status, 
+            start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)
+
+
+
+
     ## Initialization
 
     def _find_trees(self, job_pool):
