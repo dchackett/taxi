@@ -6,10 +6,8 @@ import os
 
 import taxi
 import time
-import taxi.batch_queue as batch_queue
 
-from _utility import mkdir_p
-
+from taxi._utility import mkdir_p
 
 class Pool(object):
 

@@ -65,14 +65,14 @@ for i in range(1):
 ## Set up pool and dispatch
 ## TODO: this feels like it could be condensed into a single convenience function
 base_path = os.path.abspath("./taxi-test")
-pool_path = base_path + "/test-pool.sqlite"
-pool_wd = base_path + "/pool/"
-pool_ld = base_path + "/pool/log"
 
-disp_path = base_path + "/test-disp.sqlite"
-
-my_pool = taxi.pool.SQLitePool(pool_path, pool_name, pool_wd, pool_ld)
-my_disp = taxi.dispatcher.SQLiteDispatcher(disp_path)
+my_pool = taxi.pool.SQLitePool(
+    db_path=(base_path + "/test-pool.sqlite"), 
+    pool_name=pool_name, 
+    work_dir=(base_path + "/pool/"),
+    log_dir=(base_path + "/pool/log/")
+)
+my_disp = taxi.dispatcher.SQLiteDispatcher(db_path=(base_path + "/test-disp.sqlite"))
 
 my_queue = local_queue.LocalQueue()
 

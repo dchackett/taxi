@@ -46,7 +46,7 @@ class TestCopy(unittest.TestCase):
 
     def test_copy(self):
         json_copy = json.dumps({'task_type': 'Copy', 'src': self.src, 'dest': self.dest,
-                                'use_mpi' : False, 'binary' : 'rsync -Paz'})
+                                'use_mpi' : False, 'binary' : 'rsync -Paz', 'cores' : None})
 
         copy_run = json.loads(json_copy, object_hook=self.runner_parser)
         copy_run.execute(cores=1)

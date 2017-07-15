@@ -105,6 +105,19 @@ class Die(Task):
     def compile(self):
         super(Die, self).compile()
     
+    
+class Sleep(Task):
+    """Tells taxi to sleep"""
+    
+    def __init__(self, message, req_time=0, **kwargs):        
+        super(Sleep, self).__init__(req_time=req_time, **kwargs)
+        
+        self.message = message
+
+    def compile(self):
+        super(Sleep, self).compile()
+        
+        
         
 class Runner(Task):
     """Abstract superclass to run some external program"""

@@ -7,7 +7,7 @@ import time
 import json
 
 import taxi
-import jobs
+import taxi.jobs as jobs
 
 ## Need to be able to make blank objects to reconstruct Tasks from JSON payloads
 class BlankObject(object):
@@ -46,9 +46,11 @@ class Dispatcher(object):
     def __init__(self):
         pass
 
+
     def get_task_blob(self, taxi_name):
         """Get all incomplete tasks pertinent to this taxi."""
         raise NotImplementedError
+
 
     def check_task_status(self, task):
         """Quick query of task status for task with id=task_id from job forest DB.
@@ -56,6 +58,7 @@ class Dispatcher(object):
         For last-minute checks that job hasn't been claimed by another job."""
 
         raise NotImplementedError
+        
     
     def update_task(self, task, status, start_time=None, run_time=None, by_taxi=None):
         """Change the status of task with task_id in job forest DB.  For claiming
@@ -65,16 +68,10 @@ class Dispatcher(object):
         raise NotImplementedError
 
 
-    def enough_time_for_task(self, my_taxi, task):
-        """Checks if this taxi has enough time left to execute this task."""
-        
-        elapsed_time = time.time() - my_taxi.start_time
-        time_remaining = my_taxi.time_limit - elapsed_time
-        return time_remaining > task.req_time
-
-    
     ## Taxi interface
     def request_next_task(self, for_taxi):
+        """Determines the next task to be executed by the given taxi."""
+        
         task_blob = self.get_task_blob(for_taxi)
 
         N_pending_tasks = 0
@@ -114,7 +111,6 @@ class Dispatcher(object):
             ## but add a test case!
             return jobs.Die(message="WORK COMPLETE: no tasks pending")
             
-            
         if not found_ready_task:
             ## TODO: we could add another status code that puts the taxi to sleep,
             ## but allows it to restart after some amount of time...
@@ -123,11 +119,42 @@ class Dispatcher(object):
             ## once it sees that it's happened.
             ## Also need to be wary of interaction with insufficient time check,
             ## which we should maybe track separately.
-            return jobs.Die(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
+            return jobs.Sleep(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
         
         # If we've gotten this far, successfully found a pending task.
         return task
-    
+        
+
+    def add_task(self, compiled_task):
+        raise NotImplementedError
+
+
+    def claim_task(self, my_taxi, task):
+        raise NotImplementedError
+
+
+    def add_priority_task(self, compiled_task):
+        compiled_task['priority'] = 0
+        compiled_task['task_id'] = self._get_max_task_id + 1
+
+        self.add_task(compiled_task)
+
+
+    def finalize_task_run(self, my_taxi, task):
+        task_run_time = my_taxi.task_finish_time - my_taxi.task_start_time
+
+        if task.status == 'failed':
+            task_status = 'failed'
+        else:
+            if task.is_recurring:
+                task_status = 'pending'
+            else:
+                task_status = 'complete'
+
+        self.update_task(task=task, status=task_status, 
+            start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)
+
+
     ## Initialization
     def _find_trees(self, job_pool):
         ## Scaffolding
@@ -227,10 +254,15 @@ class Dispatcher(object):
         self.task_pool = [job.compiled() for job in job_pool]
 
     def _populate_task_table(self):
-        raise NotImplementedError
+        ## TODO: is there a more efficient way than generating N queries using a Python for loop?
+
+        for compiled_task in self.task_pool:
+            self.add_task(compiled_task)
+
 
     def _get_max_task_id(self):
         raise NotImplementedError
+
 
     def initialize_new_job_pool(self, job_pool, priority_method='tree'):
         # If we are adding a new pool to an existing dispatcher, 
@@ -460,24 +492,27 @@ class SQLiteDispatcher(Dispatcher):
 
         self.update_task(task=task, status='active', by_taxi=my_taxi.name)
 
+    def add_task(self, compiled_task):
+        task_query = """INSERT OR REPLACE INTO tasks
+        (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+
+        task_values = (compiled_task['task_type'], 
+                    json.dumps(compiled_task['depends_on']),
+                    compiled_task['status'], 
+                    compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
+                    compiled_task['is_recurring'],
+                    compiled_task['req_time'], 
+                    compiled_task['priority'],
+                    json.dumps(compiled_task['payload']) if compiled_task.has_key('payload') else None,)
+        
+        self.execute_update(task_query, *task_values)
+        
+
     def _populate_task_table(self):
         ## TODO: is there a more efficient way than generating N queries using a Python for loop?
-
-        for task in self.task_pool:
-            task_query = """INSERT OR REPLACE INTO tasks
-            (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-
-            task_values = (task['task_type'], 
-                        json.dumps(task['depends_on']),
-                        task['status'], 
-                        task['for_taxi'] if task.has_key('for_taxi') else None, 
-                        task['is_recurring'],
-                        task['req_time'], 
-                        task['priority'],
-                        json.dumps(task['payload']) if task.has_key('payload') else None,)
-
-            self.execute_update(task_query, *task_values)
+        for compiled_task in self.task_pool:
+            self.add_task(compiled_task)
             
         
     def _get_max_task_id(self):

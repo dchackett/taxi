@@ -101,7 +101,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(task_blob, None)
 
             self.my_disp.initialize_new_job_pool([test_job])
-
+            
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
             self.assertEqual(len(task_blob.keys()), 1)
 

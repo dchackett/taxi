@@ -85,7 +85,7 @@ class LocalizeCommand(distutils.cmd.Command):
 
 setuptools.setup(
     name='taxi',
-    version='0.2',
+    version='0.2.0',
 
     cmdclass={
         'localize': LocalizeCommand,
