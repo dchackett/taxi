@@ -7,7 +7,9 @@ import sqlite3
 import os
 
 from taxi.batch_queue import *
-from taxi import mkdir_p
+from taxi._utility import mkdir_p
+
+import time
 
 class LocalQueue(BatchQueue):
     
@@ -99,7 +101,7 @@ class LocalQueue(BatchQueue):
             (job_name, status, taxi_args) VALUES (?, ?, ?);"""
 
         taxi_dict = taxi.to_dict()
-        key_arg_list = ['name', 'cores', 'pool_name', 'time_limit', 'dispatch_path', 'pool_path']
+        key_arg_list = ['name', 'cores', 'nodes', 'pool_name', 'time_limit', 'dispatch_path', 'pool_path']
 
         taxi_args = [ "--{} {}".format(k, taxi_dict[k]) for k in key_arg_list ]
         taxi_args_str = " ".join(taxi_args)

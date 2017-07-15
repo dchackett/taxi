@@ -33,7 +33,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
     def test_write_tables(self):
         with self.test_pool:
             empty_taxis = self.test_pool.conn.execute("""SELECT name, pool_name, time_limit, time_last_submitted, 
-                status, cores FROM taxis""").fetchall()
+                status, cores, nodes FROM taxis""").fetchall()
             pools = map(dict, self.test_pool.conn.execute("""SELECT name, working_dir, log_dir FROM pools""").fetchall())
 
             self.assertItemsEqual(empty_taxis, [])
@@ -45,7 +45,7 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
 
     def test_read_write_taxi(self):
         with self.test_pool:
-            taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
+            taxi_one = taxi.Taxi(time_limit=4000, cores=8, nodes=1, name="one")
             self.test_pool.register_taxi(taxi_one)
 
             taxi_list = self.test_pool.get_all_taxis_in_pool()
@@ -90,8 +90,8 @@ class TestSQLitePoolWithTaxis(TestSQLiteBase):
         super(TestSQLitePoolWithTaxis, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000, cores=8, name="one")
-            self.taxi_two = taxi.Taxi(time_limit=9999, cores=1, name="two")
+            self.taxi_one = taxi.Taxi(time_limit=4000, cores=8, nodes=1, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999, cores=1, nodes=1, name="two")
 
             self.test_pool.register_taxi(self.taxi_one)
             self.test_pool.register_taxi(self.taxi_two)
@@ -149,9 +149,9 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
         super(TestSQLitePoolQueueInteraction, self).setUp()
 
         with self.test_pool:
-            self.taxi_one = taxi.Taxi(time_limit=4000., cores=8, name="one")
-            self.taxi_two = taxi.Taxi(time_limit=9999., cores=1, name="two")
-            self.taxi_three = taxi.Taxi(time_limit=4040., cores=8, name="three")
+            self.taxi_one = taxi.Taxi(time_limit=4000., cores=8, nodes=1, name="one")
+            self.taxi_two = taxi.Taxi(time_limit=9999., cores=1, nodes=1, name="two")
+            self.taxi_three = taxi.Taxi(time_limit=4040., cores=8, nodes=1, name="three")
 
             self.test_pool.register_taxi(self.taxi_one)
             self.test_pool.register_taxi(self.taxi_two)

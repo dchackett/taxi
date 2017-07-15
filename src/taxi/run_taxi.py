@@ -6,28 +6,32 @@ import taxi.pool
 import taxi.jobs
 
 ## All runners to be used must be imported here as well!
-import taxi.runners.flow
-import taxi.runners.mrep_milc.pure_gauge_ora
+import taxi.apps.mrep_milc.flow
+import taxi.apps.mrep_milc.pure_gauge_ora
 
+import os
 import sys
 import argparse
 import time
 import json
+import traceback # For full error output
 
 import taxi.local.local_taxi as local_taxi
 import taxi.local.local_queue as local_queue
 
-## Utility functions
-def flush_output():
-    sys.stdout.flush()
-    sys.stderr.flush()
+from taxi._utility import sanitized_path
+from taxi._utility import flush_output
 
+## Diagnostic output
+os.system('hostname') # Print which machine we're working on
+print "Working in dir:", os.getcwd()
 
 ## Parse arguments from command line
 parser = argparse.ArgumentParser(description="Workflow taxi (NOTE: not intended to be called by user directly!)")
 
 parser.add_argument('--name', type=str, required=True, help='Taxi name (provided by shell wrapper).')
 parser.add_argument('--cores', type=int, required=True, help='Number of CPUs to tell mpirun about (provided by shell wrapper).')
+parser.add_argument('--nodes', type=int, required=True, help='Number of nodes taxi is running on (provided by shell wrapper).')
 parser.add_argument('--pool_path', type=str, required=True, help='Path of pool backend DB.')
 parser.add_argument('--pool_name', type=str, required=True, help='Name of pool this taxi is assigned to.')
 parser.add_argument('--dispatch_path', type=str, required=True, help='Path of dispatch backend DB.')
@@ -41,6 +45,9 @@ parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..
 
 taxi_obj = taxi.Taxi(name=parg.name, time_limit=parg.time_limit, cores=parg.cores)
 
+## Record starting time
+taxi_obj.start_time = time.time()
+print "Running on", taxi_obj.cores, "cores"
 
 my_dispatch = taxi.dispatcher.SQLiteDispatcher(parg.dispatch_path)
 my_pool = taxi.pool.SQLitePool(
@@ -57,9 +64,6 @@ with my_pool:
 ## should be imported in local_taxi above!
 runner_decoder = taxi.jobs.runner_rebuilder_factory()
 
-## Record starting time
-taxi_obj.start_time = time.time()
-
 ## Main control loop
 while True:
 
@@ -70,65 +74,12 @@ while True:
 
     ## Check with dispatch for tasks to execute
     with my_dispatch:
-        task_blob = my_dispatch.get_task_blob(taxi_obj)
+        # Ask dispatcher for next job
+        task = my_dispatch.request_next_task(for_taxi=taxi_obj)
 
-        N_pending_tasks = 0
-        found_ready_task = False
-
-        # Order tasks in blob by priority
-        if (task_blob is None) or (len(task_blob) == 0):
-            task_priority_ids = []
-        else:
-            task_priority_ids = [ t['id'] for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
- 
-        for task_id in task_priority_ids:
-            task = task_blob[task_id]
-
-            # Only try to do pending tasks
-            if task['status'] != 'pending':
-                continue
-            
-            N_pending_tasks += 1
-                
-            # Check whether task is ready to go
-            N_unresolved, N_failed = my_dispatch.count_unresolved_dependencies(task=task, task_blob=task_blob)
-            sufficient_time = my_dispatch.enough_time_for_task(taxi_obj, task)
-            
-            # Look deeper in priority list if task not ready
-            if N_unresolved > 0 or not sufficient_time:
-                continue
-            
-            # Task ready; stop looking for new task to run
-            found_ready_task = True
-            break
-
-
-        # If there are no tasks, finish up
-        if N_pending_tasks == 0:
-            print "WORK COMPLETE: no tasks pending"
-            ## TODO: I think this will break both the with: and the outer while True:,
-            ## but add a test case!
-
-            # No work to be done, so place the taxi on hold
-            with my_pool:
-                my_pool.update_taxi_status(taxi_obj, 'H')
-
-            break
-        if not found_ready_task:
-            ## TODO: we could add another status code that puts the taxi to sleep,
-            ## but allows it to restart after some amount of time...
-            ## Either that, or another script somewhere that checks the Pool
-            ## and un-holds taxis that were waiting for dependencies to resolved
-            ## once it sees that it's happened.
-            ## Also need to be wary of interaction with insufficient time check,
-            ## which we should maybe track separately.
-
-            print "WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks
-            break
-
-        # Otherwise, flag task for execution
+        # Flag task for execution
         try:
-            my_dispatch.claim_task(taxi_obj, task_id)
+            my_dispatch.claim_task(taxi_obj, task)
         except taxi.dispatcher.TaskClaimException, e:
             ## Race condition safeguard: skips and tries again if the task status has changed
             print str(e)
@@ -138,29 +89,37 @@ while True:
     ## Execute task
     task_start_time = time.time()
     print "EXECUTING TASK ", task
+    #print task.__dict__
     
-    if task['task_type'] == 'die':
+    if isinstance(task, taxi.jobs.Die):
         ## "Die" is a special task
+        print task.message # Die comes with a reason why
+        
         with my_dispatch:
             task_run_time = time.time() - task_start_time
-            my_dispatch.update_task(task['id'], 'complete', run_time=task_run_time, by_taxi=taxi_obj)
+            my_dispatch.update_task(task, 'complete', run_time=task_run_time, by_taxi=taxi_obj)
 
         with my_pool:
             my_pool.update_taxi_status(taxi_obj, 'H')
 
         sys.exit(0)
 
-    # Alright, this is a little odd-looking with dumps and loads in the same line...
-    task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
+    sys.stdout.flush()
+    
+    ## Dispatcher now reconstructs every object
+#    # Alright, this is a little odd-looking with dumps and loads in the same line...
+#    task_obj = json.loads(json.dumps(task), object_hook=runner_decoder)
 
     failed_task = False
     try:
-        task_obj.execute(cores=taxi_obj.cores)
+        task.execute(cores=taxi_obj.cores)
+        sys.stdout.flush()
     except:
         ## TODO: some exception logging here?
         ## Record task as failed
         failed_task = True
-        raise
+        print "RUNNING FAILED:"
+        traceback.print_exc()
 
     ## Record exit status, time taken, etc.
     taxi_obj.task_finish_time = time.time()
@@ -169,12 +128,13 @@ while True:
     if failed_task:
         task_status = 'failed'
     else:
-        if (task['is_recurring']):
+        if (task.is_recurring):
             task_status = 'pending'
         else:
             task_status = 'complete'
 
     with my_dispatch:
-        my_dispatch.update_task(task['id'], task_status, start_time=task_start_time, run_time=task_run_time, by_taxi=taxi_obj)
+        my_dispatch.update_task(task, status=task_status, start_time=task_start_time, run_time=task_run_time, by_taxi=taxi_obj)
 
+    sys.stdout.flush()
     

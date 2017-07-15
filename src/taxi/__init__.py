@@ -1,34 +1,42 @@
 __version__ = '0.2.0'
 
 import os
+import time
 
-
-
-def mkdir_p(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-        
 class Taxi(object):
 
-    def __init__(self, name=None, pool_name=None, time_limit=None, cores=None):
+    def __init__(self, name=None, pool_name=None, time_limit=None, cores=None, nodes=None):
         self.name = name
         self.pool_name = pool_name
         self.time_limit = time_limit
         self.cores = cores
+        self.nodes = nodes
         self.time_last_submitted = None
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
 
+    def __str__(self):
+        return str(self.name)
+    
     def __eq__(self, other):
         eq = (self.name == other.name)
         eq = eq and (self.pool_name == other.pool_name)
         eq = eq and (self.time_limit == other.time_limit)
         eq = eq and (self.cores == other.cores)
+        eq = eq and (self.nodes == other.nodes)
         eq = eq and (self.time_last_submitted == other.time_last_submitted)
         eq = eq and (self.start_time == other.start_time)
         eq = eq and (self.status == other.status)
 
         return eq
+    
+    def enough_time_for_task(self, task):
+        """Checks whether a taxi has enough time to complete the given task."""
+
+        elapsed_time = time.time() - self.start_time
+        time_remaining = self.time_limit - elapsed_time
+
+        return time_remaining > task.req_time
 
     def taxi_name(self):
         return '{0:s}_{1:d}'.format(self.pool_name, self.name)
@@ -39,6 +47,7 @@ class Taxi(object):
             self.pool_name = taxi_dict['pool_name']
             self.time_limit = taxi_dict['time_limit']
             self.cores = taxi_dict['cores']
+            self.nodes = taxi_dict['nodes']
             self.time_last_submitted = taxi_dict['time_last_submitted']
             self.status = taxi_dict['status']
             self.dispatch_path = taxi_dict['dispatch']
@@ -57,6 +66,7 @@ class Taxi(object):
             'pool_name': self.pool_name,
             'time_limit': self.time_limit,
             'cores': self.cores,
+            'nodes' : self.nodes,
             'time_last_submitted': self.time_last_submitted,
             'start_time': self.start_time,
             'status': self.status,

@@ -10,6 +10,13 @@ import errno
     
 machine_list = ['scalar', 'cu_hep']
 
+def symlink_with_overwrite(src, dst):
+    assert os.path.exists(src), src
+    if os.path.lexists(dst):
+        os.remove(dst)
+    os.symlink(os.path.abspath(src), dst)
+    
+
 class LocalizeCommand(distutils.cmd.Command):
     """Custom command that localizes Taxi install for a particular machine."""
 
@@ -37,8 +44,7 @@ class LocalizeCommand(distutils.cmd.Command):
     def run(self):
         machine_files = [
             'local_queue.py',
-            'local_taxi.py',
-            'taxi.sh',
+            'local_taxi.py'
         ]
         if (self.machine == 'scalar'):
             machine_files.append('sqlite_queue_runner.py')
@@ -48,10 +54,7 @@ class LocalizeCommand(distutils.cmd.Command):
 
         for f in machine_files:
             src = 'src/taxi/local/{}/{}'.format(self.machine, f)
-            if f == 'taxi.sh':
-                dst = 'bin/taxi.sh'
-            else:
-                dst = 'src/taxi/local/{}'.format(f)
+            dst = 'src/taxi/local/{}'.format(f)
 
             self.announce(
                 src + '-->' + dst,
@@ -59,8 +62,21 @@ class LocalizeCommand(distutils.cmd.Command):
             )
 
             shutil.copy(src, dst)
+            #symlink_with_overwrite(src, dst)
 
-        shutil.copy('src/taxi/run_taxi.py', 'bin/run_taxi.py')
+        self.announce(
+            'src/taxi/run_taxi.py --> bin/run_taxi.py',
+            level=distutils.log.INFO
+        )
+        #shutil.copy('src/taxi/run_taxi.py', 'bin/run_taxi.py')
+        symlink_with_overwrite('src/taxi/run_taxi.py', 'bin/run_taxi.py')
+
+        self.announce(
+            'src/taxi/local/%s/taxi.sh --> bin/taxi.sh'%self.machine,
+            level=distutils.log.INFO
+        )
+        #shutil.copy('src/taxi/local/%s/taxi.sh'%self.machine, 'bin/taxi.sh')
+        symlink_with_overwrite('src/taxi/local/%s/taxi.sh'%self.machine, 'bin/taxi.sh')
 
         self.announce(
             'Symlinked local files for machine {}.'.format(self.machine),
@@ -77,5 +93,8 @@ setuptools.setup(
 
     # Find package in src/taxi
     package_dir={'':'src'},
-    packages=setuptools.find_packages('src')
+    packages=setuptools.find_packages('src'),
+    
+    # Make taxi.sh and run_taxi.py available to run everywhere
+    scripts=['bin/taxi.sh', 'bin/run_taxi.py']
 )

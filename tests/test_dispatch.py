@@ -29,7 +29,7 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
     def test_initialize(self):
         with self.test_dispatch:
 
-            empty_query = self.test_dispatch.conn.execute("""SELECT id, task_type, task_args, priority FROM tasks""").fetchall()
+            empty_query = self.test_dispatch.conn.execute("""SELECT id FROM tasks""").fetchall()
             self.assertEqual(empty_query, [])
 
             with self.assertRaises(sqlite3.OperationalError):
@@ -37,8 +37,8 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
 
             
     def test_populate_task_pool(self):
-        test_job = Job(req_time=33)
-        test_job_two = Job(req_time=44)
+        test_job = Task(req_time=33)
+        test_job_two = Task(req_time=44)
         
         test_job.trunk = True
         test_job.status = 'complete'
@@ -53,9 +53,9 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             read_task = task_blob[1]
             read_task_two = task_blob[2]
 
-            self.assertEqual(read_task['status'], 'complete')
-            self.assertEqual(read_task_two['is_recurring'], True)
-            self.assertEqual(read_task_two['status'], test_job_two.status)
+            self.assertEqual(read_task.status, 'complete')
+            self.assertEqual(read_task_two.is_recurring, True)
+            self.assertEqual(read_task_two.status, test_job_two.status)
 
             task_blob_no_complete = self.test_dispatch.get_task_blob(None, include_complete=False)
 

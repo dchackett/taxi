@@ -7,24 +7,31 @@ import time
 import json
 
 import taxi
+import jobs
 
+## Need to be able to make blank objects to reconstruct Tasks from JSON payloads
+class BlankObject(object):
+    def __init__(self):
+        pass # Need an __init__ function to have a __dict__
+        
+        
 def task_priority_sort(a, b):
     """
     Order tasks by their priority score.
     Negative priority (default -1) is the lowest.
     For positive priority, smaller numbers are higher priority.
     """
-    if a['priority'] < 0:
-        if b['priority'] > 0:
+    if a.priority < 0:
+        if b.priority > 0:
             return 1
         else:
             return 0
-    elif b['priority'] < 0:
+    elif b.priority < 0:
         ## At this point a['priority'] must be positive
         return -1
-    elif a['priority'] < b['priority']:
+    elif a.priority < b.priority:
         return 1
-    elif a['priority'] > b['priority']:
+    elif a.priority > b.priority:
         return -1
     else:
         return 0
@@ -39,27 +46,18 @@ class Dispatcher(object):
     def __init__(self):
         pass
 
-    def _taxi_name(self, my_taxi):
-        ## Polymorphism!  (I wonder if there's a cleaner Python way to do this...)
-        if type(my_taxi) == taxi.Taxi:
-            return my_taxi.name
-        elif type(my_taxi) == str:
-            return my_taxi
-        else:
-            raise TypeError("{} is not a Taxi or taxi name!".format(my_taxi))
-
     def get_task_blob(self, taxi_name):
         """Get all incomplete tasks pertinent to this taxi."""
         raise NotImplementedError
 
-    def check_task_status(self, task_id):
+    def check_task_status(self, task):
         """Quick query of task status for task with id=task_id from job forest DB.
 
         For last-minute checks that job hasn't been claimed by another job."""
 
         raise NotImplementedError
     
-    def update_task(self, task_id, status, start_time=None, run_time=None, by_taxi=None):
+    def update_task(self, task, status, start_time=None, run_time=None, by_taxi=None):
         """Change the status of task with task_id in job forest DB.  For claiming
         task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
         used to record runtime and update status simultaneously (one less DB interaction)."""
@@ -74,8 +72,63 @@ class Dispatcher(object):
         time_remaining = my_taxi.time_limit - elapsed_time
         return time_remaining > task.req_time
 
-    ## Initialization
+    
+    ## Taxi interface
+    def request_next_task(self, for_taxi):
+        task_blob = self.get_task_blob(for_taxi)
 
+        N_pending_tasks = 0
+        found_ready_task = False
+
+        # Order tasks in blob by priority
+        if (task_blob is None) or (len(task_blob) == 0):
+            task_priority_ids = []
+        else:
+            task_priority_ids = [ t.id for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
+ 
+        for task_id in task_priority_ids:
+            task = task_blob[task_id]
+
+            # Only try to do pending tasks
+            if task.status != 'pending':
+                continue
+            
+            N_pending_tasks += 1
+                
+            # Check whether task is ready to go, and taxi can run it
+            N_unresolved, N_failed = task.count_unresolved_dependencies()
+            sufficient_time = for_taxi.enough_time_for_task(task)
+            
+            # Look deeper in priority list if task not ready
+            if N_unresolved > 0 or not sufficient_time:
+                continue
+            
+            # Task ready; stop looking for new task to run
+            found_ready_task = True
+            break
+
+
+        # If there are no tasks, finish up
+        if N_pending_tasks == 0:
+            ## TODO: I think this will break both the with: and the outer while True:,
+            ## but add a test case!
+            return jobs.Die(message="WORK COMPLETE: no tasks pending")
+            
+            
+        if not found_ready_task:
+            ## TODO: we could add another status code that puts the taxi to sleep,
+            ## but allows it to restart after some amount of time...
+            ## Either that, or another script somewhere that checks the Pool
+            ## and un-holds taxis that were waiting for dependencies to resolved
+            ## once it sees that it's happened.
+            ## Also need to be wary of interaction with insufficient time check,
+            ## which we should maybe track separately.
+            return jobs.Die(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
+        
+        # If we've gotten this far, successfully found a pending task.
+        return task
+    
+    ## Initialization
     def _find_trees(self, job_pool):
         ## Scaffolding
         # Give each task an identifier, reset dependents
@@ -168,13 +221,10 @@ class Dispatcher(object):
     def _compile(self, job_pool, start_id):
         # Give each job an integer id
         for jj, job in enumerate(job_pool):
-            job.job_id = jj + start_id + 1
+            job.id = jj + start_id + 1
 
-        # Tell all jobs to compile themselves
-        for job in job_pool:
-            job.compile()
-
-        self.task_pool = [job.compiled for job in job_pool]
+        # JSON serialize all jobs
+        self.task_pool = [job.compiled() for job in job_pool]
 
     def _populate_task_table(self):
         raise NotImplementedError
@@ -216,6 +266,15 @@ class SQLiteDispatcher(Dispatcher):
 
     def __init__(self, db_path):
         self.db_path = db_path
+        
+        ## Get a dictionary of all Task subclasses in the global scope, to
+        ## rebuild objects from JSON payloads
+        self.class_dict = {}
+        valid_task_classes = [jobs.Task] + jobs.Task.__subclasses__()
+        for valid_task_class in valid_task_classes:
+            self.class_dict[valid_task_class.__name__] = valid_task_class
+            valid_task_classes += valid_task_class.__subclasses__()
+    
 
 
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
@@ -235,16 +294,18 @@ class SQLiteDispatcher(Dispatcher):
             CREATE TABLE IF NOT EXISTS tasks (
                 id integer PRIMARY KEY,
                 task_type text,
-                task_args text,
                 depends_on text,
                 status text,
                 for_taxi text,
                 by_taxi text,
                 is_recurring bool,
+                
                 req_time integer DEFAULT 0,
                 start_time real DEFAULT -1,
                 run_time real DEFAULT -1,
-                priority integer DEFAULT -1
+                priority integer DEFAULT -1,
+                
+                payload text
             )"""
 
         with self.conn:
@@ -293,15 +354,16 @@ class SQLiteDispatcher(Dispatcher):
 
             task_res = self.execute_select(task_query)
         else:
-            taxi_name = self._taxi_name(my_taxi)
+            taxi_name = str(my_taxi)
 
             task_query = """
                 SELECT * FROM tasks
                 WHERE (for_taxi=? OR for_taxi IS null)"""
             if (not include_complete):
-                task_query += """AND (status != 'complete')"""
+                task_query += """ AND (status != 'complete')"""
         
             task_res = self.execute_select(task_query, taxi_name)
+        
 
         if len(task_res) == 0:
             return None
@@ -314,23 +376,47 @@ class SQLiteDispatcher(Dispatcher):
                 r['depends_on'] = json.loads(r['depends_on'])
             
             # Big complicated dictionary of task args in JSON format
-            if r['task_args'] is not None:
-                r['task_args'] = json.loads(r['task_args'])
+            if r['payload'] is not None:
+                r['payload'] = json.loads(r['payload'])
+                
         
-        # Package as task_id : task dict
+        # Objectify and package as task_id : task dict
         res_dict = {}
         for r in task_res:
-            res_dict[r['id']] = r
+            task_class = jobs.Task # Just make it a basic task if we can't figure out what it is
+            if self.class_dict.has_key(r['task_type']):
+                task_class = self.class_dict[r['task_type']]
+            
+            rebuilt = BlankObject()
+            rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
+            rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
+            rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
+                
+            res_dict[r['id']] = rebuilt
+        
+        
+        # Replace ID dependencies with object dependencies
+        for task_id, task in res_dict.items():
+            if task.depends_on is None:
+                continue
+            
+            # If not found in dictionary, just leave as IDs (usually don't request completes)
+            task.depends_on = [(res_dict[dep_id] if res_dict.has_key(dep_id) else dep_id) for dep_id in task.depends_on]
         
         return res_dict
 
 
-    def check_task_status(self, task_id):
+    def check_task_status(self, task):
         """Quick query of task status for task with id=task_id from job forest DB.
 
         For last-minute checks that job hasn't been claimed by another job."""
+        
+        if not hasattr(task, 'id'):
+            ## Case: Dispatcher returns 'Die' to a taxi when it wants it to stop running.
+            ## This 'Die' does not have an id, but we want it to run.
+            return 'pending'
 
-        task_res = self.execute_select("""SELECT status FROM tasks WHERE id=?""", task_id)
+        task_res = self.execute_select("""SELECT status FROM tasks WHERE id=?""", task.id)
         
         if len(task_res) == 0:
             return None
@@ -338,10 +424,15 @@ class SQLiteDispatcher(Dispatcher):
         return dict(task_res[0])['status']
         
    
-    def update_task(self, task_id, status, start_time=None, run_time=None, by_taxi=None):
+    def update_task(self, task, status, start_time=None, run_time=None, by_taxi=None):
         """Change the status of task with task_id in job forest DB.  For claiming
         task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
         used to record runtime and update status simultaneously (one less DB interaction)."""
+        
+        if not hasattr(task, 'id') or task.id is None:
+            ## Case: Dispatcher returns a "Die" that doesn't live in the dispatch DB when it
+            ## wants a taxi to stop running.
+            return
 
         update_str = """UPDATE tasks SET status=?"""
         values = [status]
@@ -353,69 +444,38 @@ class SQLiteDispatcher(Dispatcher):
             values.append(run_time)
         if by_taxi is not None:
             update_str += """, by_taxi=?"""
-            values.append(self._taxi_name(by_taxi))
+            values.append(str(by_taxi))
         update_str += """ WHERE id=?"""
-        values.append(task_id)
+        values.append(task.id)
 
         self.execute_update(update_str, *values)
 
-    def count_unresolved_dependencies(self, task, task_blob):
-        """Looks at the status of all jobs in the job forest DB that 'task' depends upon.
-        Counts up number of jobs that are not complete, and number of jobs that are failed.
-        Returns tuple (n_unresolved, n_failed)"""
-        
-        dependencies = task['depends_on']
-        
-        # Sensible behavior for dependency-tree roots
-        if dependencies is None:
-            return 0, 0
-        
-        # Count up number of incomplete, number of failed
-        N_unresolved = 0
-        N_failed = 0
-        for dependency_id in dependencies:
-            if not task_blob.has_key(dependency_id):
-                continue # Completes weren't requested in task blob
-            dependency_status = task_blob[dependency_id]['status']
-            if dependency_status != 'complete':
-                N_unresolved += 1
-            if dependency_status == 'failed':
-                N_failed += 1
-        return N_unresolved, N_failed
-        
-    def enough_time_for_task(self, my_taxi, task):
-        """Checks whether a taxi has enough time to complete the given task."""
 
-        elapsed_time = time.time() - my_taxi.start_time
-        time_remaining = my_taxi.time_limit - elapsed_time
-
-        return time_remaining > task['req_time']
-
-    def claim_task(self, my_taxi, task_id):
+    def claim_task(self, my_taxi, task):
         """Attempt to claim task for a given taxi.  Fails if the status has been changed from pending."""
 
-        task_status = self.check_task_status(task_id)
+        task_status = self.check_task_status(task)
         if task_status != 'pending':
-            raise TaskClaimException("Failed to claim task {}: status {}".format(task_id, task_status))
+            raise TaskClaimException("Failed to claim task {}: status {}".format(task.id, task_status))
 
-        self.update_task(task_id=task_id, status='active', by_taxi=my_taxi.name)
+        self.update_task(task=task, status='active', by_taxi=my_taxi.name)
 
     def _populate_task_table(self):
         ## TODO: is there a more efficient way than generating N queries using a Python for loop?
 
         for task in self.task_pool:
             task_query = """INSERT OR REPLACE INTO tasks
-            (task_type, task_args, depends_on, status, for_taxi, is_recurring, req_time, priority)
+            (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
 
             task_values = (task['task_type'], 
-                        json.dumps(task['task_args']) if task.has_key('task_args') else None,
                         json.dumps(task['depends_on']),
                         task['status'], 
                         task['for_taxi'] if task.has_key('for_taxi') else None, 
                         task['is_recurring'],
                         task['req_time'], 
-                        task['priority'])
+                        task['priority'],
+                        json.dumps(task['payload']) if task.has_key('payload') else None,)
 
             self.execute_update(task_query, *task_values)
             

@@ -8,9 +8,7 @@ import taxi
 import time
 import taxi.batch_queue as batch_queue
 
-def mkdir_p(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
+from _utility import mkdir_p
 
 
 class Pool(object):
@@ -211,6 +209,7 @@ class SQLitePool(Pool):
                 pool_name text REFERENCES pools (name),
                 time_limit real,
                 cores integer,
+                nodes integer,
                 time_last_submitted real,
                 status text,
                 dispatch text
@@ -331,11 +330,11 @@ class SQLitePool(Pool):
         """
 
         insert_taxi_query = """INSERT OR REPLACE INTO taxis
-            (name, pool_name, time_limit, cores, time_last_submitted, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (name, pool_name, time_limit, cores, nodes, time_last_submitted, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         self.execute_update(insert_taxi_query, my_taxi.name, my_taxi.pool_name, my_taxi.time_limit, 
-            my_taxi.cores, my_taxi.time_last_submitted, my_taxi.status)
+            my_taxi.cores, my_taxi.nodes, my_taxi.time_last_submitted, my_taxi.status)
 
         return
 
