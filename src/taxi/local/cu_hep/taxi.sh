@@ -1,3 +1,3 @@
 #!/bin/bash
 
-run_taxi.py $@
+python $(which run_taxi.py) $@

@@ -298,14 +298,6 @@ class SQLiteDispatcher(Dispatcher):
 
     def __init__(self, db_path):
         self.db_path = db_path
-        
-        ## Get a dictionary of all Task subclasses in the global scope, to
-        ## rebuild objects from JSON payloads
-        self.class_dict = {}
-        valid_task_classes = [jobs.Task] + jobs.Task.__subclasses__()
-        for valid_task_class in valid_task_classes:
-            self.class_dict[valid_task_class.__name__] = valid_task_class
-            valid_task_classes += valid_task_class.__subclasses__()
     
 
 
@@ -315,6 +307,10 @@ class SQLiteDispatcher(Dispatcher):
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         self.write_table_structure()
+        
+        ## Get/update a dictionary of all Task subclasses in the global scope, to
+        ## rebuild objects from JSON payloads
+        self.class_dict = taxi.jobs.valid_task_classes()
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
@@ -415,9 +411,10 @@ class SQLiteDispatcher(Dispatcher):
         # Objectify and package as task_id : task dict
         res_dict = {}
         for r in task_res:
-            task_class = jobs.Task # Just make it a basic task if we can't figure out what it is
             if self.class_dict.has_key(r['task_type']):
                 task_class = self.class_dict[r['task_type']]
+            else:
+                raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
             
             rebuilt = BlankObject()
             rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
