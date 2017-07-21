@@ -14,6 +14,8 @@ class Taxi(object):
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
         self.imports = []
+        self.log_dir = None
+        
 
     def __eq__(self, other):
         eq = (self.name == other.name)

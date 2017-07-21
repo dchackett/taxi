@@ -3,7 +3,7 @@
 import os
 import taxi.local.local_taxi as local_taxi
 
-from taxi._utility import sanitized_path
+from taxi import sanitized_path
 
 from copy import copy, deepcopy
 

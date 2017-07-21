@@ -51,7 +51,9 @@ class LocalQueue(BatchQueue):
         taxi_call += " -N {taxi_name} ".format(taxi_name=taxi.name)
 
         # Logs go in taxi dir, like dtaxi/taxi-name_1241234.log
-        logfn = "{taxi_name}_{subtime}".format(
+        if taxi.log_dir is None:
+            raise Exception("Taxi {t} doesn't have log_dir set, cannot submit".format(t=repr(taxi)))
+        logfn = "{dtaxi}/{taxi_name}_{subtime}".format(dtaxi=taxi.log_dir,
             taxi_name=taxi.name, subtime=time.strftime("%Y%b%d-%H%M"))
 
         taxi_call += " -o {logfn} ".format(logfn=logfn)

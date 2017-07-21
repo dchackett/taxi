@@ -297,7 +297,7 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def __init__(self, db_path):
-        self.db_path = db_path
+        self.db_path = taxi.expand_path(db_path)
     
 
 

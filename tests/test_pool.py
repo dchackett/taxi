@@ -5,6 +5,7 @@ import mock
 import os
 import sqlite3
 
+import taxi
 from taxi.pool import *
 from taxi.batch_queue import *
 
@@ -80,8 +81,8 @@ class TestSQLiteEmptyPool(TestSQLiteBase):
             pass
 
         with dupe_pool_obj:
-            self.assertEqual(dupe_pool_obj.work_dir, './tests/work/')
-            self.assertEqual(dupe_pool_obj.log_dir, './tests/log/')
+            self.assertEqual(dupe_pool_obj.work_dir, taxi.expand_path('./tests/work/'))
+            self.assertEqual(dupe_pool_obj.log_dir, taxi.expand_path('./tests/log/'))
 
 
 class TestSQLitePoolWithTaxis(TestSQLiteBase):

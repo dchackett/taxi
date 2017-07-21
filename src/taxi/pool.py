@@ -11,8 +11,6 @@ import json
 
 import traceback
 
-from taxi._utility import mkdir_p
-
 import __main__ # To get filename of calling script
 
 class Pool(object):
@@ -26,12 +24,12 @@ class Pool(object):
     ]
 
     def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300):
-        self.work_dir = work_dir
-        self.log_dir = log_dir
+        self.work_dir = taxi.expand_path(work_dir)
+        self.log_dir = taxi.expand_path(log_dir)
         
         if imports is None:
             # Default behavior: import the file that called this pool (run-spec script)
-            self.imports = [os.path.abspath(__main__.__file__)]
+            self.imports = [taxi.expand_path(__main__.__file__)]
         else:
             self.imports = imports
 
@@ -181,7 +179,7 @@ class SQLitePool(Pool):
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
              imports=imports, thrash_delay=thrash_delay)
 
-        self.db_path = db_path
+        self.db_path = taxi.expand_path(db_path)
         self.pool_name = pool_name
 
         self.conn = None
@@ -250,19 +248,17 @@ class SQLitePool(Pool):
         self.conn = sqlite3.connect(self.db_path, timeout=30.0)
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
         
-        self._get_or_create_pool() # Also retrieves info about pool from DB, so must occur here
+        self._get_or_create_pool() # Also retrieves info about pool from DB, including working dir, so must occur here
         
-        self.backup_cwd = os.getcwd() # backup current directory
-        if not os.path.exists(os.path.abspath(self.work_dir)):
-            mkdir_p(os.path.abspath(self.work_dir)) # Dig out working directory if it doesn't exist
-        os.chdir(os.path.abspath(self.work_dir)) # move to desired working directory
+        taxi.mkdir_p(os.path.abspath(self.work_dir)) # Dig out working directory if it doesn't exist
+        taxi.mkdir_p(os.path.abspath(self.log_dir)) # Dig out log directory if it doesn;t exist
 
         
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
         self.conn.close()
-        os.chdir(self.backup_cwd) # restore original working directory
+#        os.chdir(self.backup_cwd) # restore original working directory
 
 
     def _create_taxi_object(self, db_taxi):
@@ -274,6 +270,7 @@ class SQLitePool(Pool):
         new_taxi = taxi.Taxi()
         new_taxi.rebuild_from_dict(db_taxi)
         new_taxi.pool_path = self.db_path
+        new_taxi.log_dir = self.log_dir # Tell taxi where log_dir for this pool is
 
         return new_taxi
 
@@ -363,6 +360,7 @@ class SQLitePool(Pool):
         """
         my_taxi.pool_name = self.pool_name
         my_taxi.pool_path = self.db_path
+        my_taxi.log_dir = self.log_dir
 
         taxi_name_query = """SELECT name FROM taxis;"""
         all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))

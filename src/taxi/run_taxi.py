@@ -13,19 +13,16 @@ import taxi.dispatcher
 import taxi.pool
 import taxi.jobs
 
-import taxi.local.local_taxi as local_taxi
 import taxi.local.local_queue as local_queue
 
-from taxi._utility import sanitized_path
-from taxi._utility import flush_output
-
+from taxi import work_in_dir
 
 if __name__ == '__main__':
     
     ### Initialization
     
     os.system('hostname') # Print which machine we're working on
-    print "Working dir:", os.getcwd()
+    print "Starting in directory:", os.getcwd()
 
 
     ## Parse arguments from command line
@@ -84,74 +81,76 @@ if __name__ == '__main__':
 
     ## Decoding for runner objects; relevant TaskRunner subclasses
     ## should be imported in local_taxi above!
-    runner_decoder = taxi.jobs.runner_rebuilder_factory()
+    # runner_decoder = taxi.jobs.runner_rebuilder_factory()
 
     ## Record starting time
     taxi_obj.start_time = _start_time
     
     print "Running on", taxi_obj.cores, "cores"
+    print "Working dir:", my_pool.work_dir
 
     ## Main control loop
-    while True:
-        ## Check with pool for jobs to launch
-        with my_pool:
-            my_pool.update_all_taxis_queue_status(my_queue)
-            my_pool.spawn_idle_taxis(my_queue)
-    
-        ## Check with dispatch for tasks to execute
-        with my_dispatch:
-            # Ask dispatcher for next job
-            task = my_dispatch.request_next_task(for_taxi=taxi_obj)
-    
-            # Flag task for execution
-            try:
-                my_dispatch.claim_task(taxi_obj, task)
-            except taxi.dispatcher.TaskClaimException, e:
-                ## Race condition safeguard: skips and tries again if the task status has changed
-                print str(e)
-                continue
-
-
-        ## Execute task
-        taxi_obj.task_start_time = time.time()
-        print "EXECUTING TASK ", task
-        print task.__dict__
-
-
-        if isinstance(task, taxi.jobs.Die) or isinstance(task, taxi.jobs.Sleep):
-            ## "Die" and "Sleep" are special tasks
-            print task.message # Print reason why we're dying or sleeping
-            
-            with my_dispatch:
-                task_run_time = time.time() - taxi_obj.task_start_time
-                my_dispatch.update_task(task, 'complete', run_time=task_run_time, by_taxi=taxi_obj)
-    
+    with work_in_dir(my_pool.work_dir):
+        while True:
+            ## Check with pool for jobs to launch
             with my_pool:
-                if isinstance(task, taxi.jobs.Die):
-                    my_pool.update_taxi_status(taxi_obj, 'H')
-                else:
-                    my_pool.update_taxi_status(taxi_obj, 'I')
+                my_pool.update_all_taxis_queue_status(my_queue)
+                my_pool.spawn_idle_taxis(my_queue)
+        
+            ## Check with dispatch for tasks to execute
+            with my_dispatch:
+                # Ask dispatcher for next job
+                task = my_dispatch.request_next_task(for_taxi=taxi_obj)
+        
+                # Flag task for execution
+                try:
+                    my_dispatch.claim_task(taxi_obj, task)
+                except taxi.dispatcher.TaskClaimException, e:
+                    ## Race condition safeguard: skips and tries again if the task status has changed
+                    print str(e)
+                    continue
     
-            sys.exit(0)
     
-        sys.stdout.flush()
-
+            ## Execute task
+            taxi_obj.task_start_time = time.time()
+            print "EXECUTING TASK ", task
+            print task.__dict__
     
-        try:
-            task.execute(cores=taxi_obj.cores)
+    
+            if isinstance(task, taxi.jobs.Die) or isinstance(task, taxi.jobs.Sleep):
+                ## "Die" and "Sleep" are special tasks
+                print task.message # Print reason why we're dying or sleeping
+                
+                with my_dispatch:
+                    task_run_time = time.time() - taxi_obj.task_start_time
+                    my_dispatch.update_task(task, 'complete', run_time=task_run_time, by_taxi=taxi_obj)
+        
+                with my_pool:
+                    if isinstance(task, taxi.jobs.Die):
+                        my_pool.update_taxi_status(taxi_obj, 'H')
+                    else:
+                        my_pool.update_taxi_status(taxi_obj, 'I')
+        
+                sys.exit(0)
+        
             sys.stdout.flush()
-        except:
-            ## TODO: some exception logging here?
-            ## Record task as failed
-            task.status = 'failed'
-            print "RUNNING FAILED:"
-            sys.stdout.flush()
-            traceback.print_exc()
-            
-        ## Record exit status, time taken, etc.
-        taxi_obj.task_finish_time = time.time()
     
-        with my_dispatch:
-            my_dispatch.finalize_task_run(taxi_obj, task)
-            
-        sys.stdout.flush()
+        
+            try:
+                task.execute(cores=taxi_obj.cores)
+                sys.stdout.flush()
+            except:
+                ## TODO: some exception logging here?
+                ## Record task as failed
+                task.status = 'failed'
+                print "RUNNING FAILED:"
+                sys.stdout.flush()
+                traceback.print_exc()
+                
+            ## Record exit status, time taken, etc.
+            taxi_obj.task_finish_time = time.time()
+        
+            with my_dispatch:
+                my_dispatch.finalize_task_run(taxi_obj, task)
+                
+            sys.stdout.flush()

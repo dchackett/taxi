@@ -34,6 +34,11 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         ## Source/destination for copy test jobs
         self.src_files = ['./test_run/test_ab', './test_run/test_cd', './test_run/test_ef']
         self.dst_files = ['./test_run/test_uv', './test_run/test_wx', './test_run/test_yz']
+        
+        # Use abspaths
+        # TODO: Change test to use relative paths, becomes an implicit test of working dir functionality
+        self.src_files = map(taxi.expand_path, self.src_files)
+        self.dst_files = map(taxi.expand_path, self.dst_files)
 
         for i in range(len(self.src_files)):
             with open(self.src_files[i], 'w') as test_file:
