@@ -98,25 +98,23 @@ class Die(Task):
     """Tells taxi to die"""
     
     def __init__(self, message, req_time=0, **kwargs):        
-        super(Die, self).__init__(req_time=req_time, **kwargs)
-        
+        super(Die, self).__init__(req_time=req_time, **kwargs)        
         self.message = message
-
-    def compile(self):
-        super(Die, self).compile()
     
     
 class Sleep(Task):
     """Tells taxi to sleep"""
     
     def __init__(self, message, req_time=0, **kwargs):        
-        super(Sleep, self).__init__(req_time=req_time, **kwargs)
-        
+        super(Sleep, self).__init__(req_time=req_time, **kwargs)        
         self.message = message
-
-    def compile(self):
-        super(Sleep, self).compile()
         
+
+class Respawn(Task):
+    """Special task tells taxi to respawn itself."""
+    
+    def __init__(self, req_time=0, **kwargs):
+        super(Respawn, self).__init__(req_time=req_time, **kwargs)
         
         
 class Runner(Task):

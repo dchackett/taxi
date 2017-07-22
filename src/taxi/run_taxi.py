@@ -5,7 +5,6 @@ _start_time = time.time() # Get this ASAP for accurate accounting
 import os
 import sys
 import argparse
-import traceback # For full error output
 import imp # For dynamical imports
 
 import taxi
@@ -15,12 +14,12 @@ import taxi.jobs
 
 import taxi.local.local_queue as local_queue
 
-from taxi import work_in_dir
+from taxi import flush_output, work_in_dir, print_traceback
 
 if __name__ == '__main__':
     
     ### Initialization
-    
+    os.system('date')
     os.system('hostname') # Print which machine we're working on
     print "Starting in directory:", os.getcwd()
 
@@ -89,15 +88,19 @@ if __name__ == '__main__':
     print "Running on", taxi_obj.cores, "cores"
     print "Working dir:", my_pool.work_dir
 
+    ## Control variables
+    keep_running = True
+    tasks_run = 0
+    
     ## Main control loop
     with work_in_dir(my_pool.work_dir):
-        while True:
-            ## Check with pool for jobs to launch
+        while keep_running:
+            ### Check with pool for jobs to launch
             with my_pool:
                 my_pool.update_all_taxis_queue_status(my_queue)
                 my_pool.spawn_idle_taxis(my_queue)
         
-            ## Check with dispatch for tasks to execute
+            ### Check with dispatch for tasks to execute
             with my_dispatch:
                 # Ask dispatcher for next job
                 task = my_dispatch.request_next_task(for_taxi=taxi_obj)
@@ -111,46 +114,63 @@ if __name__ == '__main__':
                     continue
     
     
-            ## Execute task
+            ### Execute task
             taxi_obj.task_start_time = time.time()
             print "EXECUTING TASK ", task
-            print task.__dict__
-    
-    
+            #print task.__dict__
+            flush_output()
+            
+            ## Special behavior -- Die/Sleep
             if isinstance(task, taxi.jobs.Die) or isinstance(task, taxi.jobs.Sleep):
                 ## "Die" and "Sleep" are special tasks
                 print task.message # Print reason why we're dying or sleeping
-                
-                with my_dispatch:
-                    task_run_time = time.time() - taxi_obj.task_start_time
-                    my_dispatch.update_task(task, 'complete', run_time=task_run_time, by_taxi=taxi_obj)
-        
+
                 with my_pool:
                     if isinstance(task, taxi.jobs.Die):
                         my_pool.update_taxi_status(taxi_obj, 'H')
                     else:
                         my_pool.update_taxi_status(taxi_obj, 'I')
-        
-                sys.exit(0)
-        
-            sys.stdout.flush()
-    
-        
-            try:
-                task.execute(cores=taxi_obj.cores)
-                sys.stdout.flush()
-            except:
-                ## TODO: some exception logging here?
-                ## Record task as failed
-                task.status = 'failed'
-                print "RUNNING FAILED:"
-                sys.stdout.flush()
-                traceback.print_exc()
+                    
+                task.status = 'complete'
+                keep_running = False
                 
-            ## Record exit status, time taken, etc.
-            taxi_obj.task_finish_time = time.time()
-        
+            ## Special behavior -- Respawning
+            elif isinstance(task, taxi.jobs.Respawn):
+                print "RESPAWNING", taxi_obj
+                
+                with my_pool:
+                    if tasks_run > 0:
+                        # Resubmit self as queued taxi
+                        my_pool.submit_taxi_to_queue(my_taxi=taxi_obj, queue=my_queue)
+                    else:
+                        # ANTI-THRASHING: This taxi accomplished nothing while it was alive
+                        my_pool.update_taxi_status(taxi_obj, 'E')
+                        print "ANTI-THRASH: {t} ran no tasks while alive, not respawning.".format(t=str(taxi_obj))
+                    
+                keep_running = False
+                
+            ## 'Normal' behavior -- Task running
+            elif hasattr(task, 'execute') and callable(getattr(task, 'execute')): # duck typing
+                try:
+                    task.execute(cores=taxi_obj.cores)
+                except:
+                    ## TODO: some exception logging here?
+                    ## Record task as failed
+                    task.status = 'failed'
+                    print "RUNNING FAILED:"
+                    print_traceback()
+            else:
+                print "WARNING: Task type {t} does nothing".format(type(task))
+                print task.to_dict()
+            
+            flush_output()
+            
+            
+            ### Record exit status, time taken, etc.
             with my_dispatch:
-                my_dispatch.finalize_task_run(taxi_obj, task)
-                
-            sys.stdout.flush()
+                tasks_run += 1
+                my_dispatch.finalize_task_run(taxi_obj, task)    
+            flush_output()
+
+## Exit
+os.system('date')

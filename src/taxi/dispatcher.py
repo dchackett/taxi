@@ -74,15 +74,16 @@ class Dispatcher(object):
         
         task_blob = self.get_task_blob(for_taxi)
 
-        N_pending_tasks = 0
-        found_ready_task = False
-
         # Order tasks in blob by priority
         if (task_blob is None) or (len(task_blob) == 0):
             task_priority_ids = []
         else:
             task_priority_ids = [ t.id for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
  
+        # Find highest-priority task that can be completed
+        N_pending_tasks = 0
+        N_blocked_by_time = 0 # Tasks 'blocked by time' are ready to go, but not enough time to run
+        found_ready_task = False
         for task_id in task_priority_ids:
             task = task_blob[task_id]
 
@@ -95,6 +96,9 @@ class Dispatcher(object):
             # Check whether task is ready to go, and taxi can run it
             N_unresolved, N_failed = task.count_unresolved_dependencies()
             sufficient_time = for_taxi.enough_time_for_task(task)
+            
+            if not sufficient_time and N_unresolved == 0:
+                N_blocked_by_time += 1
             
             # Look deeper in priority list if task not ready
             if N_unresolved > 0 or not sufficient_time:
@@ -119,7 +123,12 @@ class Dispatcher(object):
             ## once it sees that it's happened.
             ## Also need to be wary of interaction with insufficient time check,
             ## which we should maybe track separately.
-            return jobs.Sleep(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
+            if N_blocked_by_time > 0:
+                # Just need more time -- tell this taxi to resubmit itself!
+                return jobs.Respawn()
+            else:
+                # Something is wrong other than not having enough time.
+                return jobs.Sleep(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
         
         # If we've gotten this far, successfully found a pending task.
         return task
@@ -141,17 +150,15 @@ class Dispatcher(object):
 
 
     def finalize_task_run(self, my_taxi, task):
+        my_taxi.task_finish_time = time.time()
         task_run_time = my_taxi.task_finish_time - my_taxi.task_start_time
 
-        if task.status == 'failed':
-            task_status = 'failed'
+        if task.is_recurring and task.status != 'failed':
+            task.status = 'pending'
         else:
-            if task.is_recurring:
-                task_status = 'pending'
-            else:
-                task_status = 'complete'
+            task.status = 'complete'
 
-        self.update_task(task=task, status=task_status, 
+        self.update_task(task=task, status=task.status, 
             start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)
 
 

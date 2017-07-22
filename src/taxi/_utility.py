@@ -41,3 +41,10 @@ class work_in_dir:
 
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
+        
+
+import traceback    
+def print_traceback():
+    flush_output()
+    print traceback.format_exc()
+    flush_output()

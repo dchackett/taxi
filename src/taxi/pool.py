@@ -90,7 +90,7 @@ class Pool(object):
         pool_taxi = self.get_taxi(my_taxi)
         taxi_status = pool_taxi.status
         if (taxi_status in ('H', 'E')):
-            print "Warning: did not submit taxi {} due to status flag {}.".format(my_taxi, taxi_status)
+            print "WARNING: did not submit taxi {} due to status flag {}.".format(my_taxi, taxi_status)
             return
 
         if self.check_for_thrashing(my_taxi):
