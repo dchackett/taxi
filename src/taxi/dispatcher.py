@@ -317,7 +317,7 @@ class SQLiteDispatcher(Dispatcher):
         
         ## Get/update a dictionary of all Task subclasses in the global scope, to
         ## rebuild objects from JSON payloads
-        self.class_dict = taxi.jobs.valid_task_classes()
+        self.class_dict = taxi.all_subclasses_of(taxi.jobs.Task)
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):

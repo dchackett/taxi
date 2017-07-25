@@ -74,8 +74,7 @@ if __name__ == '__main__':
     _imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(imports)]
     
     # Print valid task classes that have been loaded
-    #print "Loaded Task subclasses:", taxi.jobs.valid_task_classes().keys()
-    print "Loaded Task subclasses:", taxi.jobs.valid_task_classes()
+    print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
             
 
     ## Decoding for runner objects; relevant TaskRunner subclasses

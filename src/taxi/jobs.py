@@ -3,7 +3,7 @@
 import os
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path
+from taxi import sanitized_path, all_subclasses_of
 
 from copy import copy, deepcopy
 
@@ -199,14 +199,6 @@ class BlankObject(object):
     def __init__(self):
         pass # Need an __init__ function to have a __dict__
 
-def valid_task_classes():
-    class_dict = {}
-    valid_task_classes = [Task] + Task.__subclasses__()
-    for valid_task_class in valid_task_classes:
-        class_dict[valid_task_class.__name__] = valid_task_class
-        valid_task_classes += valid_task_class.__subclasses__()
-    return class_dict
-
 
 def runner_rebuilder_factory():
     """
@@ -218,7 +210,7 @@ def runner_rebuilder_factory():
     order to get the list of valid task types.
     """
 
-    class_dict = valid_task_classes()
+    class_dict = all_subclasses_of(Task)
     
     def runner_decoder(s):
         if s.get('task_type') in class_dict.keys():

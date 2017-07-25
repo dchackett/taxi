@@ -48,3 +48,11 @@ def print_traceback():
     flush_output()
     print traceback.format_exc()
     flush_output()
+    
+def all_subclasses_of(my_class):
+    class_dict = {}
+    valid_task_classes = [my_class] + my_class.__subclasses__()
+    for valid_task_class in valid_task_classes:
+        class_dict[valid_task_class.__name__] = valid_task_class
+        valid_task_classes += valid_task_class.__subclasses__()
+    return class_dict
