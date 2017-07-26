@@ -88,7 +88,6 @@ class TestFlowRunner(unittest.TestCase):
         hmc_flow_job = flow.FlowJob(measure_on=self.hmc_job, req_time=60, tmax=4.0)
 
         self.assertEqual(hmc_flow_job.Ns, 16)
-        self.assertEqual(hmc_flow_job.ensemble_name, self.hmc_job.ensemble_name)
 
 
     def test_generate_input(self):

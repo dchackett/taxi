@@ -46,7 +46,7 @@ if __name__ == '__main__':
     ## Add Wilson flow tasks for both streams
     flow_pool = mcmc.measure_on_config_generators(
         config_measurement_class=flow.FlowJob,
-        config_generators=hmc_pool,
+        measure_on=hmc_pool,
         req_time=60,
         tmax=1,
         start_at_traj=200

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import os
-
 from taxi.mcmc import ConfigMeasurement
 import taxi.local.local_taxi as local_taxi
-from taxi._utility import sanitized_path
+
+import taxi.fn_conventions
+import mrep_fncs
 
 ## local_taxi should specify:
 # - "flow_binary"
@@ -30,6 +30,10 @@ EOF
 """
 
 class FlowJob(ConfigMeasurement):
+    fout_filename_prefix = 'flow'
+    fout_filename_convention = mrep_fncs.PureGaugeFnConvention
+    loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
+    
     def __init__(self,
                  # Application-specific required arguments
                  tmax,
@@ -78,29 +82,6 @@ class FlowJob(ConfigMeasurement):
                 "If tmax is 0, must set adaptive flow parameters minE and mindE or flow will be trivial"
 
         self.binary = local_taxi.flow_binary
-
-        ## Sanitize paths
-        self.loadg = sanitized_path(self.loadg)
-        
-        # Filesystem
-        self.generate_outfilename()
-
-
-    ### TODO: Replace this block with modularized file naming conventions
-    def generate_outfilename(self):
-        self.fout = "flow_" + self.ensemble_name + "_{}".format(self.traj)
-        
-    def parse_params_from_loadg(self):
-        # e.g., GaugeSU4_12_6_7.75_0.128_0.128_1_0
-        words = os.path.basename(self.loadg).split('_')
-        
-        return {
-            'Ns' : int(words[1]),
-            'Nt' : int(words[2]),
-            'traj': int(words[-1]),
-            'ensemble_name' : '_'.join(words[1:-1]),
-        }
-    ### /TODO
         
     
     def build_input_string(self):

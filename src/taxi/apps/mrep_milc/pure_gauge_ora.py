@@ -5,6 +5,9 @@ import taxi.local.local_taxi as local_taxi
 
 import os
 
+from mrep_fncs import PureGaugeFnConvention
+
+
 ## local_taxi should specify:
 # - "pure_gauge_ora_binary"
 
@@ -33,11 +36,15 @@ no_gauge_fix
 EOF
 """
 
-def pure_gauge_ora_ens_name(Ns, Nt, beta, label):
-    return "{Ns}_{Nt}_{beta}_{label}".format(Ns=Ns, Nt=Nt, beta=beta, label=label)
 
 
 class PureGaugeORAJob(ConfigGenerator):
+    saveg_filename_prefix = 'cfgPG'
+    saveg_filename_convention = PureGaugeFnConvention
+    fout_filename_prefix = 'ora'
+    fout_filename_convention = PureGaugeFnConvention
+    loadg_filename_convention = [PureGaugeFnConvention] # Convention: do input/loading FNCs as lists for user-friendliness
+    
     def __init__(self,
                  # Application-specific required arguments
                  Ns, Nt, beta, label,
@@ -79,11 +86,6 @@ class PureGaugeORAJob(ConfigGenerator):
         self.qhb_steps = qhb_steps
         self.tpm = tpm
         
-        ## TODO: Modularized file naming conventions
-        self.ensemble_name = pure_gauge_ora_ens_name(self.Ns, self.Nt, self.beta, self.label)
-        self.saveg = "cfgPG_" + self.ensemble_name + "_{}".format(self.final_traj)
-        self.fout = "out_" + self.ensemble_name + "_{}".format(self.final_traj)
-
 
     def build_input_string(self):
         input_str = super(PureGaugeORAJob, self).build_input_string()

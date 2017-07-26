@@ -56,3 +56,14 @@ def all_subclasses_of(my_class):
         class_dict[valid_task_class.__name__] = valid_task_class
         valid_task_classes += valid_task_class.__subclasses__()
     return class_dict
+
+
+def fixable_dynamic_attribute(private_name, dynamical_getter):
+    def _setter(self, x):
+        setattr(self, private_name, x)
+    def _getter(self):
+        if hasattr(self, private_name):
+            return getattr(self, private_name)
+        else:
+            return dynamical_getter(self)
+    return property(fget=_getter, fset=_setter)
