@@ -109,24 +109,14 @@ class PureGaugeORAJob(ConfigGenerator):
 
     def verify_output(self):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
-
-        # Gauge file must exist
-        if (self.saveg != None) and (not os.path.exists(self.saveg)):
-            print "ORA ok check fails: Gauge file {} doesn't exist.".format(self.saveg)
-            raise RuntimeError
-
-        # Output file must exist
-        if not os.path.exists(self.fout):
-            print "ORA ok check fails: Output file {} doesn't exist.".format(self.fout)
-            raise RuntimeError
+        super(PureGaugeORAJob, self).verify_output()
 
         # Check for errors
         # Trailing space avoids catching the error_something parameter input
         with open(self.fout) as f:
             for line in f:
                 if "error " in line:
-                    print "ORA ok check fails: Error detected in " + self.fout
-                    raise RuntimeError
+                    raise RuntimeError("ORA ok check fails: Error detected in " + self.fout)
 
         # Check that the appropriate number of GMESes are present
         count_gmes = 0
@@ -141,12 +131,10 @@ class PureGaugeORAJob(ConfigGenerator):
         expect_gmes = self.n_traj / self.tpm
         
         if count_gmes < expect_gmes:
-            print "HMC ok check fails: Not enough GMES in " + self.fout + " %d/%d"%(count_gmes, expect_gmes)
-            raise RuntimeError
+            raise RuntimeError("HMC ok check fails: Not enough GMES in " + self.fout + " %d/%d"%(count_gmes, expect_gmes))
             
         if count_exit < 1:
-            print "HMC ok check fails: No exit in " + self.fout
-            raise RuntimeError
+            raise RuntimeError("HMC ok check fails: No exit in " + self.fout)
             
         return        
      

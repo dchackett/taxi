@@ -104,6 +104,22 @@ class MCMC(jobs.Runner):
         self.__dict__.update(**self.parse_params_from_loadg(self.loadg))
             
     
+    ## Standard output verification
+    def verify_output(self):
+        super(MCMC, self).verify_output()
+        
+        ## In the future, we can define custom exceptions to distinguish the below errors, if needed
+        
+        # If this job should save a gauge file, that gauge file must exist
+        if hasattr(self, 'saveg') and (self.saveg != None) and (not os.path.exists(self.saveg)):
+            print "MCMC ok check fails: Gauge file {} doesn't exist.".format(self.saveg)
+            raise RuntimeError
+            
+        # If this job should save an output file, that output file must exist
+        if hasattr(self, 'fout') and (self.fout != None) and (not os.path.exists(self.fout)):
+            print "MCMC ok check fails: Output file {} doesn't exist.".format(self.fout)
+            raise RuntimeError
+    
     ## Modular file name conventions
     # Input: Loaded gauge file
     def parse_params_from_loadg(self, fn):

@@ -90,8 +90,5 @@ class FlowJob(ConfigMeasurement):
         input_dict = self.to_dict()
 
         return input_str + flow_input_template.format(**input_dict)
-
-    def verify_output(self):
-        pass
     
 
