@@ -28,11 +28,6 @@ class Task(object):
         self.branch_root = False
         self.priority = -1
         
-        # to_dict accidental recursion handling
-        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
-        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
-        self.to_dict_recursion_depth = 0
-        
         
     def to_dict(self):
         """Returns a dictionaryized version of the object, for use in compilation
@@ -41,13 +36,18 @@ class Task(object):
         removed (private attributes in Python are indicated by a leading underscore
         like task._private_var)."""
         
-        self.to_dict_recursion_depth += 1
+        # to_dict accidental recursion handling
+        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
+        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
+        if not hasattr(self, '_to_dict_recursion_depth'):
+            self._to_dict_recursion_depth = 0
+        self._to_dict_recursion_depth += 1
         
         d = copy(self.__dict__)
         
         # Evaluate all properties, loading in to dict
         # TODO: Write a unit test for this
-        if self.to_dict_recursion_depth == 1: # Don't infinitely recurse if some property getter calls to_dict
+        if self._to_dict_recursion_depth == 1: # Don't infinitely recurse if some property getter calls to_dict
             for k in dir(self):
                 if k.startswith('_'):
                     continue # Enforce privacy
@@ -58,6 +58,7 @@ class Task(object):
                         d[k] = getattr(self, k)
                 except AttributeError:
                     pass # Don't die if getter not implemented
+            
         
         # Don't include private variables in dict version of object
         for k in d.keys():
@@ -67,7 +68,7 @@ class Task(object):
         # depends_on gets modified in compilation, so preserve the original
         d['depends_on'] = deepcopy(d['depends_on'])
         
-        self.to_dict_recursion_depth -= 1
+        self._to_dict_recursion_depth -= 1
         
         return d
     
