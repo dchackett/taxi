@@ -36,30 +36,35 @@ class Task(object):
         removed (private attributes in Python are indicated by a leading underscore
         like task._private_var)."""
         
-        # to_dict accidental recursion handling
-        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
-        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
-        if not hasattr(self, '_to_dict_recursion_depth'):
-            self._to_dict_recursion_depth = 0
-        self._to_dict_recursion_depth += 1
+#        # to_dict accidental recursion handling
+#        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
+#        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
+        if not hasattr(self, '_currently_evaluating_properties'):
+            self._currently_evaluating_properties = set([])
         
         d = copy(self.__dict__)
         
         # Evaluate all properties, loading in to dict
-        # TODO: Write a unit test for this
-        if self._to_dict_recursion_depth == 1: # Don't infinitely recurse if some property getter calls to_dict
-            for k in dir(self):
-                if k.startswith('_'):
-                    continue # Enforce privacy
-                if not hasattr(self.__class__, k):
-                    continue # Non-property attributes aren't present in both class and instance
-                try: # Try to evaluate property
-                    if isinstance(getattr(self.__class__, k), property):    
-                        d[k] = getattr(self, k)
-                except AttributeError:
-                    pass # Don't die if getter not implemented
+        # TODO: Write a unit test for this            
+        for k in dir(self):
+            if k.startswith('_'):
+                continue # Enforce privacy
+            if not hasattr(self.__class__, k):
+                continue # Non-property attributes aren't present in both class and instance
+            if k in self._currently_evaluating_properties:
+                continue # Don't let evaluating a property depend on evaluating a property
+            try: # Try to evaluate property
+                if isinstance(getattr(self.__class__, k), property):
+                    self._currently_evaluating_properties.add(k)
+                    d[k] = getattr(self, k)
+            except AttributeError:
+                pass # Don't die if getter not implemented
             
-        
+            try:
+                self._currently_evaluating_properties.remove(k) # Make sure this isn't on the stack anymore once we've evaluated it
+            except KeyError:
+                pass
+                
         # Don't include private variables in dict version of object
         for k in d.keys():
             if k.startswith('_'):
@@ -67,8 +72,6 @@ class Task(object):
         
         # depends_on gets modified in compilation, so preserve the original
         d['depends_on'] = deepcopy(d['depends_on'])
-        
-        self._to_dict_recursion_depth -= 1
         
         return d
     
