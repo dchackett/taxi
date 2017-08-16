@@ -34,7 +34,7 @@ class BasicMCMCFnConvention(taxi.fn_conventions.FileNameConvention):
         self.prefix = prefix
         
     def write(self, params):
-        return "{prefix}_{traj}".format(prefix=self.prefix, traj=params['final_traj'])
+        return "{prefix}_{traj}".format(prefix=self.prefix, traj=(params['traj'] if params.has_key('traj') else params['final_traj']))
     
     def read(self, fn):
         words = os.path.basename(fn).split('_')
@@ -181,7 +181,10 @@ class ConfigGenerator(MCMC):
         else:
             raise TypeError("Don't know what to do with starter type: {s}".format(s=type(starter)))
 
-        self.final_traj = self.start_traj + self.n_traj
+
+    def _get_final_traj(self):
+        return self.start_traj + self.n_traj
+    final_traj = property(fget=_get_final_traj)
         
     
                 
@@ -214,6 +217,7 @@ class ConfigMeasurement(MCMC):
 def make_config_generator_stream(config_generator_class, N,
                                  starter=None, # default: fresh start
                                  streamseed=None, seeds=None, # One of these must be provided
+                                 start_traj=0,
                                  **kwargs):
     """Assembles a stream of sequential ConfigGenerators, each picking up where the last left off.
     
@@ -251,6 +255,9 @@ def make_config_generator_stream(config_generator_class, N,
         # Randomly (with seed) generate a different seed for each MCMC run
         seed(streamseed%10000)      
         seeds = [randint(0, 9999) for nn in range(N)]
+        
+    # For first job in stream, restart trajectory counting (don't just continue from last stream)
+    kwargs['start_traj'] = start_traj
     
     ## Assemble stream
     stream = []
@@ -261,6 +268,9 @@ def make_config_generator_stream(config_generator_class, N,
         
         # Next ConfigGenerator will depend on this ConfigGenerator
         starter = new_job
+        
+        # After first task, don't want to reset start_traj each time
+        kwargs.pop('start_traj', None)
         
     # Let the first job know it's the beginning of a new branch/sub-trunk
     stream[0].branch_root = True
