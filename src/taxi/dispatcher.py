@@ -153,10 +153,11 @@ class Dispatcher(object):
         my_taxi.task_finish_time = time.time()
         task_run_time = my_taxi.task_finish_time - my_taxi.task_start_time
 
-        if task.is_recurring and task.status != 'failed':
-            task.status = 'pending'
-        else:
-            task.status = 'complete'
+        if task.status != 'failed':
+            if task.is_recurring:
+                task.status = 'pending'
+            else:
+                task.status = 'complete'
 
         self.update_task(task=task, status=task.status, 
             start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)

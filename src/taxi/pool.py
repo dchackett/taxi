@@ -80,7 +80,7 @@ class Pool(object):
             current_time = time.time()
             time_since_last_submit = current_time - last_submit
             if time_since_last_submit < self.thrash_delay:
-                print "Thrashing detected: {a}-{b} = {c} < {d}".format(a=current_time,
+                print "Thrashing detected: {a}-{b} = {c} < {d} (Taxi resubmitted too quickly)".format(a=current_time,
                            b=last_submit, c=time_since_last_submit, d=self.thrash_delay)
             return time_since_last_submit < self.thrash_delay
 
