@@ -36,9 +36,9 @@ class Task(object):
         removed (private attributes in Python are indicated by a leading underscore
         like task._private_var)."""
         
-#        # to_dict accidental recursion handling
-#        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
-#        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
+        # to_dict accidental recursion handling
+        # (to_dict evaluates all properties, but some property getters call to_dict, recursing infinitely)
+        # TODO: Better way to do this? Contexts? Decorator? traceback? Afraid of it breaking.
         if not hasattr(self, '_currently_evaluating_properties'):
             self._currently_evaluating_properties = set([])
         

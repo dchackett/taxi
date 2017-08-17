@@ -3,8 +3,6 @@
 from taxi.mcmc import ConfigGenerator
 import taxi.local.local_taxi as local_taxi
 
-import os
-
 from mrep_fncs import PureGaugeFnConvention
 
 
@@ -92,6 +90,7 @@ class PureGaugeORAJob(ConfigGenerator):
         
         input_dict = self.to_dict()
         
+        # Loadg/saveg logic
         if self.loadg is None:
             input_dict['load_gauge'] = 'fresh'
         else:
@@ -135,6 +134,4 @@ class PureGaugeORAJob(ConfigGenerator):
             
         if count_exit < 1:
             raise RuntimeError("HMC ok check fails: No exit in " + self.fout)
-            
-        return        
      
