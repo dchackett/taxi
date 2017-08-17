@@ -18,6 +18,7 @@ import taxi.fn_conventions
 privileged_param_names = [
     'fout',  # Output file for inline measurements and diagnostic outputs
     'saveg', # File to store configuration in at end of binary
+    'save_config', # Flag: store configuration at end of binary?
     'loadg', # File to load configuration from at beginning of run
     'binary', # Binary to run
     'seed',   # Seed for binary
@@ -52,6 +53,11 @@ class MCMC(jobs.Runner):
     fout_filename_convention = BasicMCMCFnConvention
     loadg_filename_convention = BasicMCMCFnConvention
     
+    def __init__(self, save_config=True, **kwargs):
+        super(MCMC, self).__init__(**kwargs)
+        
+        self.save_config = save_config
+    
     
     def build_input_string(self):
         """Take a heredoc, terminating in EOF, as input.  Reroute output to output
@@ -62,7 +68,7 @@ class MCMC(jobs.Runner):
         return input_str
     
     
-    ## Common "start from"/"measure on" behavior (load params from config_geneartor or filename)
+    ## Common "start from"/"measure on" behavior (load params from config_generator or filename)
     def start_from_config_generator(self, config_generator):
         """Steal parameters from specified config_generator.
         
@@ -111,7 +117,7 @@ class MCMC(jobs.Runner):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
         
         # If this job should save a gauge file, that gauge file must exist
-        if hasattr(self, 'saveg') and (self.saveg != None) and (not os.path.exists(self.saveg)):
+        if self.save_config and hasattr(self, 'saveg') and (self.saveg != None) and (not os.path.exists(self.saveg)):
             print "MCMC ok check fails: Gauge file {} doesn't exist.".format(self.saveg)
             raise RuntimeError
             
@@ -165,7 +171,7 @@ class ConfigGenerator(MCMC):
         elif isinstance(starter, ConfigGenerator):
             # Start where another ConfigGenerator leaves off
             self.start_from_config_generator(starter) # Steals parameters, adds to dependencies, etc
-            self.start_traj = starter.final_traj
+            self.start_traj = (starter.final_traj if start_traj is None else start_traj)
         
         elif isinstance(starter, str):
             # Start from a saved file -- try to steal parameters from filename
@@ -195,9 +201,9 @@ class ConfigMeasurement(MCMC):
     
     fout_filename_prefix = 'meas'
         
-    def __init__(self, measure_on, **kwargs):
+    def __init__(self, measure_on, save_config=False, **kwargs):
         
-        super(ConfigMeasurement, self).__init__(**kwargs)
+        super(ConfigMeasurement, self).__init__(save_config=save_config, **kwargs)
         
         ## Flexible behavior for finding config to measure on
         if isinstance(measure_on, str):
@@ -207,10 +213,7 @@ class ConfigMeasurement(MCMC):
         elif isinstance(measure_on, ConfigGenerator):
             # Measure on the config file saved by a ConfigGenerator task
             self.start_from_config_generator(measure_on) # Steal parameters from the ConfigGenerator
-            self.traj = measure_on.final_traj
-
-            
-                
+            self.traj = measure_on.final_traj    
 
 
 ### Stream functions
