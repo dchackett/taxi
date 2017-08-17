@@ -8,6 +8,7 @@ use_mpi = True
 ## Binary locations
 flow_binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_wf_mpi'
 pure_gauge_ora_binary = '/nfs/beowulf03/dchackett/su4_pure_gauge/bin/su4_ora'
+multirep_hmc_binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_mrep_hmc'
 
 # Spectroscopy binaries are special, because there are so many of them in MILC
 # Multirep dictionary key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
