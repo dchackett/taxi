@@ -8,7 +8,7 @@ import re
 import time
 
 from taxi.batch_queue import *
-from taxi._utility import mkdir_p
+from taxi._utility import ensure_path_exists
 
 class LocalQueue(BatchQueue):
 

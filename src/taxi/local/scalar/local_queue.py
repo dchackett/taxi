@@ -7,7 +7,7 @@ import sqlite3
 import os
 
 from taxi.batch_queue import *
-from taxi._utility import mkdir_p
+from taxi._utility import ensure_path_exists
 
 import time
 
@@ -16,7 +16,7 @@ class LocalQueue(BatchQueue):
     def __init__(self):
         self.queue_db_path = os.path.expanduser("~") + "/.taxi/"
         if not (os.path.exists(self.queue_db_path)):
-            mkdir_p(self.queue_db_path)
+            ensure_path_exists(self.queue_db_path)
 
         self.conn = sqlite3.connect(self.queue_db_path + "serial_queue.sqlite3", timeout=30.0)
         self.conn.row_factory = sqlite3.Row

@@ -250,8 +250,8 @@ class SQLitePool(Pool):
         
         self._get_or_create_pool() # Also retrieves info about pool from DB, including working dir, so must occur here
         
-        taxi.mkdir_p(os.path.abspath(self.work_dir)) # Dig out working directory if it doesn't exist
-        taxi.mkdir_p(os.path.abspath(self.log_dir)) # Dig out log directory if it doesn;t exist
+        taxi.ensure_path_exists(taxi.expand_path(self.work_dir)) # Dig out working directory if it doesn't exist
+        taxi.ensure_path_exists(taxi.expand_path(self.log_dir)) # Dig out log directory if it doesn;t exist
 
         
 

@@ -23,7 +23,7 @@ def flush_output():
     sys.stdout.flush()
     sys.stderr.flush()
 
-def mkdir_p(path):
+def ensure_path_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
         
@@ -36,7 +36,7 @@ class work_in_dir:
 
     def __enter__(self):
         self.savedPath = os.getcwd()
-        mkdir_p(self.newPath)
+        ensure_path_exists(self.newPath)
         os.chdir(self.newPath)
 
     def __exit__(self, etype, value, traceback):

@@ -11,7 +11,7 @@ import taxi.pool
 import taxi.dispatcher
 import taxi
 
-from taxi._utility import mkdir_p
+from taxi._utility import ensure_path_exists
 
 ## Note: 'scalar' localization is required
 import taxi.local.local_queue as local_queue
@@ -29,7 +29,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
     def setUp(self):
 
         if not os.path.exists('./test_run'):
-            mkdir_p('./test_run')
+            ensure_path_exists('./test_run')
  
         ## Source/destination for copy test jobs
         self.src_files = ['./test_run/test_ab', './test_run/test_cd', './test_run/test_ef']
