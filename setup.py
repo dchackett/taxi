@@ -8,7 +8,7 @@ import os
 import shutil
 import errno
     
-machine_list = ['scalar', 'cu_hep']
+machine_list = ['scalar', 'cu_hep', 'fnal']
 
 def symlink_with_overwrite(src, dst):
     assert os.path.exists(src), src
@@ -34,7 +34,7 @@ class LocalizeCommand(distutils.cmd.Command):
         try:
             assert self.machine in machine_list
         except AssertionError:
-            print "Error: invalid machine choice '{}'".format(self.machine)
+            print "Error: invalid machine choice '{0}'".format(self.machine)
             print "Valid options:"
             for m in machine_list:
                 print "- {}".format(m)
@@ -53,8 +53,8 @@ class LocalizeCommand(distutils.cmd.Command):
             os.makedirs('bin')
 
         for f in machine_files:
-            src = 'src/taxi/local/{}/{}'.format(self.machine, f)
-            dst = 'src/taxi/local/{}'.format(f)
+            src = 'src/taxi/local/{0}/{1}'.format(self.machine, f)
+            dst = 'src/taxi/local/{0}'.format(f)
 
             self.announce(
                 src + '-->' + dst,
@@ -79,7 +79,7 @@ class LocalizeCommand(distutils.cmd.Command):
         symlink_with_overwrite('src/taxi/local/%s/taxi.sh'%self.machine, 'bin/taxi.sh')
 
         self.announce(
-            'Symlinked local files for machine {}.'.format(self.machine),
+            'Symlinked local files for machine {0}.'.format(self.machine),
             level=distutils.log.INFO
         )
 

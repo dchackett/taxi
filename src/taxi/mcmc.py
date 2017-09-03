@@ -118,12 +118,12 @@ class MCMC(jobs.Runner):
         
         # If this job should save a gauge file, that gauge file must exist
         if self.save_config and hasattr(self, 'saveg') and (self.saveg != None) and (not os.path.exists(self.saveg)):
-            print "MCMC ok check fails: Gauge file {} doesn't exist.".format(self.saveg)
+            print "MCMC ok check fails: Gauge file {0} doesn't exist.".format(self.saveg)
             raise RuntimeError
             
         # If this job should save an output file, that output file must exist
         if hasattr(self, 'fout') and (self.fout != None) and (not os.path.exists(self.fout)):
-            print "MCMC ok check fails: Output file {} doesn't exist.".format(self.fout)
+            print "MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout)
             raise RuntimeError
     
     ## Modular file name conventions

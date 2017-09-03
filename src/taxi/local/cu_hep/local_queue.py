@@ -43,7 +43,7 @@ class LocalQueue(BatchQueue):
 
 
     def launch_taxi(self, taxi):
-        if taxi.cores is not None and taxi.cores != 8:
+        if taxi.nodes is not None and taxi.nodes > 1:
             raise Exception("Can only run single-node jobs on beowulf")
 
         # Arguments to SGE (Note, don't specify nodes -- always 1)

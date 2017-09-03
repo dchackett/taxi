@@ -83,5 +83,5 @@ class Taxi(object):
         return self.name
     
     def __repr__(self):
-        return "Taxi<{},{},{},{},{},{},'{}'>".format(self.name, self.pool_name, self.time_limit,
+        return "Taxi<{0},{1},{2},{3},{4},{5},'{6}'>".format(self.name, self.pool_name, self.time_limit,
             self.cores, self.nodes, self.time_last_submitted, self.status)
