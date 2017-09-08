@@ -218,7 +218,7 @@ class Copy(Runner):
         
 
     def build_input_string(self):
-        return "{} {}".format(self.src, self.dest)
+        return "{0} {1}".format(self.src, self.dest)
     
 
 ### Task rebuilder    

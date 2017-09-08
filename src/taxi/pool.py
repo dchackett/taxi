@@ -90,12 +90,12 @@ class Pool(object):
         pool_taxi = self.get_taxi(my_taxi)
         taxi_status = pool_taxi.status
         if (taxi_status in ('H', 'E')):
-            print "WARNING: did not submit taxi {} due to status flag {}.".format(my_taxi, taxi_status)
+            print "WARNING: did not submit taxi {0} due to status flag {1}.".format(my_taxi, taxi_status)
             return
 
         if self.check_for_thrashing(my_taxi):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {}; set to hold.".format(my_taxi)
+            print "Thrashing detected for taxi {0}; set to hold.".format(my_taxi)
             self.update_taxi_status(my_taxi, 'H')
             return
 
@@ -147,7 +147,7 @@ class Pool(object):
                 self.update_taxi_status(my_taxi, 'I')
                 return
         else:
-            print "Invalid queue status code - '{}'".format(queue_status)
+            print "Invalid queue status code - '{0}'".format(queue_status)
             raise BaseException
 
 
