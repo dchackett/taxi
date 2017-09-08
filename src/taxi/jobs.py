@@ -3,7 +3,7 @@
 import os
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path, all_subclasses_of
+from taxi import sanitized_path, all_subclasses_of, copy_nested_list
 
 from copy import copy, deepcopy
 
@@ -71,7 +71,7 @@ class Task(object):
                 d.pop(k)
         
         # depends_on gets modified in compilation, so preserve the original
-        d['depends_on'] = deepcopy(d['depends_on'])
+        d['depends_on'] = copy_nested_list(d['depends_on'])
         
         return d
     

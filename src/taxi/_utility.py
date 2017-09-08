@@ -27,6 +27,13 @@ def ensure_path_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
         
+        
+def copy_nested_list(L):
+    if not isinstance(L, list):
+        return L
+    else:
+        return [copy_nested_list(l) for l in L]
+        
 class work_in_dir:
     """Context manager for changing the current working directory
     https://stackoverflow.com/a/13197763
