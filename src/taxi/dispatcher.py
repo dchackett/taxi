@@ -210,7 +210,7 @@ class Dispatcher(object):
         return lowest_priority
 
 
-    def _assign_priorities(self, job_pool, priority_method='tree'):
+    def _assign_priorities(self, job_pool, priority_method='canvas'):
         """
         Assign task priorities to the newly tree-structured job pool.  Respects
         any user-assigned priority values that already exist.  All auto-assigned
@@ -223,6 +223,8 @@ class Dispatcher(object):
         of jobs, before moving on to the next one.
         - 'trunk': Trunk-first priority: the workflow will attempt to finish all available
         tasks at the same tree depth, before moving deeper.
+        - 'canvas': Or "anti-trunk".  Workflow will work on trunk tasks last, working through
+        the tree layer-by-layer.
         - 'anarchy': No priorities are automatically assigned.  In the absence of user-determined
         priorities, the tasks will be run in arbitrary order, except that dependencies will be
         resolved first.
@@ -241,10 +243,23 @@ class Dispatcher(object):
             return
 
         elif priority_method == 'trunk':
-            ## I'll need to think about this implementation...not sure exactly the right way to assign
-            ## depth-first priorities based on the current tree-construction algorithm.
-            raise NotImplementedError
+            for job in job_pool:
+                if job.priority < 0:
+                    if job.trunk:
+                        job.priority = lowest_priority + 1
+                    else:
+                        job.priority = lowest_priority + 2
+            return
 
+        elif priority_method == 'canvas':
+            for job in job_pool:
+                if job.priority < 0:
+                    if job.trunk:
+                        job.priority = lowest_priority + 2
+                    else:
+                        job.priority = lowest_priority + 1
+            return
+            
         elif priority_method == 'anarchy':
             ## Do nothing
             return
