@@ -73,7 +73,7 @@ class LocalQueue(BatchQueue):
         res = self.execute_select(taxi_status_query, '%' + taxi_name + '%')
 
         if (len(res) > 1):
-            print "WARNING: non-unique taxi status returned by queue: {} entires".format(len(res))
+            print "WARNING: non-unique taxi status returned by queue: {} entries".format(len(res))
             print res
 
         if (len(res) == 0):
