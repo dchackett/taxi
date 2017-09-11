@@ -15,20 +15,6 @@ from taxi import sanitized_path
 
 import taxi.fn_conventions
 
-privileged_param_names = [
-    'fout',  # Output file for inline measurements and diagnostic outputs
-    'saveg', # File to store configuration in at end of binary
-    'save_config', # Flag: store configuration at end of binary?
-    'loadg', # File to load configuration from at beginning of run
-    'binary', # Binary to run
-    'seed',   # Seed for binary
-    
-    # Specific to ConfigGenerator
-    'start_traj', # Index of starting trajectory of MCMC run
-    'n_traj', # Number of MCMC trajectories to run
-    'final_traj', # Index of trajectory MCMC run will end on
-]
-
 
 class BasicMCMCFnConvention(taxi.fn_conventions.FileNameConvention):
     def __init__(self, prefix=None, *args, **kwargs):
@@ -162,6 +148,8 @@ class ConfigGenerator(MCMC):
         self.n_traj = n_traj
         self.seed = seed
         
+        self.trunk = True # ConfigGenerators are "trunk" tasks
+        
         ## Flexible seed configuration behavior
         if starter is None:
             # Fresh start
@@ -192,8 +180,14 @@ class ConfigGenerator(MCMC):
         return self.start_traj + self.n_traj
     final_traj = property(fget=_get_final_traj)
         
-    
-                
+
+## Need to be able to steal physical parameters from ConfigGenerator
+## However, we don't want any of ConfigGenerator's logistical parameters (e.g. fout, seed, trunk?, ...)
+## to overwrite the logistical parameters in the ConfigGenerator/ConfigMeasurement doing the stealing
+## Need a list of parameters to be careful with. Rather than maintaining a list by hand, just
+## make an instance of the ConfigGenerator abstract class and see what attributes it has
+privileged_param_names = ConfigGenerator(seed=0).to_dict().keys()
+
         
 class ConfigMeasurement(MCMC):
     """Abstract superclass of tasks that run some external binary that performs
