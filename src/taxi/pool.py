@@ -86,6 +86,8 @@ class Pool(object):
 
 
     def submit_taxi_to_queue(self, my_taxi, queue, **kwargs):
+        print "LAUNCHING TAXI {0}".format(my_taxi)
+        
         # Don't submit hold/error status taxis
         pool_taxi = self.get_taxi(my_taxi)
         taxi_status = pool_taxi.status
@@ -105,7 +107,7 @@ class Pool(object):
             self.update_taxi_status(my_taxi, 'E')
             print "Failed to submit taxi {t}".format(t=str(my_taxi))
             traceback.print_exc()
-
+        
         self.update_taxi_last_submitted(my_taxi, time.time())
 
 
@@ -151,12 +153,32 @@ class Pool(object):
             raise BaseException
 
 
-    def spawn_idle_taxis(self, queue):
+    def spawn_idle_taxis(self, queue, dispatcher):
         taxi_list = self.get_all_taxis_in_pool()
+        
+        # Ask dispatcher which taxis should be running
+        with dispatcher:
+            should_be_running = dispatcher.should_taxis_be_running(taxi_list)
+        
+        # Look through the taxis in the pool, put them in active/inactive states as desired
         for my_taxi in taxi_list:
-            pool_status = self.get_taxi(my_taxi).status
-            if pool_status == 'I':
-                self.submit_taxi_to_queue(my_taxi, queue)
+            if not should_be_running.has_key(str(my_taxi)):
+                continue # Dispatcher hasn't given any instructions for this taxi's desired state
+                
+            if my_taxi.status in ['E', 'H'] and should_be_running[str(my_taxi)]:
+                raise Exception("Dispatcher wants taxi {0} to be running, but its state is {1}, which must be changed manually."\
+                                .format(my_taxi, my_taxi.status))
+                
+            elif my_taxi.status in ['Q', 'R'] and not should_be_running[str(my_taxi)]:
+                raise NotImplementedError("Dispatcher wants taxi {0} to stop, but it is active.".format(my_taxi))
+
+            # Launch taxi if dispatcher says it should be running            
+            if should_be_running[str(my_taxi)]:
+                if my_taxi.status == 'I':
+                    self.submit_taxi_to_queue(my_taxi, queue)
+                elif my_taxi.status not in ['Q', 'R']:
+                    raise NotImplementedError("Dispatcher wants taxi {0} running, but its status is {1}, not 'I'"\
+                                              .format(my_taxi, my_taxi.status))
 
 
 
@@ -301,15 +323,14 @@ class SQLitePool(Pool):
 
 
     def get_all_taxis_in_pool(self):
+        """Queries the pool DB to get all taxis in the pool.
+        
+        Returns a list of reconstructed taxi objects.
+        """
+
         query = """SELECT * FROM taxis;"""
         taxi_raw_info = self.execute_select(query)
-
-        all_taxis = []
-        for row in taxi_raw_info:
-            row_taxi = self._create_taxi_object(row)
-            all_taxis.append(row_taxi)
-
-        return all_taxis
+        return [self._create_taxi_object(row) for row in taxi_raw_info]
 
 
     def get_taxi(self, my_taxi):

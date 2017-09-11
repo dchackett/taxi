@@ -15,26 +15,18 @@ class BlankObject(object):
         pass # Need an __init__ function to have a __dict__
         
         
-def task_priority_sort(a, b):
-    """
+def task_priority_sort_key(task):
+    """For use as argument in sorted(..., key=task_priority_sort_key).
+    
     Order tasks by their priority score.
     Negative priority (default -1) is the lowest.
     For positive priority, smaller numbers are higher priority.
+    
+    Enforces ordering by returning (False, p) for any positive priority p, and (True, p)
+    for any negative priority p.
     """
-    if a.priority < 0:
-        if b.priority > 0:
-            return 1
-        else:
-            return 0
-    elif b.priority < 0:
-        ## At this point a['priority'] must be positive
-        return -1
-    elif a.priority < b.priority:
-        return 1
-    elif a.priority > b.priority:
-        return -1
-    else:
-        return 0
+    return (task.priority < 0, task.priority)
+
 
 class TaskClaimException(Exception):
     pass
@@ -78,8 +70,8 @@ class Dispatcher(object):
         if (task_blob is None) or (len(task_blob) == 0):
             task_priority_ids = []
         else:
-            task_priority_ids = [ t.id for t in sorted(task_blob.values(), cmp=taxi.dispatcher.task_priority_sort) ]
- 
+            task_priority_ids = [ t.id for t in sorted(task_blob.values(), key=task_priority_sort_key) ]
+        
         # Find highest-priority task that can be completed
         N_pending_tasks = 0
         N_blocked_by_time = 0 # Tasks 'blocked by time' are ready to go, but not enough time to run
@@ -161,7 +153,119 @@ class Dispatcher(object):
 
         self.update_task(task=task, status=task.status, 
             start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)
+        
+        
+    def _trunk_number(self, task_blob, for_taxi=None):
+        """Determines the number of trunks that are available to work on (roughly,
+        the number of taxis that should be actively working on a task forest).
+        
+        Returns an int, which is the count of running or pending-but-ready trunk jobs.
+        """
+        if task_blob is None or len(task_blob) == 0:
+            return 0
+        
+        task_blob = [t for t in task_blob.values() if t.trunk] # filter out non-trunks, task_blob is now list(task)
+        
+        # If we're asking about a particular taxi, filter for jobs that taxi can run
+        if for_taxi is not None:
+            for_taxi = str(taxi)
+            task_blob = [t for t in task_blob if t.for_taxi==for_taxi]
+        
+        N_active_trunks = 0
+        for task in task_blob:
+            if task.status == 'active':
+                N_active_trunks += 1
+                continue
+            
+            if task.status != 'pending':
+                continue
+                
+            # Check whether task is ready to go, and taxi can run it
+            N_unresolved, N_failed = task.count_unresolved_dependencies()
+            if N_unresolved == 0:
+                N_active_trunks += 1
 
+        return N_active_trunks    
+    
+    
+    def _N_ready_tasks(self, task_blob, for_taxi=None):
+        """Looks through task_blob and counts how many tasks are ready that can
+        only be run by the taxi specified in for_taxi.
+        """
+        if task_blob is None or len(task_blob) == 0:
+            return 0
+        
+        # Filter for jobs that are pending and only for the taxi specified
+        task_blob = [t for t in task_blob.values() if t.status == 'pending']
+        
+        if for_taxi is not None:
+            for_taxi = str(taxi)
+            task_blob = [t for t in task_blob if t.for_taxi == for_taxi] # Specifically jobs for this taxi
+        
+        N_ready_jobs = 0
+        for task in task_blob:
+            # Check whether task is ready to go, and taxi can run it
+            N_unresolved, N_failed = task.count_unresolved_dependencies()
+            if N_unresolved == 0:
+                N_ready_jobs += 1
+        return N_ready_jobs
+    
+    
+    def should_taxis_be_running(self, taxi_list):
+        """Determines whether tasks are available for each taxi to run.
+        
+        Taxis should be run if there are trunks available for them
+        
+        Args:
+            taxi_list: List of taxi objects; are there tasks available for these taxis to run?
+        Returns:
+            Dictionary like {(taxi object) : (should taxi be running?)}
+        """
+        
+        task_blob = self.get_task_blob(None) # dict(id:task)
+    
+        # There's nothing we can do with errored E or held H taxis
+        taxi_list = [t for t in taxi_list if t.status in ['Q', 'R', 'I']] # Only want queued, running, or idle taxis
+        
+        # Convenient dictionary like {(name of taxi) : (taxi object)}
+        taxi_dict = {}
+        for my_taxi in taxi_list:
+            taxi_dict[str(my_taxi)] = my_taxi
+    
+        # Initial desired state is the present state -- idle taxis idle, active taxis active
+        desired_state = {}
+        for my_taxi in taxi_list:
+            desired_state[str(my_taxi)] = my_taxi.status in ['Q', 'R'] # Active means queued or running
+        
+        # If taxi has a trunk only it can run, or some jobs are ready that only this taxi can run, it must be running
+        for my_taxi in taxi_list:
+            if self._trunk_number(task_blob, for_taxi=my_taxi) > 0:
+                desired_state[str(my_taxi)] = True
+            if self._N_ready_tasks(task_blob, for_taxi=my_taxi) > 0:
+                desired_state[str(my_taxi)] = True
+                
+        # With taxi-specific requirements imposed, now just make sure we have enough taxis running
+        active_taxis = [taxi_dict[k] for (k,v) in desired_state.items() if v]
+        idle_taxis = [taxi_dict[k] for (k,v) in desired_state.items() if not v]
+        
+        N_active_taxis = len(active_taxis)
+        
+        N_active_trunks = self._trunk_number(task_blob)
+        
+        # Even without trunks, if we have jobs that are ready, we need at least one taxi
+        if N_active_trunks == 0 and self._N_ready_tasks(task_blob):
+            N_active_trunks = 1 # Semi-kludge: if there are tasks to be done but none are trunk, run one taxi
+        
+        # Activate idle taxis until we have enough
+        for my_taxi in idle_taxis:
+            if N_active_taxis >= N_active_trunks:
+                break # We have enough taxis running
+            desired_state[str(my_taxi)] = True
+            N_active_taxis += 1
+            
+        return desired_state
+        
+        
 
     ## Initialization
     def _find_trees(self, job_pool):
@@ -210,7 +314,7 @@ class Dispatcher(object):
         return lowest_priority
 
 
-    def _assign_priorities(self, job_pool, priority_method='canvas'):
+    def _assign_priorities(self, job_pool, priority_method):
         """
         Assign task priorities to the newly tree-structured job pool.  Respects
         any user-assigned priority values that already exist.  All auto-assigned
@@ -287,7 +391,7 @@ class Dispatcher(object):
         raise NotImplementedError
 
 
-    def initialize_new_job_pool(self, job_pool, priority_method='tree'):
+    def initialize_new_job_pool(self, job_pool, priority_method='canvas'):
         # If we are adding a new pool to an existing dispatcher, 
         # start enumerating task IDs at the end
 
