@@ -157,6 +157,8 @@ class Pool(object):
 
 
     def spawn_idle_taxis(self, queue, dispatcher):
+        self.update_all_taxis_queue_status(queue)
+        
         taxi_list = self.get_all_taxis_in_pool()
         
         # Ask dispatcher which taxis should be running
