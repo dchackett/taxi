@@ -76,7 +76,8 @@ class MCMC(jobs.Runner):
                 
         # Load parameters from CG in to this object
         for k, v in cg_dict.items():
-            setattr(self, k, v)
+            if getattr(self, k, None) is None: # Don't override anything already present
+                setattr(self, k, v)
             
         # Load the output configuration of this ConfigGenerator
         self.loadg = config_generator.saveg
@@ -115,7 +116,7 @@ class MCMC(jobs.Runner):
     ## Modular file name conventions
     # Input: Loaded gauge file
     def parse_params_from_loadg(self, fn):
-        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention)        
+        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention())        
         if parsed is None:
             raise ValueError("Specified filename convention(s) {fnc} cannot parse filename {fn}".format(fnc=self.loadg_filename_convention, fn=fn))
         assert parsed.has_key('traj'), "FileNameConvention must return a key 'traj' when processing a configuration file name"
