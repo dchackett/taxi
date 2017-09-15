@@ -97,6 +97,24 @@ class MCMC(jobs.Runner):
         self.__dict__.update(**self.parse_params_from_loadg(self.loadg))
             
     
+    def execute(self, cores=None):
+        
+        ## Non-clobbering behavior
+        saveg_exists = self.save_config and getattr(self, 'saveg', None) is not None and os.path.exists(self.saveg)
+        fout_exists = getattr(self, 'fout', None) is not None and os.path.exists(self.fout)
+        if saveg_exists or fout_exists:
+            if saveg_exists:
+                print "WARNING: File saveg={0} already exists, attempting to verify output".format(self.saveg)
+            if fout_exists:
+                print "WARNING: File fout={0} already exists, attempting to verify output".format(self.fout)
+            
+            self.verify_output()
+            # Verify output throws an error and blocks rest of function if output isn't correct
+            print "WARNING: Pre-existing well-formatted output (according to verify_output()) detected; skipping running"
+            return # Never clobber
+            
+        super(MCMC, self).execute(cores=cores)
+    
     ## Standard output verification
     def verify_output(self):
         super(MCMC, self).verify_output()
