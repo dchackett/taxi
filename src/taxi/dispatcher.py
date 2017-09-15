@@ -253,8 +253,9 @@ class Dispatcher(object):
         N_active_trunks = self._trunk_number(task_blob)
         
         # Even without trunks, if we have jobs that are ready, we need at least one taxi
-        if N_active_trunks == 0 and self._N_ready_tasks(task_blob):
-            N_active_trunks = 1 # Semi-kludge: if there are tasks to be done but none are trunk, run one taxi
+        N_ready_tasks = self._N_ready_tasks(task_blob)
+        if N_active_trunks == 0 and N_ready_tasks:
+            N_active_trunks = N_ready_tasks # Correct behavior for trunkless task forests
         
         # Activate idle taxis until we have enough
         for my_taxi in idle_taxis:
