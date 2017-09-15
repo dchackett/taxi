@@ -41,7 +41,7 @@ class FlowJob(ConfigMeasurement):
                  # Override ConfigMeasurement defaults
                  req_time=600, 
                  # Application-specific defaults
-                 minE=0, mindE=0.0, epsilon=0.1, xi=None,
+                 minE=0, mindE=0.0, epsilon=0.01, xi=None,
                  # Overrides
                  Ns=None, Nt=None,
                  # Arguments to pass along to superclass
