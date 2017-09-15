@@ -80,7 +80,7 @@ def parse_with_conventions(fn, conventions):
     ## Try each FNC in the order provided.  Accept first one that works, or return None.
     parsed = None
     for fnc in fncs:
-        assert isinstance(fnc, FileNameConvention)
+        assert isinstance(fnc, FileNameConvention), "Provided fnc {fnc} is a {ft}, not a FileNameConvention".format(fnc=fnc, ft=type(fnc))
         assert hasattr(fnc, 'read'), "{fnc} has no 'read' method implemented".format(fnc=fnc)
         try:
             parsed = fnc.read(fn)

@@ -40,7 +40,7 @@ class PureGaugeSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         assert len(words) == 9
         assert 'spec' in words[0]
         return {
-            'prefix' : words[0],
+            'file_prefix' : words[0],
             'p_plus_a' : words[0].endswith('pa'),
             'screening' : words[0].startswith('x'),
             'irrep' : words[1],
@@ -60,6 +60,7 @@ class MrepFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         # Assume each kappa=0 if not specified
         k4 = params.get('k4', 0)
         k6 = params.get('k6', 0)
+        
         return "{prefix}_{Ns}_{Nt}_{beta}_{_k4}_{_k6}_{label}_{_traj}".format(
                 prefix=self.prefix, _k4=k4, _k6=k6,
                 _traj=(params['traj'] if params.has_key('traj') else params['final_traj']),
@@ -69,7 +70,7 @@ class MrepFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         words = os.path.basename(fn).split('_')
         assert len(words) == 8
         return {
-            'prefix' : words[0],
+            'file_prefix' : words[0],
             'Ns' : int(words[1]), 'Nt' : int(words[2]),
             'beta' : float(words[3]),
             'k4' : float(words[4]),
@@ -98,7 +99,7 @@ class MrepSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         assert len(words) == 10
         assert 'spec' in words[0]
         return {
-            'prefix' : words[0],
+            'file_prefix' : words[0],
             'p_plus_a' : words[0].endswith('pa'),
             'screening' : words[0].startswith('x'),
             'irrep' : words[1],
