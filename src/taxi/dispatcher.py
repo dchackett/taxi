@@ -126,7 +126,7 @@ class Dispatcher(object):
         return task
         
 
-    def add_tasks(self, compiled_tasks):
+    def add_tasks(self, tasks):
         raise NotImplementedError
 
 
@@ -366,16 +366,15 @@ class Dispatcher(object):
             raise ValueError("Invalid choice of priority assignment method: {0}".format(priority_method))
 
 
-    def _compile(self, job_pool, start_id):
+    def _assign_task_ids(self, job_pool):
+        start_id = self._get_max_task_id()
         # Give each job an integer id
         for jj, job in enumerate(job_pool):
             job.id = jj + start_id + 1
+            
 
-        # JSON serialize all jobs
-        self.task_pool = [job.compiled() for job in job_pool]
-
-    def _populate_task_table(self):
-        self.add_tasks(self.task_pool)
+    def _populate_task_table(self, task_pool):
+        self.add_tasks(task_pool)
 
 
     def _get_max_task_id(self):
@@ -386,11 +385,10 @@ class Dispatcher(object):
         # If we are adding a new pool to an existing dispatcher, 
         # start enumerating task IDs at the end
 
-        start_id = self._get_max_task_id()
         self._find_trees(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
-        self._compile(job_pool, start_id)
-        self._populate_task_table()
+        self._assign_task_ids(job_pool)
+        self._populate_task_table(job_pool)
 
 
 
@@ -616,11 +614,15 @@ class SQLiteDispatcher(Dispatcher):
         self.update_task(task=task, status='active', by_taxi=my_taxi.name)
 
 
-    def add_tasks(self, compiled_tasks):
+    def add_tasks(self, tasks):
         task_query = """INSERT OR REPLACE INTO tasks
         (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
 
+        # JSON serialize all jobs
+        compiled_tasks = [job.compiled() for job in tasks]
+        
+        # Build list to insert
         upsert_data = []
         for compiled_task in compiled_tasks:
             task_values = (
