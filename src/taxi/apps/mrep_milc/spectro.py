@@ -143,7 +143,7 @@ class SpectroTask(ConfigMeasurement):
     
         # If this job should save a propagator file, that file must exist
         if (self.savep != None) and (not os.path.exists(self.savep)):
-            print "Spectro ok check fails: Propagator file {} doesn't exist.".format(self.savep)
+            print "Spectro ok check fails: Propagator file {0} doesn't exist.".format(self.savep)
             raise RuntimeError
 
         # Check for well-formed output file

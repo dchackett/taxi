@@ -250,7 +250,7 @@ class Dispatcher(object):
             return
 
         else:
-            raise ValueError("Invalid choice of priority assignment method: {}".format(priority_method))
+            raise ValueError("Invalid choice of priority assignment method: {0}".format(priority_method))
 
 
     def _compile(self, job_pool, start_id):
@@ -493,7 +493,7 @@ class SQLiteDispatcher(Dispatcher):
 
         task_status = self.check_task_status(task)
         if task_status != 'pending':
-            raise TaskClaimException("Failed to claim task {}: status {}".format(task.id, task_status))
+            raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
 
         self.update_task(task=task, status='active', by_taxi=my_taxi.name)
 

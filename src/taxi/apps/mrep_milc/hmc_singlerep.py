@@ -219,12 +219,12 @@ class SingleRepHMCJob(ConfigGenerator):
         if self.loadg is None:
             input_dict['load_gauge'] = 'fresh'
         else:
-            input_dict['load_gauge'] = 'reload_serial {}'.format(self.loadg)
+            input_dict['load_gauge'] = 'reload_serial {0}'.format(self.loadg)
 
         if self.saveg is None:
             input_dict['save_gauge'] = 'forget'
         else:
-            input_dict['save_gauge'] = 'save_serial {}'.format(self.saveg)
+            input_dict['save_gauge'] = 'save_serial {0}'.format(self.saveg)
 
         # Hasenbuch logic
         if self.nsteps2 is None:

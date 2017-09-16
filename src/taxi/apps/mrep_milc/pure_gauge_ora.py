@@ -94,12 +94,12 @@ class PureGaugeORAJob(ConfigGenerator):
         if self.loadg is None:
             input_dict['load_gauge'] = 'fresh'
         else:
-            input_dict['load_gauge'] = 'reload_serial {}'.format(self.loadg)
+            input_dict['load_gauge'] = 'reload_serial {0}'.format(self.loadg)
 
         if self.saveg is None:
             input_dict['save_gauge'] = 'forget'
         else:
-            input_dict['save_gauge'] = 'save_serial {}'.format(self.saveg)
+            input_dict['save_gauge'] = 'save_serial {0}'.format(self.saveg)
 
         input_str += pure_gauge_ora_input_template.format(**input_dict)
 
