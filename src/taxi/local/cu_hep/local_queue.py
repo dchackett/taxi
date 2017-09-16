@@ -66,7 +66,7 @@ class LocalQueue(BatchQueue):
         taxi_dict = taxi.to_dict()
         key_arg_list = ['name', 'cores', 'nodes', 'pool_name', 'time_limit', 'dispatch_path', 'pool_path']
 
-        taxi_args = [ "--{} {}".format(k, taxi_dict[k]) for k in key_arg_list ]
+        taxi_args = [ "--{0} {1}".format(k, taxi_dict[k]) for k in key_arg_list ]
         taxi_args_str = " ".join(taxi_args)
 
         taxi_call += " " + taxi_args_str

@@ -87,7 +87,7 @@ if __name__ == '__main__':
     pool_name = "pg_test"
     for i in range(2):
         taxi_list.append(taxi.Taxi(
-            name="pg_test{}".format(i), 
+            name="pg_test{0}".format(i), 
             pool_name=pool_name,
             time_limit=10*60,
             cores=8,
