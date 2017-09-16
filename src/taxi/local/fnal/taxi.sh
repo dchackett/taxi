@@ -12,7 +12,6 @@
 #PBS -j oe
 #PBS -m n
 #PBS -v LD_LIBRARY_PATH,PV_NCPUS,PV_LOGIN,PV_LOGIN_PORT
-#PBS -A multirep
 #PBS -q test_bc
 
 # HACKED-IN: Load up virtualenv

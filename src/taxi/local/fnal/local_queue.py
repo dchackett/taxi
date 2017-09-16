@@ -91,6 +91,10 @@ class LocalQueue(BatchQueue):
         taxi_call += " -l walltime={walltime} ".format(walltime=time_str)
         taxi_call += " -l nodes={taxi_nodes} ".format(taxi_nodes=taxi.nodes)
 
+        ## Pass along allocation
+        assert taxi.allocation is not None, "FNAL requires an allocation to be specified"
+        taxi_call += " -A {0} ".format(taxi.allocation)
+
         ## Pass location of virtual environment to taxi, if we're inside one
         if os.environ.get('VIRTUAL_ENV', None) is not None:
             taxi_call += " -v TAXI_PYENV='{0}' ".format(os.environ['VIRTUAL_ENV'])

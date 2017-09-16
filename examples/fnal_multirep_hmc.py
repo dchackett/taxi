@@ -102,7 +102,8 @@ if __name__ == '__main__':
         db_path=(base_path + "/test-pool.sqlite"), 
         pool_name=pool_name, 
         work_dir=(base_path + "/pool/"),
-        log_dir=(base_path + "/pool/log/")
+        log_dir=(base_path + "/pool/log/"),
+        allocation='multirep'
     )
     my_disp = taxi.dispatcher.SQLiteDispatcher(db_path=(base_path + "/test-disp.sqlite"))
     
@@ -118,5 +119,5 @@ if __name__ == '__main__':
             my_pool.register_taxi(my_taxi)
             my_disp.register_taxi(my_taxi, my_pool)
     
-        my_pool.spawn_idle_taxis(my_queue)
+        my_pool.spawn_idle_taxis(my_queue, my_disp)
     
