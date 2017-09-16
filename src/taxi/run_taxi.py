@@ -35,12 +35,11 @@ if __name__ == '__main__':
     parser.add_argument('--dispatch_path', type=str, required=True, help='Path of dispatch backend DB.')
     parser.add_argument('--time_limit',  type=float, required=True, help='Number of seconds in time budget.')
 
-    print sys.argv
     # TODO: shouldn't this work without the sys.argv explicit specification?
     parg = parser.parse_args(sys.argv[1:]) # Call like "python run_taxi.py ...args..."
 
 
-    ## "Connect with dispatcher"
+    ## Connect with Dispatcher, Pool, Queue
     my_dispatch = taxi.dispatcher.SQLiteDispatcher(parg.dispatch_path)
     my_pool = taxi.pool.SQLitePool(
         db_path=parg.pool_path,
@@ -66,20 +65,6 @@ if __name__ == '__main__':
             my_pool.register_taxi(taxi_obj)
             my_dispatch.register_taxi(taxi_obj, my_pool)
             
-    ## Imports
-    # Must have entered my_pool context at least once for this to work
-    imports = taxi_obj.imports + my_pool.imports
-    # Just need to get these in to the global namespace somewhere so the
-    # task subclasses can be found
-    _imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(imports)]
-    
-    # Print valid task classes that have been loaded
-    print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
-            
-
-    ## Decoding for runner objects; relevant TaskRunner subclasses
-    ## should be imported in local_taxi above!
-    # runner_decoder = taxi.jobs.runner_rebuilder_factory()
 
     ## Record starting time
     taxi_obj.start_time = _start_time

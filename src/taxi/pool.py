@@ -2,16 +2,10 @@
 
 # Definition of "Pool" class - manages Taxi attributes and queue status.
 
-import os
-
 import taxi
 import time
 
-import json
-
 import traceback
-
-import __main__ # To get filename of calling script
 
 class Pool(object):
 
@@ -23,15 +17,9 @@ class Pool(object):
         'E',    # error in queue submission
     ]
 
-    def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300, allocation=None):
+    def __init__(self, work_dir, log_dir, thrash_delay=300, allocation=None):
         self.work_dir = taxi.expand_path(work_dir)
         self.log_dir = taxi.expand_path(log_dir)
-        
-        if imports is None:
-            # Default behavior: import the file that called this pool (run-spec script)
-            self.imports = [taxi.expand_path(__main__.__file__)]
-        else:
-            self.imports = imports
 
         ## thrash_delay sets the minimum time between taxi resubmissions, in seconds.
         ## Default is 5 minutes.
@@ -196,16 +184,16 @@ class SQLitePool(Pool):
     """
     
     def __init__(self, db_path, pool_name,
-                 work_dir=None, log_dir=None, imports=None,
+                 work_dir=None, log_dir=None,
                  allocation=None, thrash_delay=300):
         """
         Argument options: either [db_path, pool_name(, thrash_delay)] are specified, or
-        [work_dir, log_dir(, imports, thrash_delay)] are specified.  If all are specified,
+        [work_dir, log_dir(, thrash_delay)] are specified.  If all are specified,
         then [db_path, pool_name] takes priority and the remaining inputs
         are ignored.
         """
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
-             imports=imports, thrash_delay=thrash_delay, allocation=allocation)
+             thrash_delay=thrash_delay, allocation=allocation)
 
         self.db_path = taxi.expand_path(db_path)
         self.pool_name = pool_name
@@ -226,15 +214,13 @@ class SQLitePool(Pool):
                 nodes integer,
                 time_last_submitted real,
                 status text,
-                dispatch text,
-                imports text
+                dispatch text
             )"""
         create_pool_str = """
             CREATE TABLE IF NOT EXISTS pools (
                 name text PRIMARY KEY,
                 working_dir text,
                 log_dir text,
-                imports text,
                 allocation text
             )"""
 
@@ -253,17 +239,16 @@ class SQLitePool(Pool):
         if len(this_pool_row) == 0:
             # Did not find this pool in the pool DB; add it
             pool_write_query = """INSERT OR REPLACE INTO pools
-                (name, working_dir, log_dir, imports, allocation)
-                VALUES (?, ?, ?, ?, ?)"""
+                (name, working_dir, log_dir, allocation)
+                VALUES (?, ?, ?, ?)"""
             self.execute_update(pool_write_query, self.pool_name, self.work_dir,
-                                self.log_dir, json.dumps(self.imports), self.allocation)
+                                self.log_dir, self.allocation)
         else:
             # Found this pool in the pool DB; retrieve info about it from DB
             if self.work_dir is None: # Allow overrides
                 self.work_dir = this_pool_row[0]['working_dir']
             if self.log_dir is None: # Allow overrides
                 self.log_dir = this_pool_row[0]['log_dir']
-            self.imports = json.loads(this_pool_row[0]['imports']) # Don't allow overrides
             self.allocation = this_pool_row[0]['allocation']
             
         
@@ -290,7 +275,6 @@ class SQLitePool(Pool):
         """Interface to translate Taxi representation in the DB to a Taxi object.
         """
         db_taxi = dict(db_taxi)
-        db_taxi['imports'] = json.loads(db_taxi['imports'])
         
         new_taxi = taxi.Taxi()
         new_taxi.rebuild_from_dict(db_taxi)
@@ -404,12 +388,11 @@ class SQLitePool(Pool):
         """
 
         insert_taxi_query = """INSERT OR REPLACE INTO taxis
-            (name, pool_name, time_limit, cores, nodes, time_last_submitted, status, imports)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (name, pool_name, time_limit, cores, nodes, time_last_submitted, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         self.execute_update(insert_taxi_query, my_taxi.name, my_taxi.pool_name, my_taxi.time_limit, 
-            my_taxi.cores, my_taxi.nodes, my_taxi.time_last_submitted, my_taxi.status,
-            json.dumps(my_taxi.imports))
+            my_taxi.cores, my_taxi.nodes, my_taxi.time_last_submitted, my_taxi.status)
 
         return
 

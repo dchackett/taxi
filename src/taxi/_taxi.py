@@ -13,7 +13,6 @@ class Taxi(object):
         self.time_last_submitted = None
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
-        self.imports = []
         self.log_dir = None
         
 
@@ -48,7 +47,6 @@ class Taxi(object):
             self.time_last_submitted = taxi_dict['time_last_submitted']
             self.status = taxi_dict['status']
             self.dispatch_path = taxi_dict['dispatch']
-            self.imports = taxi_dict['imports']
         except KeyError:
             print "Error: attempted to rebuild taxi from malformed dictionary:"
             print taxi_dict
@@ -67,8 +65,7 @@ class Taxi(object):
             'nodes' : self.nodes,
             'time_last_submitted': self.time_last_submitted,
             'start_time': self.start_time,
-            'status': self.status,
-            'imports' : self.imports
+            'status': self.status
         }
         if hasattr(self, 'pool_path'):
             self_dict['pool_path'] = self.pool_path

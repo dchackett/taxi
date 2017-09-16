@@ -6,6 +6,9 @@ import os
 import time
 import json
 
+import imp # For dynamical imports
+import __main__ # To get filename of calling script
+
 import taxi
 import taxi.jobs as jobs
 
@@ -38,6 +41,19 @@ class Dispatcher(object):
     def __init__(self):
         pass
 
+
+    def _create_new_dispatch(self):
+        pass
+        
+    
+    def _load_existing_dispatch(self):
+        # Just need to get these in to the global namespace somewhere so the
+        # task subclasses can be found
+        self._imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(self.imports)]
+        
+        # Print valid task classes that have been loaded
+        print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
+        
 
     def get_task_blob(self, taxi_name):
         """Get all incomplete tasks pertinent to this taxi."""
@@ -367,7 +383,10 @@ class Dispatcher(object):
 
 
     def _assign_task_ids(self, job_pool):
+        # If we are adding a new pool to an existing dispatcher, 
+        # start enumerating task IDs at the end
         start_id = self._get_max_task_id()
+        
         # Give each job an integer id
         for jj, job in enumerate(job_pool):
             job.id = jj + start_id + 1
@@ -381,10 +400,21 @@ class Dispatcher(object):
         raise NotImplementedError
 
 
-    def initialize_new_job_pool(self, job_pool, priority_method='canvas'):
-        # If we are adding a new pool to an existing dispatcher, 
-        # start enumerating task IDs at the end
+    def _store_imports(self):
+        raise NotImplementedError
 
+
+    def initialize_new_job_pool(self, job_pool, priority_method='canvas', imports=None):
+        ## imports: Dispatcher needs to be able to import relevant runners.
+        ## Convenient default behavior: import the calling script (presumably, the run-spec script)
+        if imports is None:
+            self.imports = [taxi.expand_path(__main__.__file__)] # Import the file that called this pool (presumably, run-spec script)
+        else:
+            self.imports = imports
+        ## Store imports in the dispatch metadata
+        self._store_imports()
+            
+        ## Build dispatch
         self._find_trees(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
         self._assign_task_ids(job_pool)
@@ -414,16 +444,39 @@ class SQLiteDispatcher(Dispatcher):
 
     def __init__(self, db_path):
         self.db_path = taxi.expand_path(db_path)
+        self._setup_complete = False
     
+
+    def _create_new_dispatch(self):
+        self.write_table_structure()
+        
+        super(SQLiteDispatcher, self)._create_new_dispatch()
+        
+        
+    def _load_existing_dispatch(self):
+        ## Get imports
+        imports_query = """SELECT * FROM imports"""
+        self.imports = [ii['import'] for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
+        
+        ## Call super to do dynamical imports
+        super(SQLiteDispatcher, self)._load_existing_dispatch()
 
 
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
     def __enter__(self):
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0)
+        dispatch_db_exists = os.path.exists(self.db_path)
+            
+        self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
-        self.write_table_structure()
-        
+        # Only run initializers once
+        if not self._setup_complete:
+            self._setup_complete = True
+            if dispatch_db_exists:
+                self._load_existing_dispatch()
+            else:
+                self._create_new_dispatch()
+            
         ## Get/update a dictionary of all Task subclasses in the global scope, to
         ## rebuild objects from JSON payloads
         self.class_dict = taxi.all_subclasses_of(taxi.jobs.Task)
@@ -451,9 +504,16 @@ class SQLiteDispatcher(Dispatcher):
                 
                 payload text
             )"""
+            
+        create_imports_str = """
+            CREATE TABLE IF NOT EXISTS imports (
+                id integer PRIMARY KEY,
+                import text
+            )"""
 
         with self.conn:
             self.conn.execute(create_task_str)
+            self.conn.execute(create_imports_str)
 
         return
 
@@ -648,4 +708,10 @@ class SQLiteDispatcher(Dispatcher):
             return 0
         else:
             return max_id_query[0]
+        
+        
+    def _store_imports(self):
+        import_query = """INSERT OR REPLACE INTO imports (import) VALUES (?)"""
+        upsert_data = [(ii,) for ii in self.imports]
+        self.execute_update(import_query, *upsert_data)
 
