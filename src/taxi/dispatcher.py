@@ -55,7 +55,7 @@ class Dispatcher(object):
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
         
 
-    def get_task_blob(self, taxi_name):
+    def get_task_blob(self, taxi_name, include_complete=True):
         """Get all incomplete tasks pertinent to this taxi."""
         raise NotImplementedError
 
@@ -80,7 +80,7 @@ class Dispatcher(object):
     def request_next_task(self, for_taxi):
         """Determines the next task to be executed by the given taxi."""
         
-        task_blob = self.get_task_blob(for_taxi)
+        task_blob = self.get_task_blob(for_taxi, include_complete=False)
 
         # Order tasks in blob by priority
         if (task_blob is None) or (len(task_blob) == 0):
@@ -231,7 +231,7 @@ class Dispatcher(object):
             Dictionary like {(taxi object) : (should taxi be running?)}
         """
         
-        task_blob = self.get_task_blob(None) # dict(id:task)
+        task_blob = self.get_task_blob(None, include_complete=False) # dict(id:task)
     
         # There's nothing we can do with errored E or held H taxis
         taxi_list = [t for t in taxi_list if t.status in ['Q', 'R', 'I']] # Only want queued, running, or idle taxis
@@ -554,7 +554,7 @@ class SQLiteDispatcher(Dispatcher):
 
         return
 
-    def get_task_blob(self, my_taxi=None, include_complete=False):
+    def get_task_blob(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks pertinent to this taxi (or to all taxis.)"""
 
         if (my_taxi is None):
