@@ -93,10 +93,18 @@ if __name__ == '__main__':
     
     ## Main control loop
     with work_in_dir(my_pool.work_dir):
+        
+        loops_without_executing_task = 0 # ANTI-THRASH
+        
         while keep_running:
+            loops_without_executing_task += 1 # Value is incorrect for a while, but increment here for maximum safety
+            
+            MAX_WASTED_LOOPS = 20
+            if loops_without_executing_task > MAX_WASTED_LOOPS:
+                print "ANTI-THRASH: Entered main loop {0} times without executing a task. Killing taxi.".format(MAX_WASTED_LOOPS)
+                break
+            
             ### Maintain taxi pool
-                
-            ## Check with pool for jobs to launch
             with my_pool:
                 my_pool.update_all_taxis_queue_status(my_queue)
                 my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
@@ -114,12 +122,11 @@ if __name__ == '__main__':
                     ## Race condition safeguard: skips and tries again if the task status has changed
                     print str(e)
                     continue
-    
-    
+                
+            
             ### Execute task
             taxi_obj.task_start_time = time.time()
             print "EXECUTING TASK ", task
-            #print task.__dict__
             flush_output()
             
             ## Special behavior -- Die/Sleep
@@ -173,6 +180,8 @@ if __name__ == '__main__':
                 tasks_run += 1
                 my_dispatch.finalize_task_run(taxi_obj, task)    
             flush_output()
+            
+            loops_without_executing_task = 0 # ANTI-THRASH: Not thrashing if we've made it this far
 
 ## Exit
 os.system('date')
