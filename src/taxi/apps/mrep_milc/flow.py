@@ -22,6 +22,7 @@ epsilon {epsilon}
 tmax {tmax}
 minE {minE}
 mindE {mindE}
+{xi_str}
     
 reload_serial {loadg}
 forget
@@ -40,7 +41,7 @@ class FlowJob(ConfigMeasurement):
                  # Override ConfigMeasurement defaults
                  req_time=600, 
                  # Application-specific defaults
-                 minE=0, mindE=0.0, epsilon=0.1,
+                 minE=0, mindE=0.0, epsilon=0.01, xi=None,
                  # Overrides
                  Ns=None, Nt=None,
                  # Arguments to pass along to superclass
@@ -69,6 +70,7 @@ class FlowJob(ConfigMeasurement):
         self.minE = minE
         self.mindE = mindE
         self.epsilon = epsilon
+        self.xi = xi
         
         # Override parameters read out from a filename or stolen from a ConfigGenerator
         if Ns is not None:
@@ -88,6 +90,11 @@ class FlowJob(ConfigMeasurement):
         input_str = super(FlowJob, self).build_input_string()
         
         input_dict = self.to_dict()
+        
+        if self.xi is not None:
+            input_dict['xi_str'] = 'xi {xi}'.format(xi=self.xi)
+        else:
+            input_dict['xi_str'] = ''
 
         return input_str + flow_input_template.format(**input_dict)
     

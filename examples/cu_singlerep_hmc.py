@@ -85,7 +85,7 @@ if __name__ == '__main__':
     ## Create taxi(s) to run the job
     taxi_list = []
     pool_name = "pg_test"
-    for i in range(1):
+    for i in range(2):
         taxi_list.append(taxi.Taxi(
             name="pg_test{}".format(i), 
             pool_name=pool_name,
@@ -118,5 +118,5 @@ if __name__ == '__main__':
             my_pool.register_taxi(my_taxi)
             my_disp.register_taxi(my_taxi, my_pool)
     
-        my_pool.spawn_idle_taxis(my_queue)
+        my_pool.spawn_idle_taxis(my_queue, my_disp)
     

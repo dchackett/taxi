@@ -94,10 +94,13 @@ if __name__ == '__main__':
     ## Main control loop
     with work_in_dir(my_pool.work_dir):
         while keep_running:
-            ### Check with pool for jobs to launch
+            ### Maintain taxi pool
+                
+            ## Check with pool for jobs to launch
             with my_pool:
                 my_pool.update_all_taxis_queue_status(my_queue)
-                my_pool.spawn_idle_taxis(my_queue)
+                my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
+        
         
             ### Check with dispatch for tasks to execute
             with my_dispatch:

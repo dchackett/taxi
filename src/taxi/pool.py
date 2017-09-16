@@ -23,7 +23,7 @@ class Pool(object):
         'E',    # error in queue submission
     ]
 
-    def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300):
+    def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300, account=None):
         self.work_dir = taxi.expand_path(work_dir)
         self.log_dir = taxi.expand_path(log_dir)
         
@@ -36,6 +36,9 @@ class Pool(object):
         ## thrash_delay sets the minimum time between taxi resubmissions, in seconds.
         ## Default is 5 minutes.
         self.thrash_delay = thrash_delay
+        
+        # Account to run on
+        self.account = account
     
 
     ### Backend interaction ###
@@ -86,6 +89,8 @@ class Pool(object):
 
 
     def submit_taxi_to_queue(self, my_taxi, queue, **kwargs):
+        print "LAUNCHING TAXI {0}".format(my_taxi)
+        
         # Don't submit hold/error status taxis
         pool_taxi = self.get_taxi(my_taxi)
         taxi_status = pool_taxi.status
@@ -105,7 +110,7 @@ class Pool(object):
             self.update_taxi_status(my_taxi, 'E')
             print "Failed to submit taxi {t}".format(t=str(my_taxi))
             traceback.print_exc()
-
+        
         self.update_taxi_last_submitted(my_taxi, time.time())
 
 
@@ -151,12 +156,34 @@ class Pool(object):
             raise BaseException
 
 
-    def spawn_idle_taxis(self, queue):
+    def spawn_idle_taxis(self, queue, dispatcher):
+        self.update_all_taxis_queue_status(queue)
+        
         taxi_list = self.get_all_taxis_in_pool()
+        
+        # Ask dispatcher which taxis should be running
+        with dispatcher:
+            should_be_running = dispatcher.should_taxis_be_running(taxi_list)
+        
+        # Look through the taxis in the pool, put them in active/inactive states as desired
         for my_taxi in taxi_list:
-            pool_status = self.get_taxi(my_taxi).status
-            if pool_status == 'I':
-                self.submit_taxi_to_queue(my_taxi, queue)
+            if not should_be_running.has_key(str(my_taxi)):
+                continue # Dispatcher hasn't given any instructions for this taxi's desired state
+                
+            if my_taxi.status in ['E', 'H'] and should_be_running[str(my_taxi)]:
+                raise Exception("Dispatcher wants taxi {0} to be running, but its state is {1}, which must be changed manually."\
+                                .format(my_taxi, my_taxi.status))
+                
+            elif my_taxi.status in ['Q', 'R'] and not should_be_running[str(my_taxi)]:
+                raise NotImplementedError("Dispatcher wants taxi {0} to stop, but it is active.".format(my_taxi))
+
+            # Launch taxi if dispatcher says it should be running            
+            if should_be_running[str(my_taxi)]:
+                if my_taxi.status == 'I':
+                    self.submit_taxi_to_queue(my_taxi, queue)
+                elif my_taxi.status not in ['Q', 'R']:
+                    raise NotImplementedError("Dispatcher wants taxi {0} running, but its status is {1}, not 'I'"\
+                                              .format(my_taxi, my_taxi.status))
 
 
 
@@ -169,7 +196,8 @@ class SQLitePool(Pool):
     """
     
     def __init__(self, db_path, pool_name,
-                 work_dir=None, log_dir=None, imports=None, thrash_delay=300):
+                 work_dir=None, log_dir=None, imports=None,
+                 account=None, thrash_delay=300):
         """
         Argument options: either [db_path, pool_name(, thrash_delay)] are specified, or
         [work_dir, log_dir(, imports, thrash_delay)] are specified.  If all are specified,
@@ -177,7 +205,7 @@ class SQLitePool(Pool):
         are ignored.
         """
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
-             imports=imports, thrash_delay=thrash_delay)
+             imports=imports, thrash_delay=thrash_delay, account=account)
 
         self.db_path = taxi.expand_path(db_path)
         self.pool_name = pool_name
@@ -206,14 +234,13 @@ class SQLitePool(Pool):
                 name text PRIMARY KEY,
                 working_dir text,
                 log_dir text,
-                imports text
+                imports text,
+                account text
             )"""
 
         with self.conn:
             self.conn.execute(create_taxi_str)
             self.conn.execute(create_pool_str)
-
-        return
     
     
     def _get_or_create_pool(self):
@@ -226,10 +253,10 @@ class SQLitePool(Pool):
         if len(this_pool_row) == 0:
             # Did not find this pool in the pool DB; add it
             pool_write_query = """INSERT OR REPLACE INTO pools
-                (name, working_dir, log_dir, imports)
-                VALUES (?, ?, ?, ?)"""
+                (name, working_dir, log_dir, imports, account)
+                VALUES (?, ?, ?, ?, ?)"""
             self.execute_update(pool_write_query, self.pool_name, self.work_dir,
-                                self.log_dir, json.dumps(self.imports))
+                                self.log_dir, json.dumps(self.imports), self.account)
         else:
             # Found this pool in the pool DB; retrieve info about it from DB
             if self.work_dir is None: # Allow overrides
@@ -237,6 +264,7 @@ class SQLitePool(Pool):
             if self.log_dir is None: # Allow overrides
                 self.log_dir = this_pool_row[0]['log_dir']
             self.imports = json.loads(this_pool_row[0]['imports']) # Don't allow overrides
+            self.account = this_pool_row[0]['account']
             
         
     ## Note: definition of "enter/exit" special functions allows usage of the "with" operator, i.e.
@@ -253,9 +281,6 @@ class SQLitePool(Pool):
         taxi.ensure_path_exists(taxi.expand_path(self.work_dir)) # Dig out working directory if it doesn't exist
         taxi.ensure_path_exists(taxi.expand_path(self.log_dir)) # Dig out log directory if it doesn;t exist
 
-        
-
-
     def __exit__(self, exc_type, exc_val, exc_traceback):
         self.conn.close()
 #        os.chdir(self.backup_cwd) # restore original working directory
@@ -271,6 +296,7 @@ class SQLitePool(Pool):
         new_taxi.rebuild_from_dict(db_taxi)
         new_taxi.pool_path = self.db_path
         new_taxi.log_dir = self.log_dir # Tell taxi where log_dir for this pool is
+        new_taxi.account = self.account
 
         return new_taxi
 
@@ -301,15 +327,14 @@ class SQLitePool(Pool):
 
 
     def get_all_taxis_in_pool(self):
+        """Queries the pool DB to get all taxis in the pool.
+        
+        Returns a list of reconstructed taxi objects.
+        """
+
         query = """SELECT * FROM taxis;"""
         taxi_raw_info = self.execute_select(query)
-
-        all_taxis = []
-        for row in taxi_raw_info:
-            row_taxi = self._create_taxi_object(row)
-            all_taxis.append(row_taxi)
-
-        return all_taxis
+        return [self._create_taxi_object(row) for row in taxi_raw_info]
 
 
     def get_taxi(self, my_taxi):

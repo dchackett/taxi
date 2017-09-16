@@ -15,20 +15,6 @@ from taxi import sanitized_path
 
 import taxi.fn_conventions
 
-privileged_param_names = [
-    'fout',  # Output file for inline measurements and diagnostic outputs
-    'saveg', # File to store configuration in at end of binary
-    'save_config', # Flag: store configuration at end of binary?
-    'loadg', # File to load configuration from at beginning of run
-    'binary', # Binary to run
-    'seed',   # Seed for binary
-    
-    # Specific to ConfigGenerator
-    'start_traj', # Index of starting trajectory of MCMC run
-    'n_traj', # Number of MCMC trajectories to run
-    'final_traj', # Index of trajectory MCMC run will end on
-]
-
 
 class BasicMCMCFnConvention(taxi.fn_conventions.FileNameConvention):
     def __init__(self, prefix=None, *args, **kwargs):
@@ -90,7 +76,8 @@ class MCMC(jobs.Runner):
                 
         # Load parameters from CG in to this object
         for k, v in cg_dict.items():
-            setattr(self, k, v)
+            if getattr(self, k, None) is None: # Don't override anything already present
+                setattr(self, k, v)
             
         # Load the output configuration of this ConfigGenerator
         self.loadg = config_generator.saveg
@@ -109,6 +96,24 @@ class MCMC(jobs.Runner):
         # Steal parameters from parsed filename
         self.__dict__.update(**self.parse_params_from_loadg(self.loadg))
             
+    
+    def execute(self, cores=None):
+        
+        ## Non-clobbering behavior
+        saveg_exists = self.save_config and getattr(self, 'saveg', None) is not None and os.path.exists(self.saveg)
+        fout_exists = getattr(self, 'fout', None) is not None and os.path.exists(self.fout)
+        if saveg_exists or fout_exists:
+            if saveg_exists:
+                print "WARNING: File saveg={0} already exists, attempting to verify output".format(self.saveg)
+            if fout_exists:
+                print "WARNING: File fout={0} already exists, attempting to verify output".format(self.fout)
+            
+            self.verify_output()
+            # Verify output throws an error and blocks rest of function if output isn't correct
+            print "WARNING: Pre-existing well-formatted output (according to verify_output()) detected; skipping running"
+            return # Never clobber
+            
+        super(MCMC, self).execute(cores=cores)
     
     ## Standard output verification
     def verify_output(self):
@@ -129,7 +134,7 @@ class MCMC(jobs.Runner):
     ## Modular file name conventions
     # Input: Loaded gauge file
     def parse_params_from_loadg(self, fn):
-        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention)        
+        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention())        
         if parsed is None:
             raise ValueError("Specified filename convention(s) {fnc} cannot parse filename {fn}".format(fnc=self.loadg_filename_convention, fn=fn))
         assert parsed.has_key('traj'), "FileNameConvention must return a key 'traj' when processing a configuration file name"
@@ -162,6 +167,8 @@ class ConfigGenerator(MCMC):
         self.n_traj = n_traj
         self.seed = seed
         
+        self.trunk = True # ConfigGenerators are "trunk" tasks
+        
         ## Flexible seed configuration behavior
         if starter is None:
             # Fresh start
@@ -192,8 +199,14 @@ class ConfigGenerator(MCMC):
         return self.start_traj + self.n_traj
     final_traj = property(fget=_get_final_traj)
         
-    
-                
+
+## Need to be able to steal physical parameters from ConfigGenerator
+## However, we don't want any of ConfigGenerator's logistical parameters (e.g. fout, seed, trunk?, ...)
+## to overwrite the logistical parameters in the ConfigGenerator/ConfigMeasurement doing the stealing
+## Need a list of parameters to be careful with. Rather than maintaining a list by hand, just
+## make an instance of the ConfigGenerator abstract class and see what attributes it has
+privileged_param_names = ConfigGenerator(seed=0).to_dict().keys()
+
         
 class ConfigMeasurement(MCMC):
     """Abstract superclass of tasks that run some external binary that performs

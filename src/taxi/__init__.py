@@ -6,3 +6,4 @@ from _utility import sanitized_path, ensure_path_exists, work_in_dir, expand_pat
 from _utility import flush_output, print_traceback
 from _utility import all_subclasses_of
 from _utility import fixable_dynamic_attribute
+from _utility import copy_nested_list
