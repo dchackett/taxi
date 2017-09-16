@@ -12,7 +12,7 @@
 #PBS -j oe
 #PBS -m n
 #PBS -v LD_LIBRARY_PATH,PV_NCPUS,PV_LOGIN,PV_LOGIN_PORT
-#PBS -q test_bc
+#PBS -q bc
 
 # HACKED-IN: Load up virtualenv
 source $TAXI_PYENV/bin/activate
