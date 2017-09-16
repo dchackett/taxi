@@ -91,7 +91,7 @@ class Task(object):
         if not hasattr(self, 'depends_on') or self.depends_on is None or len(self.depends_on) == 0:
             compiled['depends_on'] = None
         else:
-            compiled['depends_on'] = [d.id for d in self.depends_on]
+            compiled['depends_on'] = [d.id for d in self.depends_on if not isinstance(d, int)]
             
         return compiled
     
