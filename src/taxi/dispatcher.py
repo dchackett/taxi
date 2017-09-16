@@ -126,19 +126,12 @@ class Dispatcher(object):
         return task
         
 
-    def add_task(self, compiled_task):
+    def add_tasks(self, compiled_tasks):
         raise NotImplementedError
 
 
     def claim_task(self, my_taxi, task):
         raise NotImplementedError
-
-
-    def add_priority_task(self, compiled_task):
-        compiled_task['priority'] = 0
-        compiled_task['task_id'] = self._get_max_task_id + 1
-
-        self.add_task(compiled_task)
 
 
     def finalize_task_run(self, my_taxi, task):
@@ -382,10 +375,7 @@ class Dispatcher(object):
         self.task_pool = [job.compiled() for job in job_pool]
 
     def _populate_task_table(self):
-        ## TODO: is there a more efficient way than generating N queries using a Python for loop?
-
-        for compiled_task in self.task_pool:
-            self.add_task(compiled_task)
+        self.add_tasks(self.task_pool)
 
 
     def _get_max_task_id(self):
@@ -479,9 +469,17 @@ class SQLiteDispatcher(Dispatcher):
         return res
 
     def execute_update(self, query, *query_args):
+        # Semi-intelligent behavior for whether to execute or executemany
+        # If query_args is nothing but tuples (from unpacking [(1,...), (2,...), ...]), then many
+        # Otherwise, execute one
+        use_execute_many = all([isinstance(qa, tuple) for qa in query_args])
+        
         try:
             with self.conn:
-                self.conn.execute(query, query_args)
+                if not use_execute_many:
+                    self.conn.execute(query, query_args)
+                else:
+                    self.conn.executemany(query, query_args)
                 self.conn.commit()
         except:
             print "Failed to execute query: "
@@ -617,27 +615,27 @@ class SQLiteDispatcher(Dispatcher):
 
         self.update_task(task=task, status='active', by_taxi=my_taxi.name)
 
-    def add_task(self, compiled_task):
+
+    def add_tasks(self, compiled_tasks):
         task_query = """INSERT OR REPLACE INTO tasks
         (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
 
-        task_values = (compiled_task['task_type'], 
-                    json.dumps(compiled_task['depends_on']),
-                    compiled_task['status'], 
-                    compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
-                    compiled_task['is_recurring'],
-                    compiled_task['req_time'], 
-                    compiled_task['priority'],
-                    json.dumps(compiled_task['payload']) if compiled_task.has_key('payload') else None,)
+        upsert_data = []
+        for compiled_task in compiled_tasks:
+            task_values = (
+                compiled_task['task_type'], 
+                json.dumps(compiled_task['depends_on']),
+                compiled_task['status'], 
+                compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
+                compiled_task['is_recurring'],
+                compiled_task['req_time'], 
+                compiled_task['priority'],
+                json.dumps(compiled_task['payload']) if compiled_task.has_key('payload') else None,
+            )
+            upsert_data.append(task_values)
         
-        self.execute_update(task_query, *task_values)
-        
-
-    def _populate_task_table(self):
-        ## TODO: is there a more efficient way than generating N queries using a Python for loop?
-        for compiled_task in self.task_pool:
-            self.add_task(compiled_task)
+        self.execute_update(task_query, *upsert_data)
             
         
     def _get_max_task_id(self):
