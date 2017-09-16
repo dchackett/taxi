@@ -23,7 +23,7 @@ class Pool(object):
         'E',    # error in queue submission
     ]
 
-    def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300, account=None):
+    def __init__(self, work_dir, log_dir, imports=None, thrash_delay=300, allocation=None):
         self.work_dir = taxi.expand_path(work_dir)
         self.log_dir = taxi.expand_path(log_dir)
         
@@ -37,8 +37,8 @@ class Pool(object):
         ## Default is 5 minutes.
         self.thrash_delay = thrash_delay
         
-        # Account to run on
-        self.account = account
+        # Allocation to run on
+        self.allocation = allocation
     
 
     ### Backend interaction ###
@@ -197,7 +197,7 @@ class SQLitePool(Pool):
     
     def __init__(self, db_path, pool_name,
                  work_dir=None, log_dir=None, imports=None,
-                 account=None, thrash_delay=300):
+                 allocation=None, thrash_delay=300):
         """
         Argument options: either [db_path, pool_name(, thrash_delay)] are specified, or
         [work_dir, log_dir(, imports, thrash_delay)] are specified.  If all are specified,
@@ -205,7 +205,7 @@ class SQLitePool(Pool):
         are ignored.
         """
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
-             imports=imports, thrash_delay=thrash_delay, account=account)
+             imports=imports, thrash_delay=thrash_delay, allocation=allocation)
 
         self.db_path = taxi.expand_path(db_path)
         self.pool_name = pool_name
@@ -235,7 +235,7 @@ class SQLitePool(Pool):
                 working_dir text,
                 log_dir text,
                 imports text,
-                account text
+                allocation text
             )"""
 
         with self.conn:
@@ -253,10 +253,10 @@ class SQLitePool(Pool):
         if len(this_pool_row) == 0:
             # Did not find this pool in the pool DB; add it
             pool_write_query = """INSERT OR REPLACE INTO pools
-                (name, working_dir, log_dir, imports, account)
+                (name, working_dir, log_dir, imports, allocation)
                 VALUES (?, ?, ?, ?, ?)"""
             self.execute_update(pool_write_query, self.pool_name, self.work_dir,
-                                self.log_dir, json.dumps(self.imports), self.account)
+                                self.log_dir, json.dumps(self.imports), self.allocation)
         else:
             # Found this pool in the pool DB; retrieve info about it from DB
             if self.work_dir is None: # Allow overrides
@@ -264,7 +264,7 @@ class SQLitePool(Pool):
             if self.log_dir is None: # Allow overrides
                 self.log_dir = this_pool_row[0]['log_dir']
             self.imports = json.loads(this_pool_row[0]['imports']) # Don't allow overrides
-            self.account = this_pool_row[0]['account']
+            self.allocation = this_pool_row[0]['allocation']
             
         
     ## Note: definition of "enter/exit" special functions allows usage of the "with" operator, i.e.
@@ -296,7 +296,7 @@ class SQLitePool(Pool):
         new_taxi.rebuild_from_dict(db_taxi)
         new_taxi.pool_path = self.db_path
         new_taxi.log_dir = self.log_dir # Tell taxi where log_dir for this pool is
-        new_taxi.account = self.account
+        new_taxi.allocation = self.allocation
 
         return new_taxi
 

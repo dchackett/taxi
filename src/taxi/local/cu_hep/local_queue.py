@@ -46,8 +46,8 @@ class LocalQueue(BatchQueue):
         if taxi.nodes is not None and taxi.nodes > 1:
             raise Exception("Can only run single-node jobs on beowulf")
             
-        if taxi.account is not None:
-            print "WARNING: taxi account '{a}' is specified, but will be ignored on cu_hep cluster".format(a=taxi.account)
+        if taxi.allocation is not None:
+            print "WARNING: taxi allocation '{a}' is specified, but will be ignored on cu_hep cluster".format(a=taxi.allocation)
 
         # Arguments to SGE (Note, don't specify nodes -- always 1)
         taxi_call = "Qsub -e -G beowulf "
