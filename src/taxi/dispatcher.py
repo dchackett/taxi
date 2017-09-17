@@ -55,7 +55,7 @@ class Dispatcher(object):
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
         
 
-    def get_task_blob(self, taxi_name, include_complete=True):
+    def get_task_blob(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks pertinent to this taxi."""
         raise NotImplementedError
 
@@ -267,18 +267,23 @@ class Dispatcher(object):
         return desired_state
         
         
-
-    ## Initialization
-    def _find_trees(self, job_pool):
-        ## Scaffolding
+    def _invert_dependency_graph(self, job_pool):
         # Give each task an identifier, reset dependents
         for jj, job in enumerate(job_pool):
             job._dependents = []
 
         # Let dependencies know they have a dependent
         for job in job_pool:
+            if job.depends_on is None:
+                continue
             for dependency in job.depends_on:
                 dependency._dependents.append(job)
+                
+
+    ## Initialization
+    def _find_trees(self, job_pool):
+        ## Scaffolding
+        self._invert_dependency_graph(job_pool)
                 
         ## Break apart jobs into separate trees
         # First, find all roots
@@ -412,7 +417,44 @@ class Dispatcher(object):
         self._populate_task_table(job_pool)
 
 
+    ## Cascading rollback
+    def rollback(self, task, delete_files=False, rollback_dir=None):
+        """Rolls back a task and any tasks that depend on it, and any tasks that depend on those, etc.
+        """
+        assert not (rollback_dir is None and delete_files == False),\
+            "Must either provide a rollback_dir to copy files to or give permission to delete_files"
+        assert task.status != 'active', "Can't rollback an active task. Kill it first."
 
+        task_blob = self.get_task_blob(include_complete=True)
+        
+        # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
+        # TODO: Use task equality instead of ids?
+        assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
+        task = task_blob[task.id]
+        
+        # Find rollbackable (non-active, non-pending) tasks (also dict->list)
+        task_blob = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
+        
+        # Find dependents
+        self._invert_dependency_graph(task_blob)
+        
+        # Could do this with recursion instead, but recursion is slow in Python
+        rollback_tasks = [task]
+        while len(rollback_tasks) > 0:
+            # Pop task to roll back off front of list
+            rt = rollback_tasks[0]
+            rollback_tasks = rollback_tasks[1:]
+            
+            # Must roll back everything downstream, add to list
+            for d in rt._dependents:
+                if d not in task_blob:
+                    continue # Not rollbackable
+                rollback_tasks.append(d)
+                
+            # Perform rollback
+            rt.rollback(delete_files=delete_files, rollback_dir=rollback_dir)
+            
+            
     
 
     
