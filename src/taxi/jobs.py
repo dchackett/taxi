@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import os
+import shutil
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path, all_subclasses_of, copy_nested_list
+from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list
 
 from copy import copy, deepcopy
 
-special_keys = ['task_type', 'depends_on', 'status', 'for_taxi', 'is_recurring', 'req_time', 'priority']
+special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'is_recurring', 'req_time', 'priority']
 
 class Task(object):
     """Abstract task superclass"""
@@ -118,6 +119,11 @@ class Task(object):
             if dependency.status == 'failed':
                 N_failed += 1
         return N_unresolved, N_failed
+    
+    
+    def rollback(self):
+        assert self.status != 'active', "Task {0} is active, cannot roll it back. Kill it first.".format(self)
+        self.status = 'pending'
 
         
 ### Special jobs
@@ -155,6 +161,8 @@ class Runner(Task):
             self.cores = cores
         if not hasattr(self, 'use_mpi'):
             self.use_mpi = use_mpi
+            
+        self.output_files = []
         
         # Defaults
         if not hasattr(self, 'binary'): # Don't clobber anything set by a subclass
@@ -198,6 +206,50 @@ class Runner(Task):
         os.system(exec_str)
 
         self.verify_output()
+        
+        
+    def rollback(self, rollback_dir=None, delete_files=False):
+        super(Runner, self).rollback()
+        
+        
+        if self.output_files is not None and len(self.output_files) > 0:
+            assert not (rollback_dir is None and delete_files == False),\
+                "Must either provide a rollback_dir to copy files to or give permission to delete_files"
+            
+            if rollback_dir is not None:
+                rollback_dir = expand_path(rollback_dir)
+                assert os.path.exists(rollback_dir), \
+                    "Provided rollback dir (expanded) '{0}' does not exist".format(rollback_dir)
+        
+            self.output_files = [fn for fn in self.output_files if fn is not None] # Happens when e.g. MCMC passes saveg up, but saveg was None
+            
+            for fn in self.output_files:
+                
+                if not os.path.exists(fn):
+                    continue
+                
+                if rollback_dir is not None:
+                    to_path = os.path.join(rollback_dir, os.path.basename(fn))
+                    
+                    # Don't clobber any files in the rollback directory -- rename duplicate files like hmc_output(1)
+                    counter = 0
+                    while os.path.exists(to_path):
+                        counter += 1
+                        new_fn = os.path.basename(fn) + '{0}'.format(counter)
+                        to_path = os.path.join(rollback_dir, new_fn)
+                    
+                    print "Rollback: '{0}' -> '{1}'".format(fn, to_path)
+                    shutil.move(fn, to_path)
+                    
+                
+                elif delete_files:
+                    # Safety: Don't delete files even if granted permission if a rollback_dir is provided
+                    print "Rollback: deleting '{0}'".format(fn)
+                    os.remove(fn)
+                
+            # Output files are cleared, don't need to keep track of them anymore
+            self.output_files = []
+            
 
 
 ### Standard runners
@@ -219,6 +271,11 @@ class Copy(Runner):
 
     def build_input_string(self):
         return "{0} {1}".format(self.src, self.dest)
+    
+    def rollback(self, rollback_dir=None, delete_files=False):
+        self.output_files.append(self.dest)
+        
+        super(Copy, self).rollback(rollback_dir=rollback_dir, delete_files=delete_files)
     
 
 ### Task rebuilder    

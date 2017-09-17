@@ -11,7 +11,7 @@ from random import seed, randint
 import os
 
 import jobs
-from taxi import sanitized_path
+from taxi import sanitized_path, expand_path
 
 import taxi.fn_conventions
 
@@ -38,6 +38,9 @@ class MCMC(jobs.Runner):
     saveg_filename_convention = BasicMCMCFnConvention
     fout_filename_convention = BasicMCMCFnConvention
     loadg_filename_convention = BasicMCMCFnConvention
+    
+    ## For rollbacking
+    output_file_attributes = ['fout', 'saveg']
     
     def __init__(self, save_config=True, **kwargs):
         super(MCMC, self).__init__(**kwargs)
@@ -98,7 +101,6 @@ class MCMC(jobs.Runner):
             
     
     def execute(self, cores=None):
-        
         ## Non-clobbering behavior
         saveg_exists = self.save_config and getattr(self, 'saveg', None) is not None and os.path.exists(self.saveg)
         fout_exists = getattr(self, 'fout', None) is not None and os.path.exists(self.fout)
@@ -114,6 +116,14 @@ class MCMC(jobs.Runner):
             return # Never clobber
             
         super(MCMC, self).execute(cores=cores)
+        
+        # Keep track of absolute paths of output files created, for rollbacking
+        # For user-friendliness, only have to provide a list of attributes that may contain output filenames
+        for ofa in self.output_file_attributes:
+            if getattr(self, ofa, None) is not None and os.path.exists(getattr(self, ofa)):
+                self.output_files.append(expand_path(getattr(self, ofa)))
+        
+    
     
     ## Standard output verification
     def verify_output(self):
@@ -122,14 +132,16 @@ class MCMC(jobs.Runner):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
         
         # If this job should save a gauge file, that gauge file must exist
-        if self.save_config and hasattr(self, 'saveg') and (self.saveg != None) and (not os.path.exists(self.saveg)):
+        if self.save_config and getattr(self, 'saveg', None) is not None and (not os.path.exists(self.saveg)):
             print "MCMC ok check fails: Gauge file {0} doesn't exist.".format(self.saveg)
             raise RuntimeError
             
         # If this job should save an output file, that output file must exist
-        if hasattr(self, 'fout') and (self.fout != None) and (not os.path.exists(self.fout)):
+        if getattr(self, 'fout', None) is not None and (not os.path.exists(self.fout)):
             print "MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout)
             raise RuntimeError
+            
+        
     
     ## Modular file name conventions
     # Input: Loaded gauge file

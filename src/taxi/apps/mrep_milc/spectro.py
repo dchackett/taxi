@@ -2,6 +2,7 @@
 
 import os
 
+from taxi import expand_path
 from taxi import fixable_dynamic_attribute
 from taxi.mcmc import ConfigMeasurement
 import taxi.local.local_taxi as local_taxi
@@ -51,6 +52,8 @@ class SpectroTask(ConfigMeasurement):
     fout_filename_prefix = None # Ignored for spectroscopy
     fout_filename_convention = mrep_fncs.PureGaugeSpectroFnConvention
     loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
+    
+    output_file_attributes = ['fout', 'saveg', 'savep'] # savep in addition to usual MCMC fout and saveg
     
     def __init__(self,
                  # Application-specific required arguments
@@ -142,7 +145,7 @@ class SpectroTask(ConfigMeasurement):
         super(SpectroTask, self).verify_output()
     
         # If this job should save a propagator file, that file must exist
-        if (self.savep != None) and (not os.path.exists(self.savep)):
+        if getattr(self, 'savep', None) is not None and (not os.path.exists(self.savep)):
             print "Spectro ok check fails: Propagator file {0} doesn't exist.".format(self.savep)
             raise RuntimeError
 
@@ -179,3 +182,4 @@ class SpectroTask(ConfigMeasurement):
         except KeyError:
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
+
