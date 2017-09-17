@@ -66,14 +66,6 @@ class Dispatcher(object):
         For last-minute checks that job hasn't been claimed by another job."""
 
         raise NotImplementedError
-        
-    
-    def update_task(self, task, status, start_time=None, run_time=None, by_taxi=None):
-        """Change the status of task with task_id in job forest DB.  For claiming
-        task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
-        used to record runtime and update status simultaneously (one less DB interaction)."""
-
-        raise NotImplementedError
 
 
     ## Taxi interface
@@ -151,17 +143,16 @@ class Dispatcher(object):
 
 
     def finalize_task_run(self, my_taxi, task):
-        my_taxi.task_finish_time = time.time()
-        task_run_time = my_taxi.task_finish_time - my_taxi.task_start_time
-
         if task.status != 'failed':
             if task.is_recurring:
                 task.status = 'pending'
             else:
                 task.status = 'complete'
 
-        self.update_task(task=task, status=task.status, 
-            start_time=my_taxi.task_start_time, run_time=task_run_time, by_taxi=my_taxi)
+        # Write local (completed) version of the task to the dispatch DB
+        # ...unless we don't have an id for it, in which case it's not in the DB or we can't find it
+        if getattr(task, 'id', None) is not None:
+            self.add_tasks([task])
         
         
     def _trunk_number(self, task_blob, for_taxi=None):
@@ -635,49 +626,37 @@ class SQLiteDispatcher(Dispatcher):
             return None
         
         return dict(task_res[0])['status']
-        
-   
-    def update_task(self, task, status, start_time=None, run_time=None, by_taxi=None):
-        """Change the status of task with task_id in job forest DB.  For claiming
-        task as 'active', marking tasks as 'complete', 'failed', etc.  At end of run,
-        used to record runtime and update status simultaneously (one less DB interaction)."""
-        
-        if not hasattr(task, 'id') or task.id is None:
-            ## Case: Dispatcher returns a "Die" that doesn't live in the dispatch DB when it
-            ## wants a taxi to stop running.
-            return
-
-        update_str = """UPDATE tasks SET status=?"""
-        values = [status]
-        if start_time is not None:
-            update_str += """, start_time=?"""
-            values.append(start_time)
-        if run_time is not None:
-            update_str += """, run_time=?"""
-            values.append(run_time)
-        if by_taxi is not None:
-            update_str += """, by_taxi=?"""
-            values.append(str(by_taxi))
-        update_str += """ WHERE id=?"""
-        values.append(task.id)
-
-        self.execute_update(update_str, *values)
 
 
     def claim_task(self, my_taxi, task):
         """Attempt to claim task for a given taxi.  Fails if the status has been changed from pending."""
 
-        task_status = self.check_task_status(task)
-        if task_status != 'pending':
-            raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
-
-        self.update_task(task=task, status='active', by_taxi=my_taxi.name)
+        # If task has no id, either it's not in the DB or we couldn't claim it anyways
+        if getattr(task, 'id', None) is not None:
+            # Claim in DB -- check for race conditions
+            with self.conn:
+                # Try to change status, but with condition that taxi status is pending
+                claim_query = """UPDATE tasks SET status="active", by_taxi=? WHERE id=? AND status="pending";"""
+                # Affected rows == 1 if this worked correctly
+                result = self.conn.execute(claim_query, (my_taxi.name, task.id))
+                claim_failed = result.rowcount != 1
+                
+                if claim_failed:
+                    task_status = self.check_task_status(task)
+                    raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
+                    
+                # Claim went through successfully, commit the claim
+                self.conn.commit()
+            
+        # Keep task object up-to-date
+        task.status = 'active'
+        task.by_taxi = my_taxi.name
 
 
     def add_tasks(self, tasks):
         task_query = """INSERT OR REPLACE INTO tasks
-        (task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         # JSON serialize all jobs
         compiled_tasks = [job.compiled() for job in tasks]
@@ -686,6 +665,7 @@ class SQLiteDispatcher(Dispatcher):
         upsert_data = []
         for compiled_task in compiled_tasks:
             task_values = (
+                compiled_task['id'],
                 compiled_task['task_type'], 
                 json.dumps(compiled_task['depends_on']),
                 compiled_task['status'], 

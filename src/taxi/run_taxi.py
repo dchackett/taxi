@@ -110,8 +110,8 @@ if __name__ == '__main__':
                 
             
             ### Execute task
-            taxi_obj.task_start_time = time.time()
             print "EXECUTING TASK ", task
+            task.start_time = time.time()
             flush_output()
             
             ## Special behavior -- Die/Sleep
@@ -161,6 +161,7 @@ if __name__ == '__main__':
             
             
             ### Record exit status, time taken, etc.
+            task.run_time = time.time() - task.start_time
             with my_dispatch:
                 tasks_run += 1
                 my_dispatch.finalize_task_run(taxi_obj, task)    
