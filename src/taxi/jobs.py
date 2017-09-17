@@ -92,7 +92,7 @@ class Task(object):
         if not hasattr(self, 'depends_on') or self.depends_on is None or len(self.depends_on) == 0:
             compiled['depends_on'] = None
         else:
-            compiled['depends_on'] = [d.id for d in self.depends_on if isinstance(d, Task)]
+            compiled['depends_on'] = [d.id if isinstance(d, Task) else d for d in self.depends_on]
             
         return compiled
     
@@ -307,4 +307,4 @@ def runner_rebuilder_factory():
 
         return s
 
-    return runner_decoder
+    return runner_decoder        
