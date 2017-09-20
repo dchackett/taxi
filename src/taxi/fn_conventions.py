@@ -77,11 +77,17 @@ def parse_with_conventions(fn, conventions):
     else:
         raise ValueError("loadg_filename_convention must be either a list of FileNameConventions or a FileNameConvention")
 
+
     ## Try each FNC in the order provided.  Accept first one that works, or return None.
     parsed = None
     for fnc in fncs:
+        ## Get an instance of FNCs that were provided abstractly
+        if issubclass(fnc, FileNameConvention):
+            fnc = fnc()
+
         assert isinstance(fnc, FileNameConvention), "Provided fnc {fnc} is a {ft}, not a FileNameConvention".format(fnc=fnc, ft=type(fnc))
         assert hasattr(fnc, 'read'), "{fnc} has no 'read' method implemented".format(fnc=fnc)
+
         try:
             parsed = fnc.read(fn)
         except:
