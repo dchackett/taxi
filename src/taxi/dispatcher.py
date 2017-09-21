@@ -581,8 +581,8 @@ class SQLiteDispatcher(Dispatcher):
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
-                self.execute_select(query, *query_args)
-            return
+                res = self.execute_select(query, *query_args)
+            return res
         
         try:
             with self.conn:
