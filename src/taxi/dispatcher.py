@@ -504,6 +504,9 @@ class SQLiteDispatcher(Dispatcher):
         self._setup_complete = False
         
         self._in_context = False
+        
+        with self:
+            pass # Semi-kludgey creation/retrieval of dispatch DB
     
 
     def _create_new_dispatch(self):
