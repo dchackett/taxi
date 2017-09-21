@@ -112,6 +112,8 @@ class SingleRepHMCJob(ConfigGenerator):
     fout_filename_convention = MrepFnConvention
     loadg_filename_convention = [MrepFnConvention] # Convention: do input/loading FNCs as lists for user-friendliness
     
+    binary = local_taxi.multirep_hmc_binary
+    
     def __init__(self,
                  # Application-specific required arguments
                  Ns, Nt, beta, kappa, irrep, label, nsteps1,
@@ -163,8 +165,6 @@ class SingleRepHMCJob(ConfigGenerator):
             
         """
         super(SingleRepHMCJob, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
-        
-        self.binary = local_taxi.multirep_hmc_binary
 
         self.Ns = Ns
         self.Nt = Nt

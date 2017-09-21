@@ -35,6 +35,8 @@ class FlowJob(ConfigMeasurement):
     fout_filename_convention = mrep_fncs.PureGaugeFnConvention
     loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
     
+    binary = local_taxi.flow_binary
+    
     def __init__(self,
                  # Application-specific required arguments
                  tmax,
@@ -82,8 +84,6 @@ class FlowJob(ConfigMeasurement):
         if tmax == 0:
             assert minE != 0 or mindE != 0, \
                 "If tmax is 0, must set adaptive flow parameters minE and mindE or flow will be trivial"
-
-        self.binary = local_taxi.flow_binary
         
     
     def build_input_string(self):

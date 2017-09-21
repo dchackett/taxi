@@ -43,6 +43,8 @@ class PureGaugeORAJob(ConfigGenerator):
     fout_filename_convention = PureGaugeFnConvention
     loadg_filename_convention = [PureGaugeFnConvention] # Convention: do input/loading FNCs as lists for user-friendliness
     
+    binary = local_taxi.pure_gauge_ora_binary
+    
     def __init__(self,
                  # Application-specific required arguments
                  Ns, Nt, beta, label,
@@ -71,8 +73,6 @@ class PureGaugeORAJob(ConfigGenerator):
             label (str): Text label for the ensemble
         """
         super(PureGaugeORAJob, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
-        
-        self.binary = local_taxi.pure_gauge_ora_binary
 
         self.Ns = Ns
         self.Nt = Nt

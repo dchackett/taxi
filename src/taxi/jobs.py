@@ -153,6 +153,8 @@ class Respawn(Task):
 class Runner(Task):
     """Abstract superclass to run some external program"""
     
+    binary = 'echo' # Default: For testing purposes
+    
     def __init__(self, cores=None, use_mpi=None, **kwargs):
         super(Runner, self).__init__(**kwargs)
         
@@ -164,9 +166,6 @@ class Runner(Task):
             
         self.output_files = []
         
-        # Defaults
-        if not hasattr(self, 'binary'): # Don't clobber anything set by a subclass
-            self.binary = 'echo' # For testing purposes
 
     def build_input_string(self):
         return ""
@@ -256,10 +255,10 @@ class Runner(Task):
 class Copy(Runner):
     """Copy a file from src to dest using rsync"""
     
+    binary = "rsync -Paz"
+    
     def __init__(self, src, dest, req_time=60, **kwargs):
         super(Copy, self).__init__(req_time=req_time, **kwargs)
-
-        self.binary = "rsync -Paz"
         
         # Store sanitized file paths
         assert isinstance(src, basestring)
