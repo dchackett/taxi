@@ -433,10 +433,6 @@ class Dispatcher(object):
         affected_tasks = []
         
         for task in tasks:
-            if task.status != 'active':
-                "Can't rollback active task w/ id={0} task. Kill it first.".format(task.id)
-                continue
-    
             # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
             # TODO: Use task equality instead of ids?
             assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
@@ -449,20 +445,30 @@ class Dispatcher(object):
             self._invert_dependency_graph(task_blob)
             
             # Could do this with recursion instead, but recursion is slow in Python
-            rollback_tasks = [task]
-            while len(rollback_tasks) > 0:
+            cascade_tasks = [task]
+            tasks_to_roll_back = []
+            while len(cascade_tasks) > 0:
                 # Pop task to roll back off front of list
-                rt = rollback_tasks[0]
-                rollback_tasks = rollback_tasks[1:]
-                affected_tasks.append(rt)
+                rt = cascade_tasks[0]
+                cascade_tasks = cascade_tasks[1:]
+                
+                if rt.status == 'active':
+                    print "Can't rollback active task w/ id={0}. Kill it first.".format(task.id)
+                    # Cancel rollbacking
+                    tasks_to_roll_back = [] 
+                    break
+                
+                tasks_to_roll_back.append(rt)
                 
                 # Must roll back everything downstream, add to list
                 for d in rt._dependents:
                     if d not in task_blob:
                         continue # Not rollbackable
-                    rollback_tasks.append(d)
+                    cascade_tasks.append(d)
                     
+            for rt in tasks_to_roll_back:
                 # Perform rollback
+                affected_tasks.append(rt)
                 rt.rollback(delete_files=delete_files, rollback_dir=rollback_dir)
             
         # Update DB
