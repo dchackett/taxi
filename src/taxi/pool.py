@@ -200,6 +200,8 @@ class SQLitePool(Pool):
 
         self.conn = None
         
+        self._in_context = False
+        
         with self:
             pass # Semi-kludgey creation/retrieval of pool DB
     
@@ -258,6 +260,11 @@ class SQLitePool(Pool):
     ## This automatically takes care of setup/teardown without any try/finally clause.
     
     def __enter__(self):
+        # Don't allow layered entry
+        if self._in_context:
+            return
+        self._in_context = True
+        
         self.conn = sqlite3.connect(self.db_path, timeout=30.0)
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
         
@@ -269,6 +276,7 @@ class SQLitePool(Pool):
     def __exit__(self, exc_type, exc_val, exc_traceback):
         self.conn.close()
 #        os.chdir(self.backup_cwd) # restore original working directory
+        self._in_context = False
 
 
     def _create_taxi_object(self, db_taxi):
@@ -286,6 +294,12 @@ class SQLitePool(Pool):
 
 
     def execute_select(self, query, *query_args):
+        # If we're not in context when this is called, get in context
+        if not self._in_context:
+            with self:
+                res = self.execute_select(query, *query_args)
+            return res
+        
         try:
             with self.conn:
                 res = self.conn.execute(query, query_args).fetchall()
@@ -296,6 +310,12 @@ class SQLitePool(Pool):
 
 
     def execute_update(self, query, *query_args):
+        # If we're not in context when this is called, get in context
+        if not self._in_context:
+            with self:
+                res = self.execute_update(query, *query_args)
+            return res
+        
         try:
             with self.conn:
                 self.conn.execute(query, query_args)
