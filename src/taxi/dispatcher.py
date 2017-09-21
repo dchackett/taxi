@@ -469,7 +469,7 @@ class Dispatcher(object):
             for rt in tasks_to_roll_back:
                 # Perform rollback
                 affected_tasks.append(rt)
-                rt.rollback(delete_files=delete_files, rollback_dir=rollback_dir)
+                rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
             
         # Update DB
         self.add_tasks(affected_tasks)

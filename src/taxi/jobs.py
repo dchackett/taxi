@@ -121,7 +121,7 @@ class Task(object):
         return N_unresolved, N_failed
     
     
-    def rollback(self):
+    def _rollback(self):
         assert self.status != 'active', "Task {0} is active, cannot roll it back. Kill it first.".format(self)
         self.status = 'pending'
 
@@ -208,8 +208,8 @@ class Runner(Task):
         self.verify_output()
         
         
-    def rollback(self, rollback_dir=None, delete_files=False):
-        super(Runner, self).rollback()
+    def _rollback(self, rollback_dir=None, delete_files=False):
+        super(Runner, self)._rollback()
         
         
         if self.output_files is not None and len(self.output_files) > 0:
