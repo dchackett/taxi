@@ -390,15 +390,35 @@ class SQLitePool(Pool):
         my_taxi.pool_name = self.pool_name
         my_taxi.pool_path = self.db_path
         my_taxi.log_dir = self.log_dir
-
-        taxi_name_query = """SELECT name FROM taxis;"""
-        all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
-
-        if str(my_taxi) in all_taxi_names:
-            # Already registered in pool DB
-            return
+        
+        if getattr(my_taxi, 'name', None) is None:
+            # Pop a name off queue of taxi names, for convenience
+            my_taxi.name = self.get_next_unused_taxi_name()
         else:
-            self._add_taxi_to_pool(my_taxi)
+            # Name was specified, make sure there's no collision
+            taxi_name_query = """SELECT name FROM taxis;"""
+            all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
+
+            if my_taxi.name in all_taxi_names:
+                # Already registered in pool DB
+                print "Taxi with name {0} already registered in pool {1}/{2}".format(my_taxi.name, self.db_path, self.pool_name)
+                return
+
+        self._add_taxi_to_pool(my_taxi)
+        
+        
+    def get_next_unused_taxi_name(self):
+        taxis = self.get_all_taxis_in_pool()
+        taxi_names = [t.name for t in taxis]
+        
+        ii = 0
+        while True:
+            new_name = "{0}-{1}".format(self.pool_name, ii)
+            if new_name not in taxi_names:
+                break
+            ii += 1
+            
+        return new_name
 
 
     def _add_taxi_to_pool(self, my_taxi):

@@ -4,9 +4,7 @@ import time
 
 class Taxi(object):
 
-    def __init__(self, name=None, pool_name=None, time_limit=None, cores=None, nodes=None):
-        self.name = name
-        self.pool_name = pool_name
+    def __init__(self, name=None, time_limit=None, cores=None, nodes=None):
         self.time_limit = time_limit
         self.cores = cores
         self.nodes = nodes
@@ -14,7 +12,9 @@ class Taxi(object):
         self.start_time = None  ## Not currently saved to DB, but maybe it should be?
         self.status = 'I'
         self.log_dir = None
+        self.name = name
         
+        self.pool_name = None       
 
     def __eq__(self, other):
         eq = (self.name == other.name)

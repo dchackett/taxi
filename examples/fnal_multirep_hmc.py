@@ -19,6 +19,11 @@ flow.FlowJob.fout_filename_convention = mrep_fncs.MrepFnConvention
 spectro.SpectroTask.loadg_filename_convention = mrep_fncs.MrepFnConvention
 spectro.SpectroTask.fout_filename_convention = mrep_fncs.MrepSpectroFnConvention
 
+# Specify paths to Dispatch and Pools DBS
+base_path = os.path.abspath("./taxi-test")
+pool_db_path = base_path + "/test-pool.sqlite"
+dispatch_db_path = base_path + "/test-disp.sqlite"
+
 # Taxis will import this file, so everything except for imports and
 # relevant declarations need to go in to a __main__ block so the job isn't
 # repeatedly respecified
@@ -82,37 +87,36 @@ if __name__ == '__main__':
     
     job_pool = hmc_pool + flow_pool + spec4_pool + spec6_pool
     
-    ## Create taxi(s) to run the job
-    taxi_list = []
-    pool_name = "pg_test"
-    for i in range(2):
-        taxi_list.append(taxi.Taxi(
-            name="pg_test{0}".format(i), 
-            pool_name=pool_name,
-            time_limit=10*60,
-            cores=32,
-            nodes=1
-        ))
-    
-    ## Set up pool and dispatch
-    ## TODO: this feels like it could be condensed into a single convenience function
-    base_path = os.path.abspath("./taxi-test")
-    
+        
+    ## Set up pool and feed it taxis
+    pool_name = "mrep_test"
     my_pool = taxi.pool.SQLitePool(
-        db_path=(base_path + "/test-pool.sqlite"), 
+        db_path=pool_db_path, 
         pool_name=pool_name, 
         work_dir=(base_path + "/pool/"),
-        log_dir=(base_path + "/pool/log/"),
+        log_dir=(base_path + "/log/"),
         allocation='multirep'
     )
-    my_disp = taxi.dispatcher.SQLiteDispatcher(db_path=(base_path + "/test-disp.sqlite"))
     
+    ## Setup dispatcher
+    my_disp = taxi.dispatcher.SQLiteDispatcher(db_path=dispatch_db_path)
+    
+    ## Connect with queue to launch taxis
     my_queue = local_queue.LocalQueue()
     
     ## Initialize task pool with the dispatch
     with my_disp:
         my_disp.initialize_new_job_pool(job_pool)
     
+    # Create taxi(s) to run the job
+    taxi_list = []
+    for i in range(2):
+        taxi_list.append(taxi.Taxi(
+            time_limit=10*60,
+            cores=32,
+            nodes=1
+        ))
+            
     ## Register taxis and launch!
     with my_pool:
         for my_taxi in taxi_list:
@@ -121,3 +125,4 @@ if __name__ == '__main__':
     
         my_pool.spawn_idle_taxis(my_queue, my_disp)
     
+

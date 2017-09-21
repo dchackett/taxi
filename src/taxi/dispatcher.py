@@ -626,13 +626,11 @@ class SQLiteDispatcher(Dispatcher):
             print query_args
             raise
 
-        return
 
     def register_taxi(self, my_taxi, my_pool):
         my_taxi.dispatch_path = self.db_path
         my_pool.update_taxi_dispatch(my_taxi, self.db_path)
 
-        return
 
     def get_task_blob(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks pertinent to this taxi (or to all taxis.)"""
