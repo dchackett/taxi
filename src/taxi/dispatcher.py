@@ -281,22 +281,22 @@ class Dispatcher(object):
                 
 
     ## Initialization
-    def _find_trees(self, job_pool):
+    def find_branches(self, job_pool):
         ## Scaffolding
         self._invert_dependency_graph(job_pool)
                 
         ## Break apart jobs into separate trees
         # First, find all roots
-        self.trees = []
+        trees = []
         for job in job_pool:
             if job.depends_on is None or len(job.depends_on) == 0:
-                self.trees.append([job])
+                trees.append([job])
 
         ## Build out from roots
         # TODO:
         # - If dependent has different number of nodes, make it a new tree
         # - If job is a trunk job and two dependents are trunk jobs, make one of them a new tree
-        for tree in self.trees:
+        for tree in trees:
             for tree_job in tree:
                 if not tree_job.trunk:
                     continue
@@ -306,10 +306,12 @@ class Dispatcher(object):
                     if d.trunk:
                         n_trunks_found += 1
                         if n_trunks_found > 1:
-                            self.trees.append([d]) # Break branch off in to a new tree
+                            trees.append([d]) # Break branch off in to a new tree
                             continue
                     # Normal behavior: build on current tree
                     tree.append(d)
+        
+        return trees
                 
     def _find_lowest_job_priority(self, job_pool):
         lowest_priority = 0
@@ -411,7 +413,7 @@ class Dispatcher(object):
         self._store_imports()
             
         ## Build dispatch
-        self._find_trees(job_pool)
+        self.tress = self.find_branches(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
         self._assign_task_ids(job_pool)
         self._populate_task_table(job_pool)
