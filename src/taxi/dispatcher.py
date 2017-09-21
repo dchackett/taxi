@@ -227,6 +227,9 @@ class Dispatcher(object):
         # There's nothing we can do with errored E or held H taxis
         taxi_list = [t for t in taxi_list if t.status in ['Q', 'R', 'I']] # Only want queued, running, or idle taxis
         
+        # We only care taxis running on this dispatch
+        taxi_list = [t for t in taxi_list if taxi.expand_path(t.dispatch_path) == taxi.expand_path(self.db_path)]
+        
         # Convenient dictionary like {(name of taxi) : (taxi object)}
         taxi_dict = {}
         for my_taxi in taxi_list:
