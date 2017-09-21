@@ -418,42 +418,55 @@ class Dispatcher(object):
 
 
     ## Cascading rollback
-    def rollback(self, task, delete_files=False, rollback_dir=None):
-        """Rolls back a task and any tasks that depend on it, and any tasks that depend on those, etc.
+    def rollback(self, tasks, delete_files=False, rollback_dir=None):
+        """Rolls back a task (or tasks) and any tasks that depend on it, and any tasks that depend on those, etc.
         """
+        
+        if not hasattr(tasks, '__iter__'): # Passed a single task, presumably
+            tasks = [tasks]
+        
         assert not (rollback_dir is None and delete_files == False),\
             "Must either provide a rollback_dir to copy files to or give permission to delete_files"
-        assert task.status != 'active', "Can't rollback an active task. Kill it first."
-
+        
         task_blob = self.get_task_blob(include_complete=True)
         
-        # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
-        # TODO: Use task equality instead of ids?
-        assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
-        task = task_blob[task.id]
+        affected_tasks = []
         
-        # Find rollbackable (non-active, non-pending) tasks (also dict->list)
-        task_blob = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
-        
-        # Find dependents
-        self._invert_dependency_graph(task_blob)
-        
-        # Could do this with recursion instead, but recursion is slow in Python
-        rollback_tasks = [task]
-        while len(rollback_tasks) > 0:
-            # Pop task to roll back off front of list
-            rt = rollback_tasks[0]
-            rollback_tasks = rollback_tasks[1:]
+        for task in tasks:
+            if task.status != 'active':
+                "Can't rollback active task w/ id={0} task. Kill it first.".format(task.id)
+                continue
+    
+            # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
+            # TODO: Use task equality instead of ids?
+            assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
+            task = task_blob[task.id]
             
-            # Must roll back everything downstream, add to list
-            for d in rt._dependents:
-                if d not in task_blob:
-                    continue # Not rollbackable
-                rollback_tasks.append(d)
+            # Find rollbackable (non-active, non-pending) tasks (also dict->list)
+            task_blob = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
+            
+            # Find dependents
+            self._invert_dependency_graph(task_blob)
+            
+            # Could do this with recursion instead, but recursion is slow in Python
+            rollback_tasks = [task]
+            while len(rollback_tasks) > 0:
+                # Pop task to roll back off front of list
+                rt = rollback_tasks[0]
+                rollback_tasks = rollback_tasks[1:]
+                affected_tasks.append(rt)
                 
-            # Perform rollback
-            rt.rollback(delete_files=delete_files, rollback_dir=rollback_dir)
+                # Must roll back everything downstream, add to list
+                for d in rt._dependents:
+                    if d not in task_blob:
+                        continue # Not rollbackable
+                    rollback_tasks.append(d)
+                    
+                # Perform rollback
+                rt.rollback(delete_files=delete_files, rollback_dir=rollback_dir)
             
+        # Update DB
+        self.add_tasks(affected_tasks)
             
     
 
