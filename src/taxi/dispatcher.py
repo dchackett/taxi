@@ -134,7 +134,7 @@ class Dispatcher(object):
         return task
         
 
-    def add_tasks(self, tasks):
+    def write_tasks(self, tasks):
         raise NotImplementedError
 
 
@@ -152,7 +152,7 @@ class Dispatcher(object):
         # Write local (completed) version of the task to the dispatch DB
         # ...unless we don't have an id for it, in which case it's not in the DB or we can't find it
         if getattr(task, 'id', None) is not None:
-            self.add_tasks([task])
+            self.write_tasks([task])
         
         
     def _trunk_number(self, task_blob, for_taxi=None):
@@ -389,7 +389,7 @@ class Dispatcher(object):
             
 
     def _populate_task_table(self, task_pool):
-        self.add_tasks(task_pool)
+        self.write_tasks(task_pool)
 
 
     def _get_max_task_id(self):
@@ -472,7 +472,7 @@ class Dispatcher(object):
                 rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
             
         # Update DB
-        self.add_tasks(affected_tasks)
+        self.write_tasks(affected_tasks)
             
     
 
@@ -497,6 +497,8 @@ class SQLiteDispatcher(Dispatcher):
     def __init__(self, db_path):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
+        
+        self._in_context = False
     
 
     def _create_new_dispatch(self):
@@ -516,6 +518,11 @@ class SQLiteDispatcher(Dispatcher):
 
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
     def __enter__(self):
+        # Don't allow layered entry
+        if self._in_context:
+            return
+        self._in_context = True
+        
         dispatch_db_exists = os.path.exists(self.db_path)
             
         self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
@@ -536,6 +543,7 @@ class SQLiteDispatcher(Dispatcher):
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
         self.conn.close()
+        self._in_context = False
 
 
     def write_table_structure(self):
@@ -570,6 +578,12 @@ class SQLiteDispatcher(Dispatcher):
         return
 
     def execute_select(self, query, *query_args):
+        # If we're not in context when this is called, get in context
+        if not self._in_context:
+            with self:
+                self.execute_select(query, *query_args)
+            return
+        
         try:
             with self.conn:
                 res = self.conn.execute(query, query_args).fetchall()
@@ -579,6 +593,12 @@ class SQLiteDispatcher(Dispatcher):
         return res
 
     def execute_update(self, query, *query_args):
+        # If we're not in context when this is called, get in context
+        if not self._in_context:
+            with self:
+                self.execute_update(query, *query_args)
+            return
+        
         # Semi-intelligent behavior for whether to execute or executemany
         # If query_args is nothing but tuples (from unpacking [(1,...), (2,...), ...]), then many
         # Otherwise, execute one
@@ -714,7 +734,7 @@ class SQLiteDispatcher(Dispatcher):
         task.by_taxi = my_taxi.name
 
 
-    def add_tasks(self, tasks):
+    def write_tasks(self, tasks):
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
