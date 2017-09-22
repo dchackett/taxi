@@ -4,7 +4,7 @@ import os
 import shutil
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list
+from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list, ensure_path_exists
 
 from copy import copy, deepcopy
 
@@ -270,6 +270,10 @@ class Copy(Runner):
 
     def build_input_string(self):
         return "{0} {1}".format(self.src, self.dest)
+    
+    def execute(self, *args, **kwargs):
+        ensure_path_exists(os.path.dirname(self.dest))
+        super(Copy, self).execute(*args, **kwargs)
     
     def rollback(self, rollback_dir=None, delete_files=False):
         self.output_files.append(self.dest)
