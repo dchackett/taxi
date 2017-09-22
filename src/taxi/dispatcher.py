@@ -769,12 +769,12 @@ class SQLiteDispatcher(Dispatcher):
         
     def _get_max_task_id(self):
         task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""
-        max_id_query = self.execute_select(task_id_query)
+        max_id_query = map(dict, self.execute_select(task_id_query))
 
         if len(max_id_query) == 0:
             return 0
         else:
-            return max_id_query[0]
+            return max_id_query[0]['id']
         
         
     def _store_imports(self):
