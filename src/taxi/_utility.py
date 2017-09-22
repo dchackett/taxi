@@ -17,7 +17,7 @@ def sanitized_path(path):
 def expand_path(path):
     if path is None:
         return None
-    return os.path.abspath(os.path.expanduser(sanitized_path(os.path.expandvars(path))))
+    return os.path.realpath(os.path.abspath(sanitized_path(os.path.expanduser(os.path.expandvars(path)))))
 
 def flush_output():
     sys.stdout.flush()
