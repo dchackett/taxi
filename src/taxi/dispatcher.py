@@ -416,7 +416,7 @@ class Dispatcher(object):
         self._store_imports()
             
         ## Build dispatch
-        self.tress = self.find_branches(job_pool)
+        self.trees = self.find_branches(job_pool)
         self._assign_priorities(job_pool, priority_method=priority_method)
         self._assign_task_ids(job_pool)
         self._populate_task_table(job_pool)
