@@ -121,7 +121,7 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
         if not isinstance(task, taxi.mcmc.MCMC):
             continue
         
-        subpath = "{b}/{k4}_{k6}/".format(b=task.beta, k4=task.k4, k6=task.k6)
+        subpath = "{ns}x{nt}/{b}/{k4}_{k6}/".format(ns=task.Ns, nt=task.Nt, b=task.beta, k4=task.k4, k6=task.k6)
         if isinstance(task, taxi.mcmc.ConfigGenerator):
             if getattr(task, 'saveg', None) is not None:
                 saveg_dest = os.path.join(os.path.join(gauge_dir, subpath), os.path.basename(task.saveg))
@@ -136,7 +136,7 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
             type_subpath = ''
             if words[0] == 'hmc':
                 type_subpath = 'hmc/'
-            elif 'spec' in words[0] == 'spec':
+            elif 'spec' in words[0]:
                 if words[1] in ['f', 'F', '4']:
                     type_subpath = 'spec4'
                 elif words[1] in ['a2', 'A2', 'as2', 'AS2', '6', 'as', 'AS']:
@@ -144,7 +144,7 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
             elif 'flow' in words[0]:
                 type_subpath = 'flow'
             
-            fout_dest = os.path.join(os.path.join(os.path.join(out_dir, type_subpath), subpath), os.path.basename(task.fout))
+            fout_dest = os.path.join(os.path.join(os.path.join(out_dir, subpath), type_subpath), os.path.basename(task.fout))
             new_copy_job = Copy(src=task.fout, dest=fout_dest)
             new_copy_job.depends_on = [task]
             copy_jobs.append(new_copy_job)
