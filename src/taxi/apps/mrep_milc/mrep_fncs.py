@@ -5,7 +5,7 @@
 import os
 
 import taxi.mcmc
-
+from taxi.jobs import Copy
 
 ## File naming conventions for pure gauge theory
 class PureGaugeFnConvention(taxi.mcmc.BasicMCMCFnConvention):
@@ -111,3 +111,59 @@ class MrepSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
             'traj' : int(words[9])
         }
         
+        
+def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
+    out_dir = taxi.expand_path(out_dir)
+    gauge_dir = taxi.expand_path(gauge_dir)
+    
+    copy_jobs = []
+    for task in job_pool:
+        if not isinstance(task, taxi.mcmc.MCMC):
+            continue
+        
+        subpath = "{b}/{k4}_{k6}/".format(b=task.beta, k4=task.k4, k6=task.k6)
+        if isinstance(task, taxi.mcmc.ConfigGenerator):
+            if getattr(task, 'saveg', None) is not None:
+                saveg_dest = os.path.join(os.path.join(gauge_dir, subpath), os.path.basename(task.saveg))
+                
+                new_copy_job = Copy(src=task.saveg, dest=saveg_dest)
+                new_copy_job.depends_on = [task]
+                copy_jobs.append(new_copy_job)
+        
+        if getattr(task, 'fout', None) is not None:
+            words = os.path.basename(task.fout).split('_')
+            
+            type_subpath = ''
+            if words[0] == 'hmc':
+                type_subpath = 'hmc/'
+            elif 'spec' in words[0] == 'spec':
+                if words[1] in ['f', 'F', '4']:
+                    type_subpath = 'spec4'
+                elif words[1] in ['a2', 'A2', 'as2', 'AS2', '6', 'as', 'AS']:
+                    type_subpath = 'spec6'
+            elif 'flow' in words[0]:
+                type_subpath = 'flow'
+            
+            fout_dest = os.path.join(os.path.join(os.path.join(out_dir, type_subpath), subpath), os.path.basename(task.fout))
+            new_copy_job = Copy(src=task.fout, dest=fout_dest)
+            new_copy_job.depends_on = [task]
+            copy_jobs.append(new_copy_job)
+    
+    return copy_jobs
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
