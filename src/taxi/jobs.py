@@ -225,6 +225,7 @@ class Runner(Task):
             for fn in self.output_files:
                 
                 if not os.path.exists(fn):
+                    print "Rollback unable to find file: '{0}'".format(fn)
                     continue
                 
                 if rollback_dir is not None:
@@ -234,7 +235,7 @@ class Runner(Task):
                     counter = 0
                     while os.path.exists(to_path):
                         counter += 1
-                        new_fn = os.path.basename(fn) + '{0}'.format(counter)
+                        new_fn = os.path.basename(fn) + '({0})'.format(counter)
                         to_path = os.path.join(rollback_dir, new_fn)
                     
                     print "Rollback: '{0}' -> '{1}'".format(fn, to_path)

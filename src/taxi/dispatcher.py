@@ -585,6 +585,7 @@ class SQLiteDispatcher(Dispatcher):
 
         return
 
+
     def execute_select(self, query, *query_args):
         # If we're not in context when this is called, get in context
         if not self._in_context:
@@ -599,6 +600,7 @@ class SQLiteDispatcher(Dispatcher):
             raise
 
         return res
+
 
     def execute_update(self, query, *query_args):
         # If we're not in context when this is called, get in context
