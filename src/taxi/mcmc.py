@@ -114,14 +114,18 @@ class MCMC(jobs.Runner):
             # Verify output throws an error and blocks rest of function if output isn't correct
             print "WARNING: Pre-existing well-formatted output (according to verify_output()) detected; skipping running"
             return # Never clobber
-            
-        super(MCMC, self).execute(cores=cores)
         
         # Keep track of absolute paths of output files created, for rollbacking
         # For user-friendliness, only have to provide a list of attributes that may contain output filenames
+        # Track these before execution. If output fails, want to have a list of output files that may have been created.
         for ofa in self.output_file_attributes:
-            if getattr(self, ofa, None) is not None and os.path.exists(getattr(self, ofa)):
+            if getattr(self, ofa, None) is not None:
                 self.output_files.append(expand_path(getattr(self, ofa)))
+            
+        super(MCMC, self).execute(cores=cores)
+        
+        # Only keep track of files that were actually created (unless verify_output kills us in execute, and the line below is never run)
+        self.output_files = [ofn for ofn in self.output_files if os.path.exists(ofn)]
         
     
     
