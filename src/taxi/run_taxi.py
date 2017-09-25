@@ -110,7 +110,7 @@ if __name__ == '__main__':
                 
             
             ### Execute task
-            print "EXECUTING TASK ", task
+            print "EXECUTING TASK ({0})".format(getattr(task, 'id', None)), task
             task.start_time = time.time()
             flush_output()
             
