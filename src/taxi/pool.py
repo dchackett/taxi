@@ -4,6 +4,7 @@
 
 import taxi
 import time
+import os
 
 import traceback
 
@@ -183,7 +184,7 @@ class SQLitePool(Pool):
     Concrete implementation of the Pool class using an SQLite backend.
     """
     
-    def __init__(self, db_path, pool_name,
+    def __init__(self, db_path, pool_name=None,
                  work_dir=None, log_dir=None,
                  allocation=None, thrash_delay=300):
         """
@@ -196,7 +197,14 @@ class SQLitePool(Pool):
              thrash_delay=thrash_delay, allocation=allocation)
 
         self.db_path = taxi.expand_path(db_path)
-        self.pool_name = pool_name
+            
+        if not os.path.exists(self.db_path) and pool_name is None:
+            # Case: Making a new pool but pool_name not provided.  Set to default.
+            self.pool_name = 'default'
+        else:
+            # Case: Accessing existing pool. If pool name is not provided, and
+            # only one pool in DB, use that one.  If pool name is provided, find that one.
+            self.pool_name = pool_name
 
         self.conn = None
         
@@ -235,18 +243,32 @@ class SQLitePool(Pool):
         self.write_table_structure()
 
         # Make sure pool details are written
-        pool_query = """SELECT * FROM pools WHERE name = ?"""
-        this_pool_row = self.execute_select(pool_query, self.pool_name)
+        if self.pool_name is not None:      
+            # Case: Pool name provided
+            pool_query = """SELECT * FROM pools WHERE name = ?"""
+            this_pool_row = self.execute_select(pool_query, self.pool_name)
+        else:
+            # Case: pool name not provided for existing pool; use first pool found, if only one in DB
+            pool_query = """SELECT * FROM pools"""
+            this_pool_row = self.execute_select(pool_query)
+            if len(this_pool_row) != 1:
+                raise Exception("Must provide pool_name if there are more than one pools in pool DB.  Found {0} != 1.".format(len(this_pool_row)))
+            
 
         if len(this_pool_row) == 0:
+            # Case: Pool name provided, but doesn't exist in pools table
             # Did not find this pool in the pool DB; add it
+            assert self.work_dir is not None, "Must provide work_dir to make new pool in pool DB"
+            assert self.log_dir is not None, "Must provide log_dir to make new pool in pool DB"
+            
             pool_write_query = """INSERT OR REPLACE INTO pools
                 (name, working_dir, log_dir, allocation)
                 VALUES (?, ?, ?, ?)"""
             self.execute_update(pool_write_query, self.pool_name, self.work_dir,
                                 self.log_dir, self.allocation)
         else:
-            # Found this pool in the pool DB; retrieve info about it from DB
+            # Case: Pool name provided, found this pool in the pool DB:
+            # retrieve info about it from DB
             if self.work_dir is None: # Allow overrides
                 self.work_dir = this_pool_row[0]['working_dir']
             if self.log_dir is None: # Allow overrides
