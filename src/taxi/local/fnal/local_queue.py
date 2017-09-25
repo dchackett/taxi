@@ -15,6 +15,21 @@ def _total_seconds(td):
     """
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6
 
+def _pbs_status_from_qstat_block(block):
+    pbs_status = re.findall("job_state = (\S+)\n", block)
+    assert len(pbs_status) == 1, "Found too many PBS job_states = [{0}] in block: {1}".format(pbs_status, block)
+    return pbs_status[0]
+    
+def _taxi_status_from_qstat_block(block):
+    pbs_status = _pbs_status_from_qstat_block(block)
+    
+    status_map_pbs_to_taxi = {'Q':'Q', 'R':'R', 'E':'R', 'H':'Q', 'T':'R', 'W':'Q', 'S':'Q'}
+    assert pbs_status in status_map_pbs_to_taxi.keys(), "Don't know how to interpret PBS status {ps}".format(ps=pbs_status)
+    taxi_status = status_map_pbs_to_taxi[pbs_status]
+    
+    return taxi_status
+
+
 class LocalQueue(BatchQueue):
 
     def report_taxi_status_by_name(self, taxi_name):
@@ -42,21 +57,32 @@ class LocalQueue(BatchQueue):
                     'job_number' : None,
                     'running_time' : None
                 }
+            elif len(blocks) == 1:
+                block = blocks[0]
             elif len(blocks) > 1:
-                print blocks
-                raise Exception("Multiple taxis with name {tn} found in queue!".format(tn=taxi_name))
-            block = blocks[0]
+                # Multiple taxis with this name in the block
+                # This can be okay, if the taxi has just respawned -- must have one running, and one queued.
+                taxi_statuses = [_taxi_status_from_qstat_block(block) for block in blocks]
+                if len([ts for ts in taxi_statuses if ts == 'R']) > 1:
+                    for b in blocks: print b
+                    raise Exception("Multiple running taxis with name {tn} found in queue!".format(tn=taxi_name))
+                if len([ts for ts in taxi_statuses if ts == 'Q']) == 0:
+                    for b in blocks: print b
+                    raise Exception("Multiple taxis with name {tn}, none queued?  Statuses: {ts}".format(tn=taxi_name, ts=taxi_statuses))
+                if len([ts for ts in taxi_statuses if ts == 'Q']) > 1:
+                    for b in blocks: print b
+                    raise Exception("Multiple queued taxis with name {tn} found in queue!".format(tn=taxi_name))
+
+                # Find the single queued taxi; this is the 'active' taxi now                    
+                idx = [tt for (tt, ts) in enumerate(taxi_statuses) if ts == 'Q'][0]
+                block = blocks[idx]
+            
             
             # Get job ID
             taxi_job_number = re.findall("Job Id: (\S+)\n", block)
 
             # Get status
-            pbs_status = re.findall("job_state = (\S+)\n", block)
-            assert len(pbs_status) == 1, "Found too many PBS job_states = [{0}] in block: {1}".format(pbs_status, block)
-            pbs_status = pbs_status[0]
-            status_map_pbs_to_taxi = {'Q':'Q', 'R':'R', 'E':'R', 'H':'Q', 'T':'R', 'W':'Q', 'S':'Q'}
-            assert pbs_status in status_map_pbs_to_taxi.keys(), "Don't know how to interpret PBS status {ps}".format(ps=pbs_status)
-            taxi_status = status_map_pbs_to_taxi[pbs_status]
+            taxi_status = _taxi_status_from_qstat_block(block)
             
             # Get running time
             walltime = re.findall("Resource_List.walltime = (\S+)\n", block)
