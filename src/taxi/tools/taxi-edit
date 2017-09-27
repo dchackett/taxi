@@ -1,11 +1,11 @@
-#!/usr/bin/env python2
+#!/bin/bash
 
+python -i -c """
 import taxi
 import taxi.tools as tools
 import taxi.mcmc
-import sys
 
-d = tools.load.dispatch(sys.argv[1])
+d = tools.load.dispatch($1)
 q = taxi.local.local_queue.LocalQueue()
 
 tb = d.get_task_blob(d)
@@ -17,3 +17,4 @@ cgtrees = d.find_branches(tbcg)
 trees = d.find_branches(tb.values())
 
 tools.summary(d)
+"""
