@@ -14,8 +14,11 @@
 #PBS -v LD_LIBRARY_PATH,PV_NCPUS,PV_LOGIN,PV_LOGIN_PORT
 #PBS -q bc
 
-# HACKED-IN: Load up virtualenv
-source $TAXI_PYENV/bin/activate
+# Load specified virtualenv, if provided
+if [[ ! -z "${TAXI_PYENV// }" ]]; then
+ source $TAXI_PYENV/bin/activate
+fi
+
 
 # TODO: Below block currently unused
 # From USQCD batch submission example (and auto-pbs):
