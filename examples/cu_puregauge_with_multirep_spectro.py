@@ -96,9 +96,6 @@ if __name__ == '__main__':
     ## Setup dispatcher
     my_disp = taxi.dispatcher.SQLiteDispatcher(db_path=dispatch_db_path)
     
-    ## Connect with queue to launch taxis
-    my_queue = local_queue.LocalQueue()
-    
     ## Initialize task pool with the dispatch
     with my_disp:
         my_disp.initialize_new_job_pool(job_pool)
@@ -118,5 +115,5 @@ if __name__ == '__main__':
             my_pool.register_taxi(my_taxi)
             my_disp.register_taxi(my_taxi, my_pool)
     
-        my_pool.spawn_idle_taxis(my_queue, my_disp)
+        my_pool.spawn_idle_taxis(dispatcher=my_disp)
     

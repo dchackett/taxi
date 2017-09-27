@@ -78,8 +78,11 @@ class Pool(object):
             return time_since_last_submit < self.thrash_delay
 
 
-    def submit_taxi_to_queue(self, my_taxi, queue, **kwargs):
+    def submit_taxi_to_queue(self, my_taxi, queue=None, **kwargs):
         print "LAUNCHING TAXI {0}".format(my_taxi)
+        
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
         
         # Don't submit hold/error status taxis
         pool_taxi = self.get_taxi(my_taxi)
@@ -104,10 +107,12 @@ class Pool(object):
         self.update_taxi_last_submitted(my_taxi, time.time())
 
 
-    def remove_taxi_from_queue(self, my_taxi, queue):
+    def remove_taxi_from_queue(self, my_taxi, queue=None):
+        """Remove all jobs from the queue associated with the given taxi.
         """
-        Remove all jobs from the queue associated with the given taxi.
-        """
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
+            
         taxi_status = queue.report_taxi_status(my_taxi)
 
         for job in taxi_status['job_numbers']:
@@ -118,13 +123,19 @@ class Pool(object):
 
     ### Control logic ###
 
-    def update_all_taxis_queue_status(self, queue, dispatcher=None):
+    def update_all_taxis_queue_status(self, queue=None, dispatcher=None):
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
+            
         taxi_list = self.get_all_taxis_in_pool()
         for my_taxi in taxi_list:
-            self.update_taxi_queue_status(my_taxi, queue, dispatcher=dispatcher)
+            self.update_taxi_queue_status(my_taxi, queue=queue, dispatcher=dispatcher)
 
 
-    def update_taxi_queue_status(self, my_taxi, queue, dispatcher=None):
+    def update_taxi_queue_status(self, my_taxi, queue=None, dispatcher=None):
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
+            
         queue_status = queue.report_taxi_status(my_taxi)['status']
         pool_status = self.get_taxi(my_taxi).status
 
@@ -162,8 +173,11 @@ class Pool(object):
             raise BaseException
 
 
-    def spawn_idle_taxis(self, queue, dispatcher):
-        self.update_all_taxis_queue_status(queue)
+    def spawn_idle_taxis(self, dispatcher, queue=None):
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
+            
+        self.update_all_taxis_queue_status(queue=queue)
         
         taxi_list = self.get_all_taxis_in_pool()
         
@@ -186,7 +200,7 @@ class Pool(object):
             # Launch taxi if dispatcher says it should be running            
             if should_be_running[str(my_taxi)]:
                 if my_taxi.status == 'I':
-                    self.submit_taxi_to_queue(my_taxi, queue)
+                    self.submit_taxi_to_queue(my_taxi, queue=queue)
                 elif my_taxi.status not in ['Q', 'R']:
                     raise NotImplementedError("Dispatcher wants taxi {0} running, but its status is {1}, not 'I'"\
                                               .format(my_taxi, my_taxi.status))
