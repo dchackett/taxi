@@ -65,10 +65,14 @@ def summary(dispatch):
 
     # Print diagnostics
     if len(active_tasks) > 0:
-        print "ACTIVE TASKS:", "  ".join(["{0} ({1})".format(t.id, t.by_taxi) for t in active_tasks])
+        print "ACTIVE TASKS:"
+        for t in [" {0} ({1}) {2}".format(t.id, t.by_taxi, t) for t in active_tasks]: print t
     if len(abandoned_tasks) > 0:
-        print "ABANDONED TASKS:", "  ".join(["{0} ({1})".format(t.id, t.by_taxi) for t in abandoned_tasks])
+        print "ABANDONED TASKS:"
+        for t in [" {0} ({1}) {2}".format(t.id, t.by_taxi, t) for t in abandoned_tasks]: print t
     if len(failed_tasks) > 0:
-        print "FAILED TASKS:", "  ".join(["{0} ({1})".format(t.id, t.by_taxi) for t in failed_tasks])
+        print "FAILED TASKS:"
+        for t in ["{0} ({1}) {2}".format(t.id, t.by_taxi, t) for t in failed_tasks]: print t
     if len(blocked_tasks) > 0:
-        print "BLOCKED TASKS:", "  ".join(["{0} ({1})".format(t.id, ",".join([dep.id for dep in t.depends_on if dep in abandoned_tasks+failed_tasks])) for t in blocked_tasks])
+        print "BLOCKED TASKS:"
+        for t in [" {0} ({1}) {2}".format(t.id, ",".join([dep.id for dep in t.depends_on if dep in abandoned_tasks+failed_tasks]), t) for t in blocked_tasks]: print t
