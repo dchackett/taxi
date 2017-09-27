@@ -7,6 +7,8 @@ import load
 from taxi.dispatcher import Dispatcher
 from taxi.local.local_queue import LocalQueue
 
+import _utility
+
 def summary(dispatch):
     """
     """
@@ -28,18 +30,10 @@ def summary(dispatch):
     pending_tasks   = []
     ready_tasks     = []
     blocked_tasks   = []
-    active_tasks    = []
-    abandoned_tasks = []
     failed_tasks    = []
     completed_tasks = []
     
-    # Find abandoned tasks
-    for task in [t for t in tasks.values() if t.status == 'active']:
-        running_taxi_status = q.report_taxi_status_by_name(task.by_taxi)
-        if running_taxi_status != 'R':
-            abandoned_tasks.append(task)
-        else:
-            active_tasks.append(task)
+    active_tasks, abandoned_tasks = _utility.classify_abandoned_tasks(tasks=tasks, queue=q)
     
     # Classify remaining tasks
     for task_id, task in tasks.items():
