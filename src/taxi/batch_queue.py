@@ -22,6 +22,11 @@ class BatchQueue(object):
             * 'status': code indicating current queue status, enumerated in queue_status_codes
             * 'job_number': list of job numbers associated with this taxi
             * 'running_time': if running, amount of time currently elapsed
+        
+        Valid statuses to return:
+            Q: Taxi is on the queue, waiting to run
+            R: Taxi is running currently
+            X: Taxi is not present on the queue, or is in some sort of error state.
         """
 
         raise NotImplementedError

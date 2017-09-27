@@ -16,6 +16,7 @@ class Pool(object):
         'I',    # idle
         'H',    # on hold
         'E',    # error in queue submission
+        'M',    # Missing: taxi died unexpectedly
     ]
 
     def __init__(self, work_dir, log_dir, thrash_delay=300, allocation=None):
@@ -127,18 +128,24 @@ class Pool(object):
         queue_status = queue.report_taxi_status(my_taxi)['status']
         pool_status = self.get_taxi(my_taxi).status
 
-        if queue_status in ('Q', 'R'):
-            if pool_status in ('E', 'H'):
-                # Hold and error status must be changed explicitly
+        if queue_status in ('Q', 'R'): # Taxi is present on queue
+            if pool_status in ('E', 'H', 'M'):
+                # Hold and error statuses must be changed explicitly
                 return
             else:
                 self.update_taxi_status(my_taxi, queue_status)
                 return
-        elif queue_status == 'X':
-            if pool_status in ('E', 'H'):
+        elif queue_status == 'X': # Taxi is not present on queue
+            if pool_status in ('E', 'H', 'M'):
+                # Taxi shouldn't be on queue: all is well
                 return
+            elif pool_status in ('Q', 'R'):
+                # Taxi should be on queue, but is MIA
+                # NOTE: Implicitly, this means that a currently-running taxi is only allowed to respawn itself
+                # i.e., no other taxis are allowed to resubmit a currently-running taxi.
+                self.update_taxi_status(my_taxi, 'M')
             else:
-                self.update_taxi_status(my_taxi, 'I')
+                # Taxi is marked (I)dle, and not present on queue: all is well
                 return
         else:
             print "Invalid queue status code - '{0}'".format(queue_status)
