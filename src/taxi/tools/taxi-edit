@@ -1,3 +1,14 @@
 #!/bin/bash
 
-python -i -c "import taxi.tools._load_editing_environment; taxi.tools._load_editing_environment._load_to_global_scope('$1')"
+python -i -c """
+import taxi.tools as tools
+d = tools.load.dispatch(dispatch_db_path)
+tb = d.get_task_blob(d)
+tbf = [t for t in tb.values() if t.status == 'failed']
+tba = [t for t in tb.values() if t.status == 'active']
+tbcg = [t for t in tb.values() if isinstance(t, taxi.mcmc.ConfigGenerator)]
+cgtrees = d.find_branches(tbcg)
+trees = d.find_branches(tb.values())
+
+tools.summary(d)
+"""
