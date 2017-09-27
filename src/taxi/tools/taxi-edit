@@ -5,16 +5,21 @@ import taxi
 import taxi.tools as tools
 import taxi.mcmc
 
-d = tools.load.dispatch('$1')
+command_line_args = '$*'.split()
+d,p = tools.load.dispatch_and_pool(*command_line_args)
 q = taxi.local.local_queue.LocalQueue()
 
-tb = d.get_task_blob(d)
-tbf = [t for t in tb.values() if t.status == 'failed']
-tba = [t for t in tb.values() if t.status == 'active']
-tbcg = [t for t in tb.values() if isinstance(t, taxi.mcmc.ConfigGenerator)]
+if d is not None:
+    tb = d.get_task_blob(d)
+    tbf = [t for t in tb.values() if t.status == 'failed']
+    tba = [t for t in tb.values() if t.status == 'active']
+    tbcg = [t for t in tb.values() if isinstance(t, taxi.mcmc.ConfigGenerator)]
 
-cgtrees = d.find_branches(tbcg)
-trees = d.find_branches(tb.values())
+    cgtrees = d.find_branches(tbcg)
+    trees = d.find_branches(tb.values())
 
-tools.summary(d)
+    tools.summary(d)
+    
+if p is not None:
+    tl = p.get_all_taxis_in_pool()
 """
