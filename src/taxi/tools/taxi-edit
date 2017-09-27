@@ -5,7 +5,7 @@ import taxi
 import taxi.tools as tools
 import taxi.mcmc
 
-d = tools.load.dispatch($1)
+d = tools.load.dispatch('$1')
 q = taxi.local.local_queue.LocalQueue()
 
 tb = d.get_task_blob(d)
