@@ -5,7 +5,7 @@ _start_time = time.time() # Get this ASAP for accurate accounting
 import os
 import sys
 import argparse
-import imp # For dynamical imports
+import datetime
 
 import taxi
 import taxi.dispatcher
@@ -15,6 +15,7 @@ import taxi.jobs
 import taxi.local.local_queue as local_queue
 
 from taxi import flush_output, work_in_dir, print_traceback
+
 
 if __name__ == '__main__':
     
@@ -68,10 +69,13 @@ if __name__ == '__main__':
 
     ## Record starting time
     taxi_obj.start_time = _start_time
+    print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
     
+    
+    ## Diagnostic outputs: where are we running?
     print "Running on", taxi_obj.cores, "cores"
     print "Working dir:", my_pool.work_dir
-
+    
     ## Control variables
     keep_running = True
     tasks_run = 0
@@ -110,8 +114,13 @@ if __name__ == '__main__':
                 
             
             ### Execute task
-            print "EXECUTING TASK ({0})".format(getattr(task, 'id', None)), task
+            print "EXECUTING TASK {0}".format(getattr(task, 'id', None))
+            print task
+            
+            ## Timing
             task.start_time = time.time()
+            print "Time remaining:", taxi_obj.time_limit - (task.start_time - taxi_obj.start_time)
+            
             flush_output()
             
             ## Special behavior -- Die/Sleep
