@@ -91,7 +91,7 @@ if __name__ == '__main__':
             
             ### Maintain taxi pool
             with my_pool:
-                my_pool.update_all_taxis_queue_status(my_queue)
+                my_pool.update_all_taxis_queue_status(queue=my_queue, dispatcher=my_dispatch)
                 my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
         
         

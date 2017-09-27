@@ -118,13 +118,13 @@ class Pool(object):
 
     ### Control logic ###
 
-    def update_all_taxis_queue_status(self, queue):
+    def update_all_taxis_queue_status(self, queue, dispatcher=None):
         taxi_list = self.get_all_taxis_in_pool()
         for my_taxi in taxi_list:
-            self.update_taxi_queue_status(my_taxi, queue)
+            self.update_taxi_queue_status(my_taxi, queue, dispatcher=dispatcher)
 
 
-    def update_taxi_queue_status(self, my_taxi, queue):
+    def update_taxi_queue_status(self, my_taxi, queue, dispatcher=None):
         queue_status = queue.report_taxi_status(my_taxi)['status']
         pool_status = self.get_taxi(my_taxi).status
 
@@ -143,8 +143,17 @@ class Pool(object):
                 # Taxi should be on queue, but is MIA
                 # NOTE: Implicitly, this means that a currently-running taxi is only allowed to respawn itself
                 # i.e., no other taxis are allowed to resubmit a currently-running taxi.
+                
+                # Mark the taxi as missing
                 print "WARNING: Taxi {tn} is missing in action".format(tn=my_taxi)
                 self.update_taxi_status(my_taxi, 'M')
+                
+                # If a taxi is missing, it's probably abandoned a task
+                # If provided a dispatcher to talk to, mark that task failed to avoid hanging actives
+                if dispatcher is not None:
+                    dispatcher.mark_abandoned_task(my_taxi)
+                    
+                return
             else:
                 # Taxi is marked (I)dle, and not present on queue: all is well
                 return
