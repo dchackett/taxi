@@ -1,6 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env python2
 
-python -i -c """
 import taxi
 import taxi.tools as tools
 import taxi.mcmc
@@ -17,4 +16,3 @@ cgtrees = d.find_branches(tbcg)
 trees = d.find_branches(tb.values())
 
 tools.summary(d)
-"""
