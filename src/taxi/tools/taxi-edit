@@ -3,8 +3,9 @@
 import taxi
 import taxi.tools as tools
 import taxi.mcmc
+import sys
 
-d = tools.load.dispatch('$1')
+d = tools.load.dispatch(sys.argv[1])
 q = taxi.local.local_queue.LocalQueue()
 
 tb = d.get_task_blob(d)
