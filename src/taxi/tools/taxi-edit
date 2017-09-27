@@ -1,12 +1,18 @@
 #!/bin/bash
 
 python -i -c """
+import taxi
 import taxi.tools as tools
-d = tools.load.dispatch(dispatch_db_path)
+import taxi.mcmc
+
+d = tools.load.dispatch('$1')
+q = taxi.local.local_queue.LocalQueue()
+
 tb = d.get_task_blob(d)
 tbf = [t for t in tb.values() if t.status == 'failed']
 tba = [t for t in tb.values() if t.status == 'active']
 tbcg = [t for t in tb.values() if isinstance(t, taxi.mcmc.ConfigGenerator)]
+
 cgtrees = d.find_branches(tbcg)
 trees = d.find_branches(tb.values())
 
