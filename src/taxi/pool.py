@@ -143,6 +143,7 @@ class Pool(object):
                 # Taxi should be on queue, but is MIA
                 # NOTE: Implicitly, this means that a currently-running taxi is only allowed to respawn itself
                 # i.e., no other taxis are allowed to resubmit a currently-running taxi.
+                print "WARNING: Taxi {tn} is missing in action".format(tn=my_taxi)
                 self.update_taxi_status(my_taxi, 'M')
             else:
                 # Taxi is marked (I)dle, and not present on queue: all is well
