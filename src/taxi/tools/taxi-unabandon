@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python -i -c """
+python -c """
 import taxi
 import taxi.tools as tools
 import taxi.mcmc
