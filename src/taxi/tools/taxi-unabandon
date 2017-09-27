@@ -1,0 +1,14 @@
+#!/bin/bash
+
+python -i -c """
+import taxi
+import taxi.tools as tools
+import taxi.mcmc
+
+command_line_args = '$*'.split()
+d,p = tools.load.dispatch_and_pool(*command_line_args)
+
+taxi.tools.unabandon(dispatch=d, pool=p, delete_files=True)
+"""
+
+

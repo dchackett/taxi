@@ -158,7 +158,7 @@ class Dispatcher(object):
     def mark_abandoned_task(self, by_taxi):
         """Method for when a Taxi has died unexpectedly.  When this occurs, it often means
         a task is left marked 'active', but has in fact failed(/been abandoned).  This method marks that task
-        failed.
+        abandoned.
         """
         
         by_taxi = str(by_taxi)
@@ -168,8 +168,8 @@ class Dispatcher(object):
         abandoned_tasks = []
         for task_id, task in tasks.items():
             if task.status == 'active' and task.by_taxi == by_taxi:
-                task.status == 'failed'
-                print "WARNING: Task {tid} was abandoned by taxi {tn}, marking task as failed.".format(tid=task_id, tn=by_taxi)
+                task.status = 'abandoned'
+                print "WARNING: Task {tid} was abandoned by taxi {tn}.".format(tid=task_id, tn=by_taxi)
                 abandoned_tasks.append(task)
         
         # NOTE: At present, a taxi shouldn't be able to run multiple tasks at once
