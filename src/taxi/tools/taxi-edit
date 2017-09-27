@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python -i -c "import taxi.tools._load_editing_environment; taxi.tools._load_editing_environment._load_to_global_scope('$1')"
