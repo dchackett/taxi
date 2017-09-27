@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python -c "import taxi.tools; taxi.tools.summary('$1')"
