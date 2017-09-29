@@ -19,6 +19,8 @@ def unabandon(dispatch, pool, rollback_dir=None, delete_files=False):
     relevant_taxis = []
     for task in abandoned_tasks:
         print "UNABANDONING", task.id, task
+        task.status = 'abandoned'
+        dispatch.write_tasks([task])
         dispatch.rollback(task, rollback_dir=rollback_dir, delete_files=delete_files)
         q.update_taxi_status(my_taxi=task.by_taxi, status='I')
         relevant_taxis.append(task.by_taxi)
