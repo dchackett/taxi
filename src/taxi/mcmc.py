@@ -152,6 +152,8 @@ class MCMC(jobs.Runner):
     ## Modular file name conventions
     # Input: Loaded gauge file
     def parse_params_from_loadg(self, fn):
+        if self.loadg_filename_convention is None:
+            return None
         parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention)
         if parsed is None:
             raise ValueError("Specified filename convention(s) {fnc} cannot parse filename {fn}".format(fnc=self.loadg_filename_convention, fn=fn))
