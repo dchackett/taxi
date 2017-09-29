@@ -97,7 +97,9 @@ class MCMC(jobs.Runner):
         self.loadg = loadg
         
         # Steal parameters from parsed filename
-        self.__dict__.update(**self.parse_params_from_loadg(self.loadg))
+        stolen_params = self.parse_params_from_loadg(self.loadg)
+        if stolen_params is not None:
+            self.__dict__.update(**stolen_params)
             
     
     def execute(self, cores=None):

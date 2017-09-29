@@ -65,9 +65,11 @@ def parse_with_conventions(fn, conventions):
     
     Args:
         fn (str): A parsable filename.
-        conventions: Either a FileNameConvention object or a list thereof.  Technically,
-            this is duck-typed and will accept anything that has a "read" method implemented.
+        conventions: Either a FileNameConvention object or a list thereof.
     """
+    if conventions is None:
+        return None
+    
     ## One FNC or a list of FNCs?  Get in list form.
     if hasattr(conventions, '__iter__'):
         fncs = conventions
