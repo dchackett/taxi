@@ -8,6 +8,8 @@ from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_lis
 
 from copy import copy, deepcopy
 
+import hashlib # For checksum comparisons by Copy
+
 special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'is_recurring', 'req_time', 'priority']
 
 class Task(object):
@@ -251,14 +253,14 @@ class Runner(Task):
             self.output_files = []
             
 
-
-### Standard runners
 class Copy(Runner):
-    """Copy a file from src to dest using rsync"""
+    """Copy a file from src to dest. Does not overwrite anything unless told to.
+    
+    Unlike the usual runner, doesn't call a binary."""
     
     binary = "rsync -Paz"
     
-    def __init__(self, src, dest, req_time=60, **kwargs):
+    def __init__(self, src, dest, allow_overwrite=False, req_time=60, **kwargs):
         super(Copy, self).__init__(req_time=req_time, **kwargs)
         
         # Store sanitized file paths
@@ -268,13 +270,39 @@ class Copy(Runner):
         self.src = sanitized_path(src)
         self.dest = sanitized_path(dest)
         
-
-    def build_input_string(self):
-        return "{0} {1}".format(self.src, self.dest)
+        self.allow_overwrite = allow_overwrite
+        
     
     def execute(self, *args, **kwargs):
-        ensure_path_exists(os.path.dirname(self.dest))
-        super(Copy, self).execute(*args, **kwargs)
+        assert os.path.exists(self.src), "Source file '{0}' must exist".format(self.src)
+        
+        if os.path.exists(self.dest):
+            if self.allow_overwrite:
+                ## Only overwrite if file is updated.  Try to avoid hashing.
+                file_updated = False
+                if os.path.getmtime(self.src) > os.path.getmtime(self.dest):
+                    # Source was modifiedly more recently than dest
+                    file_updated = True
+                elif os.stat(self.src).st_size != os.stat(self.dest).st_size:
+                    # Sizes are not the same
+                    file_updated = True
+                else:
+                    # Do the hash. MD5 should be good enough.
+                    hash_src = hashlib.md5(open(self.src, 'rb').read()).digest()
+                    hash_dest = hashlib.md5(open(self.dest, 'rb').read()).digest()
+                    if hash_src != hash_dest:
+                        file_updated = True
+                if not file_updated:
+                    print "Skipping copy: '{0}' = '{1}'".format(self.src, self.dest)
+                    return
+                    
+            else:
+                raise Exception("Path '{0}' already exists and overwriting not allowed".format(self.dest))
+        
+        ensure_path_exists(os.path.dirname(self.dest))       
+        print "{0} -> {1}".format(self.src, self.dest)
+        shutil.copy2(self.src, self.dest)
+        
     
     def rollback(self, rollback_dir=None, delete_files=False):
         self.output_files.append(self.dest)
