@@ -120,11 +120,11 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
     for task in job_pool:
         if not isinstance(task, taxi.mcmc.MCMC):
             continue
-        
-        subpath = "{ns}x{nt}/{b}/{k4}_{k6}/".format(ns=task.Ns, nt=task.Nt, b=task.beta, k4=task.k4, k6=task.k6)
+        volume_subpath = "{ns}x{nt}/".format(ns=task.Ns, nt=task.Nt)
+        param_subpath = "{b}/{k4}_{k6}/".format(b=task.beta, k4=task.k4, k6=task.k6)
         if isinstance(task, taxi.mcmc.ConfigGenerator):
             if getattr(task, 'saveg', None) is not None:
-                saveg_dest = os.path.join(os.path.join(gauge_dir, subpath), os.path.basename(task.saveg))
+                saveg_dest = os.path.join(gauge_dir, volume_subpath, param_subpath, task.saveg)
                 
                 new_copy_job = Copy(src=task.saveg, dest=saveg_dest)
                 new_copy_job.depends_on = [task]
@@ -141,10 +141,15 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
                     type_subpath = 'spec4'
                 elif words[1] in ['a2', 'A2', 'as2', 'AS2', '6', 'as', 'AS']:
                     type_subpath = 'spec6'
+                    
+                if words[2].startswith('r'):
+                    type_subpath += '_{0:g}'.format(words[2])
+                    # i.e., spec4_r6. {:g} formatting 
+                    
             elif 'flow' in words[0]:
                 type_subpath = 'flow'
             
-            fout_dest = os.path.join(os.path.join(os.path.join(out_dir, subpath), type_subpath), os.path.basename(task.fout))
+            fout_dest = os.path.join(out_dir, volume_subpath, type_subpath, param_subpath, os.path.basename(task.fout))
             new_copy_job = Copy(src=task.fout, dest=fout_dest)
             new_copy_job.depends_on = [task]
             copy_jobs.append(new_copy_job)
