@@ -12,7 +12,7 @@ def classify_abandoned_tasks(tasks, queue):
         if task.status == 'abandoned':
             abandoned_tasks.append(task)
         else:
-            running_taxi_status = queue.report_taxi_status_by_name(task.by_taxi)
+            running_taxi_status = queue.report_taxi_status_by_name(task.by_taxi)['status']
             if running_taxi_status != 'R':
                 abandoned_tasks.append(task)
             else:
