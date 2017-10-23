@@ -110,8 +110,83 @@ class MrepSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
             'label' : words[8],
             'traj' : int(words[9])
         }
+
+class MrepSpectroWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
+    """ Multirep spectroscopy filename conventions used by wijay """
+    def write(self, params):
+        # Assume each kappa=0 if not specified
+        params['k4'] = params.get('k4',0)
+        params['k6'] = params.get('k4',0)        
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{count}".\
+            format(**params)
+    def read(self, fn, delim='_'):
+        words = os.path.basename(fn).split(delim)
+        assert (len(words) == 8),\
+            "Error: Does filename satisfy wijay conventions?"
+        assert words[0] == 'outCt',\
+            "Error: Does filename refer to a correlation function output file?"
+        return {
+            'file_prefix' : words[0],
+            'Ns' : words[1][:2],
+            'Nt' : words[1][2:],
+            'beta' : float(words[2][1:]),
+            'k4' : float(words[3][2:]),
+            'k6' : float(words[4][3:]),
+            'irrep' : words[5],
+            'r0' : float(words[6].strip('gf')),
+            'count' : int(words[7]),
+        }
         
+class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
+    """ Multirep gauge binary filename conventions used by wijay """
+    def write(self, params):
+        # Assume each kappa=0 if not specified
+        params['k4'] = params.get('k4',0)
+        params['k6'] = params.get('k4',0)        
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{count}".\
+            format(**params)
+    def read(self, fn, delim='_'):
+        words = os.path.basename(fn).split(delim)
+        assert (len(words) == 6),\
+            "Error: Does filename satisfy wijay conventions?"
+        assert (words[0] == 'cfg'),\
+            "Error: Does filename refer to a gauge binary file?"
+        return {
+            'file_prefix' : words[0],
+            'Ns' : words[1][:2],
+            'Nt' : words[1][2:],
+            'beta' : float(words[2][1:]),
+            'k4' : float(words[3][2:]),
+            'k6' : float(words[4][3:]),
+            'count' : int(words[5]),
+        }
         
+class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
+    """ Multirep propagator binary filename conventions used by wijay """
+    def write(self, params):
+        # Assume each kappa=0 if not specified
+        params['k4'] = params.get('k4',0)
+        params['k6'] = params.get('k4',0)        
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{count}".\
+            format(**params)
+    def read(self, fn, delim='_'):
+        words = os.path.basename(fn).split(delim)
+        assert (len(words) == 8),\
+            "Error: Does filename satisfy wijay conventions?"
+        assert (words[0] == 'prop'),\
+            "Error: Does filename refer to a propagator binary file?"
+        return {
+            'file_prefix' : words[0],
+            'Ns' : words[1][:2],
+            'Nt' : words[1][2:],
+            'beta' : float(words[2][1:]),
+            'k4' : float(words[3][2:]),
+            'k6' : float(words[4][3:]),
+            'irrep' : words[5],
+            'r0' : float(words[6].strip('gf')),
+            'count' : int(words[7]),
+        }
+
 def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
     out_dir = taxi.expand_path(out_dir)
     gauge_dir = taxi.expand_path(gauge_dir)
