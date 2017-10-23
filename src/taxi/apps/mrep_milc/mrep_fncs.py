@@ -115,9 +115,10 @@ class MrepSpectroWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
     """ Multirep spectroscopy filename conventions used by wijay """
     def write(self, params):
         # Assume each kappa=0 if not specified
+        params['file_prefix'] = 'outCt'
         params['k4'] = params.get('k4',0)
         params['k6'] = params.get('k4',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{count}".\
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
         words = os.path.basename(fn).split(delim)
@@ -134,7 +135,7 @@ class MrepSpectroWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
             'k6' : float(words[4][3:]),
             'irrep' : words[5],
             'r0' : float(words[6].strip('gf')),
-            'count' : int(words[7]),
+            'traj' : int(words[7]),
         }
         
 class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
@@ -143,7 +144,7 @@ class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         # Assume each kappa=0 if not specified
         params['k4'] = params.get('k4',0)
         params['k6'] = params.get('k4',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{count}".\
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
         words = os.path.basename(fn).split(delim)
@@ -158,7 +159,7 @@ class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
             'beta' : float(words[2][1:]),
             'k4' : float(words[3][2:]),
             'k6' : float(words[4][3:]),
-            'count' : int(words[5]),
+            'traj' : int(words[5]),
         }
         
 class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
@@ -167,7 +168,7 @@ class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         # Assume each kappa=0 if not specified
         params['k4'] = params.get('k4',0)
         params['k6'] = params.get('k4',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{count}".\
+        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
         words = os.path.basename(fn).split(delim)
@@ -184,7 +185,7 @@ class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
             'k6' : float(words[4][3:]),
             'irrep' : words[5],
             'r0' : float(words[6].strip('gf')),
-            'count' : int(words[7]),
+            'traj' : int(words[7]),
         }
 
 def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
