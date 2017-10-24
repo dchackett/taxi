@@ -166,6 +166,7 @@ class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
     """ Multirep propagator binary filename conventions used by wijay """
     def write(self, params):
         # Assume each kappa=0 if not specified
+        params['file_prefix'] = 'prop'        
         params['k4'] = params.get('k4',0)
         params['k6'] = params.get('k4',0)        
         return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\

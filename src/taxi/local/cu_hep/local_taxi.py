@@ -21,6 +21,6 @@ multirep_spectro_binaries = {
     (4, 'a2', False, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_pa',
     (4, 'a2', True, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_s_pa',
     # Baryon binaries 
-    (4, 'a2', False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_f_clov_cg_bar',
-    (4, 'f',  False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_as2_clov_cg_bar',
+    (4, 'a2', False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_as2_clov_cg_bar',
+    (4, 'f',  False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_f_clov_cg_bar',
 }
