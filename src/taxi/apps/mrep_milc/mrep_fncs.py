@@ -117,7 +117,7 @@ class MrepSpectroWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         # Assume each kappa=0 if not specified
         params['file_prefix'] = 'outCt'
         params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k4',0)        
+        params['k6'] = params.get('k6',0)        
         return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
@@ -143,7 +143,7 @@ class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
     def write(self, params):
         # Assume each kappa=0 if not specified
         params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k4',0)        
+        params['k6'] = params.get('k6',0)        
         return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
@@ -168,7 +168,7 @@ class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
         # Assume each kappa=0 if not specified
         params['file_prefix'] = 'prop'        
         params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k4',0)        
+        params['k6'] = params.get('k6',0)        
         return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
             format(**params)
     def read(self, fn, delim='_'):
