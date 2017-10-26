@@ -80,6 +80,7 @@ class OverlapTask(ConfigMeasurement):
     
     def __init__(self,
                  number_of_masses, m0, error_for_propagator,
+                 source_type, r0,
                  n_inner_eigenvals, n_h0_eigenvals, n_hov_eigenvals,
                  prec_sign, zolo_min, zolo_max, 
                  inner_cg_iters, inner_residue, inner_residue_h,                                 
@@ -90,10 +91,12 @@ class OverlapTask(ConfigMeasurement):
                  req_time, **kwargs):
                 
         super(OverlapTask, self).__init__(req_time=req_time, **kwargs)
-        
+                
         self.number_of_masses = number_of_masses
         self.m0 = m0
         self.error_for_propagator = error_for_propagator
+        self.source_type = source_type
+        self.r0 = r0
 
         ######################################################
         # Hard-coded values for multimass conjugate gradient #
@@ -102,8 +105,6 @@ class OverlapTask(ConfigMeasurement):
         self.scalez = 1.0                  # Additional rescaling of dslash
         self.max_cg_iters = 500            # Used if doing CG, else not used
         self.max_cg_restarts = 1           # Used if doing CG, else not used
-        self.source_type = 'point'         # Used if doing CG, else not used
-        self.r0 = 0.0                      # Used if doing CG, else not used
         
         ####################################
         # Specifying number of eigenvalues #
@@ -139,6 +140,14 @@ class OverlapTask(ConfigMeasurement):
         self.error_decr_low = error_decr_low
         self.eigenval_tol_high = eigenval_tol_high
         self.error_decr_high = error_decr_high
+        
+    def construct_seed(self):
+        """ Construct a reaonable seed for the random number generator. """        
+        self.seed = int("{0}{1}{2}{3}".format(
+                        self.Ns,
+                        self.Nt,
+                        int((self.beta*100)//2),
+                        self.loadg.split('_')[-1]))
         
     def reformat_args_for_input(self):
         """
@@ -176,7 +185,7 @@ class OverlapTask(ConfigMeasurement):
         if self.loadg is None:
             input_dict['load_gauge'] = 'fresh'
         else:
-            input_dict['load_gauge'] = 'load_serial {loadg}'.format(loadg=self.loadg)
+            input_dict['load_gauge'] = 'reload_serial {loadg}'.format(loadg=self.loadg)
             
         if self.saveg is None:
             input_dict['save_gauge'] = 'forget'
@@ -207,7 +216,7 @@ class OverlapTask(ConfigMeasurement):
 
         ## h0 modes I/O
         if self.load_h0 is None:
-            input_dict['load_h0'] = 'fresh'
+            input_dict['load_h0'] = 'fresh_hr0_modes'
         else:
             # Leading i for 'input'
             input_dict['load_h0'] = 'iserial_hr0_modes {load_h0}'.format(load_h0=self.load_h0)
@@ -215,11 +224,11 @@ class OverlapTask(ConfigMeasurement):
         if self.save_h0 is None:
             input_dict['save_h0'] = 'forget_hr0_modes'
         else:
-            input_dict['save_h0'] = 'serial_hr0_modes'         
+            input_dict['save_h0'] = 'serial_hr0_modes {save_h0}'.format(save_h0=self.save_h0)
             
         ## hov modes I/O
         if self.load_hov is None:
-            input_dict['load_hov'] = 'fresh'
+            input_dict['load_hov'] = 'fresh_hov_modes'
         else:
             # Leading i for 'input'
             input_dict['load_hov'] = 'iserial_hov_modes {load_hov}'.format(load_hov=self.load_hov)          
@@ -227,7 +236,7 @@ class OverlapTask(ConfigMeasurement):
         if self.save_hov is None:
             input_dict['save_hov'] = 'forget_hov_modes'
         else:
-            input_dict['save_hov'] = 'serial_hov_modes'         
+            input_dict['save_hov'] = 'serial_hov_modes {save_hov}'.format(save_hov=self.save_hov)       
 
         return input_str + overlap_template.format(**input_dict)
 
@@ -247,6 +256,8 @@ class OverlapPreconditionTask(OverlapTask):
     
     output_file_attributes = ['fout', 'saveg', 'saveh0', 'savehov']
         
+    binary = '/nfs/beowulf03/wijay/mrep/bin/su3_ov_eig_cg_f_hyp'
+    
     def __init__(self,
                  ## I/O
                  loadg,
@@ -353,11 +364,16 @@ class OverlapPreconditionTask(OverlapTask):
         Returns: 
             OverlapPreconditionTask instance
         """
+        # No multimass CG when computing eigenmodes
         number_of_masses = 1
         m0 = 0.0
+        # Hard-coded point source to make it clear no smearing occurs
+        source_type= 'point' # Not used for eigenmode preconditioning
+        r0 = 0.0             # Not used for eigenmode preconditioning
         
         OverlapTask.__init__(self,\
             number_of_masses, m0, error_for_propagator,\
+            source_type, r0,
             n_inner_eigenvals, n_h0_eigenvals, n_hov_eigenvals,\
             prec_sign, zolo_min, zolo_max,\
             inner_cg_iters, inner_residue, inner_residue_h,\
@@ -411,6 +427,7 @@ class OverlapPreconditionTask(OverlapTask):
             "Error: Please specify save_hov when computing eigenvalues."        
         self.save_hov = save_hov
 
+        OverlapTask.construct_seed(self)
         OverlapTask.reformat_args_for_input(self)
 
         
@@ -447,8 +464,6 @@ class OverlapPreconditionTask(OverlapTask):
                 raise RuntimeError("OverlapPrecondition verification failure: did not find end of reading in " + self.fout)
             if not found_running_completed:
                 raise RuntimeError("OverlapPrecondition verification failure: running did not complete in " + self.fout)
-
-    #TODO: add binary 
     
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.
 #    def _dynamic_get_binary(self):
@@ -479,6 +494,8 @@ class OverlapPropagatorTask(OverlapTask):
     
     output_file_attributes = ['fout', 'savep']
 
+    binary = '/nfs/beowulf03/wijay/mrep/bin/su3_ov_eig_cg_multi'
+
     def __init__(self,
                  ## I/O
                  loadg,
@@ -487,6 +504,8 @@ class OverlapPropagatorTask(OverlapTask):
                  load_hov,
                  m0=[0.0],
                  error_for_propagator=[1e-6],
+                 source_type='point',
+                 r0=0.0,
                  ## For taxi
                  req_time=600,
                  ## Override autodetection from loadg
@@ -505,8 +524,8 @@ class OverlapPropagatorTask(OverlapTask):
                  inner_residue=1e-7, 
                  inner_residue_h=1e-7, 
                  ## Eigenvalue finder
-                 max_rayleigh_iters=100, 
-                 max_r0_iters=100, 
+                 max_rayleigh_iters=0, 
+                 max_r0_iters=0, 
                  restart_rayleigh=10, 
                  kalkreuter_iters=10, 
                  eigenvec_quality=1.0e-4,
@@ -527,6 +546,7 @@ class OverlapPropagatorTask(OverlapTask):
             
         OverlapTask.__init__(self,\
             number_of_masses, m0, error_for_propagator,\
+            source_type, r0,\
             n_inner_eigenvals, n_h0_eigenvals, n_hov_eigenvals,\
             prec_sign, zolo_min, zolo_max,\
             inner_cg_iters, inner_residue, inner_residue_h,\
@@ -578,6 +598,7 @@ class OverlapPropagatorTask(OverlapTask):
             "Error: OverlapPropagator assumes hov eigenvalues have been computed. Please load them."
         self.load_hov = load_hov
 
+        OverlapTask.construct_seed(self)
         OverlapTask.reformat_args_for_input(self)
         
         
@@ -604,4 +625,3 @@ class OverlapPropagatorTask(OverlapTask):
                 raise RuntimeError("OverlapPropagator verification failure: did not find end of reading in " + self.fout)
             if not found_running_completed:
                 raise RuntimeError("OverlapPropagator verification failure: running did not complete in " + self.fout)
-    #TODO: add binary
