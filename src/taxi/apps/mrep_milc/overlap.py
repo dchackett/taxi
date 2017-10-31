@@ -393,6 +393,17 @@ class OverlapPreconditionTask(OverlapTask):
             req_time, **kwargs)
         
         ## Override parameters read out from a filename or stolen from a ConfigGenerator
+        params = self.parse_params_from_loadg(loadg)
+        self.beta = params['beta']
+        self.Ns = params['Ns']
+        self.Nt = params['Nt']
+
+        ## Override parameters read out from a filename or stolen from a ConfigGenerator
+        params = self.parse_params_from_loadg(loadg)
+        self.beta = params['beta']
+        self.Ns = params['Ns']
+        self.Nt = params['Nt']
+
         if beta is not None:
             self.beta = beta
         if Ns is not None:
