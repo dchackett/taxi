@@ -260,10 +260,10 @@ class OverlapPreconditionTask(OverlapTask):
     
     def __init__(self,
                  ## I/O
-                 loadg,
-                 saveg,
-                 save_h0,
-                 save_hov,
+                 loadg=None,
+                 saveg=None,
+                 save_h0=None,
+                 save_hov=None,
                  ## For taxi
                  req_time=600,
                  ## Override autodetection from loadg
@@ -364,6 +364,15 @@ class OverlapPreconditionTask(OverlapTask):
         Returns: 
             OverlapPreconditionTask instance
         """
+        if loadg is None:
+            raise ValueError("Error: Must specify loadg")
+        if saveg is None:
+            raise ValueError("Error: Must specify saveg")
+        if save_h0 is None:
+            raise ValueError("Error: Must specify save_h0")
+        if save_hov is None:
+            raise ValueError("Error: Must specify save_hov")
+
         # No multimass CG when computing eigenmodes
         number_of_masses = 1
         m0 = 0.0
@@ -542,6 +551,16 @@ class OverlapPropagatorTask(OverlapTask):
                  **kwargs ## Should inlcude 'measure_on' for ConfigMeasurement
                  ):
         """ doc string here """
+        
+        if loadg is None:
+            raise ValueError("Error: Must specfiy loadg")
+        if savep is None:
+            raise ValueError("Error: Must specfiy savep")
+        if load_h0 is None:
+            raise ValueError("Error: Must specfiy load_h0")
+        if load_hov is None:
+            raise ValueError("Error: Must specfiy load_hov")
+
         number_of_masses = len(m0)
         if len(error_for_propagator) != number_of_masses:
             assert len(error_for_propagator) == 1,\
