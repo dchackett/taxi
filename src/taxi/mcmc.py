@@ -369,7 +369,7 @@ def measure_on_files(config_measurement_class, filenames, **kwargs):
     for fn in filenames:
         
         if not os.path.exists(sanitized_path(fn)):
-            print "Can't apply measurement {m} to {fn}: file does not exist.".format(m=str(config_measurement_class, fn=fn))
+            print "Can't apply measurement {m} to {fn}: file does not exist.".format(m=str(config_measurement_class), fn=fn)
             continue # Instead of raising, just skip; more convenient
         
         measurements.append(config_measurement_class(measure_on=fn, **kwargs))
