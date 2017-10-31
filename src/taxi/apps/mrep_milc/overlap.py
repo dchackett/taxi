@@ -243,14 +243,14 @@ class OverlapTask(ConfigMeasurement):
 class OverlapPreconditionTask(OverlapTask):
 
     fout_prefix = 'outModes'
-    saveg_prefix = 'cfg'
+    saveg_prefix = 'cfgLandau'
     saveh0_prefix = 'h0ModesOverlap'
     savehov_prefix = 'hovModesOverlap'
-    #TODO: Set file name conventions
-    fout_filename_convention = None
-    saveg_filename_convention = None
-    saveh0_filename_convention = None
-    savehov_filename_convention = None    
+
+    fout_filename_convention = mrep_fncs.MrepModesOverlapOutputWijayFnConvention
+    saveg_filename_convention = mrep_fncs.MrepGaugeLandauWijayFnConvention
+    saveh0_filename = mrep_fncs.MrepH0WijayFnConvention
+    savehov_filename_convention = mrep_fncs.MrepHovWijayFnConvention
     # Convention: do input/loading FNCs as lists for user-friendliness
     loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs)
     
@@ -483,16 +483,20 @@ class OverlapPreconditionTask(OverlapTask):
 #    binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
 
 class OverlapPropagatorTask(OverlapTask):
-    
+
+    loadho_prefix = 'h0'
+    loadhov_prefix = 'hov'    
     fout_prefix = 'outProp'
     savep_prefix = 'prop'
-    #TODO: Set file name conventions
-    fout_filename_convention = None
-    savep_filename_convention = None
+
+    loadh0_filename_convention = mrep_fncs.MrepH0WijayFnConvention
+    loadhov_filename_convention = mrep_fncs.MrepHovWijayFnConvention
+    fout_filename_convention = mrep_fncs.MrepPropOverlapOutputWijayFnConvention
+    savep_filename_convention = mrep_fncs.MrepPropOverlapWijayFnConvention    
     # Convention: do input/loading FNCs as lists for user-friendliness
     loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs)
     
-    output_file_attributes = ['fout', 'savep']
+    output_file_attributes = ['fout', 'savep', 'loadg', 'loadh0', 'loadhov']
 
     binary = '/nfs/beowulf03/wijay/mrep/bin/su3_ov_eig_cg_multi'
 
