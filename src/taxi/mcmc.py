@@ -91,20 +91,24 @@ class MCMC(jobs.Runner):
         self.depends_on.append(config_generator)
             
             
-    def start_from_config_file(self, loadg):
+    def start_from_config_file(self, loadg, delay_fn_exists_check=False):
         loadg = sanitized_path(loadg)
         
         # Measure on a stored gauge file
-        assert os.path.exists(loadg), "Need a valid path to a configuration; {s} does not exist".format(s=loadg)
+        if not delay_fn_exists_check:
+            assert os.path.exists(loadg), "Need a valid path to a configuration; {s} does not exist".format(s=loadg)
         self.loadg = loadg
         
         # Steal parameters from parsed filename
         stolen_params = self.parse_params_from_loadg(self.loadg)
         if stolen_params is not None:
             self.__dict__.update(**stolen_params)
+
             
-    
     def execute(self, cores=None):
+        assert os.path.exists(self.loadg),\
+            "Error: file {loadg} does not exist.".format(loadg=self.loadg)
+
         ## Non-clobbering behavior
         saveg_exists = self.save_config and getattr(self, 'saveg', None) is not None and os.path.exists(self.saveg)
         fout_exists = getattr(self, 'fout', None) is not None and os.path.exists(self.fout)
@@ -239,14 +243,15 @@ class ConfigMeasurement(MCMC):
     
     fout_filename_prefix = 'meas'
         
-    def __init__(self, measure_on, save_config=False, **kwargs):
+    def __init__(self, measure_on, save_config=False, delay_fn_exists_check=False, **kwargs):
         
         super(ConfigMeasurement, self).__init__(save_config=save_config, **kwargs)
         
         ## Flexible behavior for finding config to measure on
         if isinstance(measure_on, str):
             # Measure on some existing configuration file
-            self.start_from_config_file(measure_on)
+            self.start_from_config_file(measure_on,
+                                        delay_fn_exists_check=delay_fn_exists_check)
             
         elif isinstance(measure_on, ConfigGenerator):
             # Measure on the config file saved by a ConfigGenerator task
