@@ -269,7 +269,8 @@ class OverlapPreconditionTask(OverlapTask):
                  ## Override autodetection from loadg
                  beta=None,
                  Ns=None, 
-                 Nt=None, 
+                 Nt=None,
+                 irrep='f', 
                  gauge_fix='landau_gauge_fix',
                  error_for_propagator=1e-6,
                  ## Numbers of eigenvalues
@@ -377,6 +378,8 @@ class OverlapPreconditionTask(OverlapTask):
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
+
+        self.irrep = irrep
 
         ## Override parameters read out from a filename or stolen from a ConfigGenerator
         if beta is not None:
@@ -529,7 +532,8 @@ class OverlapPropagatorTask(OverlapTask):
                  ## Override autodetection from loadg
                  beta=None,
                  Ns=None, 
-                 Nt=None, 
+                 Nt=None,
+                 irrep='f', 
                  ## Numbers of eigenvalues
                  n_inner_eigenvals=10, 
                  n_h0_eigenvals=16, 
@@ -576,6 +580,8 @@ class OverlapPropagatorTask(OverlapTask):
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
+
+        self.irrep = irrep
 
         ## Override parameters read out from a filename or stolen from a ConfigGenerator
         if beta is not None:
