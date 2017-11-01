@@ -373,11 +373,18 @@ class OverlapPreconditionTask(OverlapTask):
         if save_hov is None:
             raise ValueError("Error: Must specify save_hov")
 
-        ## Override parameters read out from a filename or stolen from a ConfigGenerator
         params = self.parse_params_from_loadg(loadg)
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
+
+        ## Override parameters read out from a filename or stolen from a ConfigGenerator
+        if beta is not None:
+            self.beta = beta
+        if Ns is not None:
+            self.Ns = Ns
+        if Nt is not None:
+            self.Nt = Nt
 
         # No multimass CG when computing eigenmodes
         number_of_masses = 1
@@ -398,19 +405,6 @@ class OverlapPreconditionTask(OverlapTask):
             eigenval_tol_high, error_decr_high,\
             req_time, **kwargs)
         
-        ## Override parameters read out from a filename or stolen from a ConfigGenerator
-        params = self.parse_params_from_loadg(loadg)
-        self.beta = params['beta']
-        self.Ns = params['Ns']
-        self.Nt = params['Nt']
-
-        if beta is not None:
-            self.beta = beta
-        if Ns is not None:
-            self.Ns = Ns
-        if Nt is not None:
-            self.Nt = Nt
-
         assert gauge_fix is not None,\
             "Error: Should gauge fix to landau gauge for OverlapPreconditioning"
         self.gauge_fix = gauge_fix 
@@ -577,6 +571,11 @@ class OverlapPropagatorTask(OverlapTask):
             assert len(error_for_propagator) == 1,\
                 "Error: poorly formatted 'error_for_propagator'; check the length of the list."
             error_for_propagator = [error_for_propagator[0] for _ in m0]
+
+        params = self.parse_params_from_loadg(loadg)
+        self.beta = params['beta']
+        self.Ns = params['Ns']
+        self.Nt = params['Nt']
 
         ## Override parameters read out from a filename or stolen from a ConfigGenerator
         if beta is not None:
