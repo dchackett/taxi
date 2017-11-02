@@ -390,7 +390,7 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
                     type_subpath = 'spec6'
                     
                 if words[2].startswith('r'):
-                    type_subpath += '_{0:g}'.format(words[2])
+                    type_subpath += '_{0:g}'.format(float(words[2][len('r'):]))
                     # i.e., spec4_r6. {:g} formatting 
                     
             elif 'flow' in words[0]:
