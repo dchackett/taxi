@@ -168,10 +168,13 @@ class LocalQueue(BatchQueue):
         batch_out, batch_err = subprocess.Popen(taxi_call, 
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
 
-        print batch_out
+        print batch_out.strip()
         if batch_err != '':
             print batch_err
             raise RuntimeError("Error in taxi invocation: \n", taxi_call)
+            
+        # Return job ID
+        return batch_out.split('\n')[0]
 
 
     def cancel_job(self, job_number):

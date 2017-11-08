@@ -79,6 +79,8 @@ class LocalQueue(BatchQueue):
         if batch_err != '':
             print batch_err
             raise RuntimeError("Error in taxi invocation: \n", taxi_call)
+            
+        return batch_out.split()[2] # "Your job #### ("name") has been submitted"
 
 
     def cancel_job(self, job_number):
