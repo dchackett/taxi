@@ -239,6 +239,12 @@ class OverlapTask(ConfigMeasurement):
             input_dict['save_hov'] = 'serial_hov_modes {save_hov}'.format(save_hov=self.save_hov)       
 
         return input_str + overlap_template.format(**input_dict)
+    
+    ## Spectroscopy-specific output: Saved final propagator file
+    def _dynamic_get_savep(self):
+        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
+    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)
+
 
 class OverlapPreconditionTask(OverlapTask):
 

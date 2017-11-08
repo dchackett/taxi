@@ -36,8 +36,6 @@ class MCMC(jobs.Runner):
     ## Modular file naming convention defaults
     saveg_filename_prefix = 'cfg'
     saveg_filename_convention = BasicMCMCFnConvention
-    savep_filename_prefix = 'prop'
-    savep_filename_convention = BasicMCMCFnConvention
     fout_filename_convention = BasicMCMCFnConvention
     loadg_filename_convention = BasicMCMCFnConvention
     
@@ -176,10 +174,7 @@ class MCMC(jobs.Runner):
         return self.fout_filename_convention(prefix=self.fout_filename_prefix).write(self.to_dict())    
     fout = taxi.fixable_dynamic_attribute(private_name='_fout', dynamical_getter=_dynamic_get_fout)
     
-    # Output: Saved final propagator file
-    def _dynamic_get_savep(self):
-        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
-    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)
+    
 
 class ConfigGenerator(MCMC):
     """Abstract superclass of tasks that run some external binary that

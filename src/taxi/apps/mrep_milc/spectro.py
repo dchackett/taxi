@@ -49,9 +49,11 @@ SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
 
 
 class SpectroTask(ConfigMeasurement):
-    fout_filename_prefix = None # Ignored for spectroscopy
+    fout_filename_prefix = 'spec'
     fout_filename_convention = mrep_fncs.PureGaugeSpectroFnConvention
     loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
+    savep_filename_prefix = 'prop'
+    savep_filename_convention = mrep_fncs.PureGaugeSpectroFnConvention
     
     output_file_attributes = ['fout', 'saveg', 'savep'] # savep in addition to usual MCMC fout and saveg
     
@@ -183,3 +185,7 @@ class SpectroTask(ConfigMeasurement):
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
 
+    ## Spectroscopy-specific output: Saved final propagator file
+    def _dynamic_get_savep(self):
+        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
+    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)
