@@ -239,6 +239,12 @@ class OverlapTask(ConfigMeasurement):
             input_dict['save_hov'] = 'serial_hov_modes {save_hov}'.format(save_hov=self.save_hov)       
 
         return input_str + overlap_template.format(**input_dict)
+    
+    ## Spectroscopy-specific output: Saved final propagator file
+    def _dynamic_get_savep(self):
+        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
+    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)
+
 
 class OverlapPreconditionTask(OverlapTask):
 
@@ -269,7 +275,8 @@ class OverlapPreconditionTask(OverlapTask):
                  ## Override autodetection from loadg
                  beta=None,
                  Ns=None, 
-                 Nt=None, 
+                 Nt=None,
+                 irrep='f', 
                  gauge_fix='landau_gauge_fix',
                  error_for_propagator=1e-6,
                  ## Numbers of eigenvalues
@@ -373,11 +380,20 @@ class OverlapPreconditionTask(OverlapTask):
         if save_hov is None:
             raise ValueError("Error: Must specify save_hov")
 
-        ## Override parameters read out from a filename or stolen from a ConfigGenerator
         params = self.parse_params_from_loadg(loadg)
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
+
+        self.irrep = irrep
+
+        ## Override parameters read out from a filename or stolen from a ConfigGenerator
+        if beta is not None:
+            self.beta = beta
+        if Ns is not None:
+            self.Ns = Ns
+        if Nt is not None:
+            self.Nt = Nt
 
         # No multimass CG when computing eigenmodes
         number_of_masses = 1
@@ -398,19 +414,6 @@ class OverlapPreconditionTask(OverlapTask):
             eigenval_tol_high, error_decr_high,\
             req_time, **kwargs)
         
-        ## Override parameters read out from a filename or stolen from a ConfigGenerator
-        params = self.parse_params_from_loadg(loadg)
-        self.beta = params['beta']
-        self.Ns = params['Ns']
-        self.Nt = params['Nt']
-
-        if beta is not None:
-            self.beta = beta
-        if Ns is not None:
-            self.Ns = Ns
-        if Nt is not None:
-            self.Nt = Nt
-
         assert gauge_fix is not None,\
             "Error: Should gauge fix to landau gauge for OverlapPreconditioning"
         self.gauge_fix = gauge_fix 
@@ -535,7 +538,8 @@ class OverlapPropagatorTask(OverlapTask):
                  ## Override autodetection from loadg
                  beta=None,
                  Ns=None, 
-                 Nt=None, 
+                 Nt=None,
+                 irrep='f', 
                  ## Numbers of eigenvalues
                  n_inner_eigenvals=10, 
                  n_h0_eigenvals=16, 
@@ -577,6 +581,13 @@ class OverlapPropagatorTask(OverlapTask):
             assert len(error_for_propagator) == 1,\
                 "Error: poorly formatted 'error_for_propagator'; check the length of the list."
             error_for_propagator = [error_for_propagator[0] for _ in m0]
+
+        params = self.parse_params_from_loadg(loadg)
+        self.beta = params['beta']
+        self.Ns = params['Ns']
+        self.Nt = params['Nt']
+
+        self.irrep = irrep
 
         ## Override parameters read out from a filename or stolen from a ConfigGenerator
         if beta is not None:
