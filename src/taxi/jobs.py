@@ -57,7 +57,10 @@ class Task(object):
             if k in self._currently_evaluating_properties:
                 continue # Don't let evaluating a property depend on evaluating a property
             try: # Try to evaluate property
-                if hasattr(getattr(self.__class__, k), '__get__'):
+                if isinstance(getattr(self.__class__, k), property):
+                # TODO: Switch to a working duck-typed check for 'property'
+                # The current problem is that (at least) instance methods also have __get__
+                # if hasattr(getattr(self.__class__, k), '__get__'):
                     self._currently_evaluating_properties.add(k)
                     d[k] = getattr(self, k)
             except AttributeError:
