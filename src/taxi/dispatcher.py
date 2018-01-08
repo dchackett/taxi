@@ -5,6 +5,7 @@
 import os
 import time
 import json
+from taxi._utility import LocalEncoder
 
 import imp # For dynamical imports
 import __main__ # To get filename of calling script
@@ -778,13 +779,13 @@ class SQLiteDispatcher(Dispatcher):
             task_values = (
                 compiled_task['id'],
                 compiled_task['task_type'], 
-                json.dumps(compiled_task['depends_on']),
+                json.dumps(compiled_task['depends_on'], cls=LocalEncoder),
                 compiled_task['status'], 
                 compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
                 compiled_task['is_recurring'],
                 compiled_task['req_time'], 
                 compiled_task['priority'],
-                json.dumps(compiled_task['payload']) if compiled_task.has_key('payload') else None,
+                json.dumps(compiled_task['payload'], cls=LocalEncoder) if compiled_task.has_key('payload') else None,
             )
             upsert_data.append(task_values)
         

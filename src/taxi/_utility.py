@@ -64,13 +64,10 @@ def all_subclasses_of(my_class):
         valid_task_classes += valid_task_class.__subclasses__()
     return class_dict
 
-
-def fixable_dynamic_attribute(private_name, dynamical_getter):
-    def _setter(self, x):
-        setattr(self, private_name, x)
-    def _getter(self):
-        if hasattr(self, private_name):
-            return getattr(self, private_name)
+import json   
+class LocalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if callable(getattr(obj, '__json__', None)):
+            return obj.__json__()
         else:
-            return dynamical_getter(self)
-    return property(fget=_getter, fset=_setter)
+            return json.JSONEncoder.default(self, obj)
