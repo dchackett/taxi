@@ -312,34 +312,3 @@ class Copy(Runner):
         
         super(Copy, self).rollback(rollback_dir=rollback_dir, delete_files=delete_files)
     
-
-### Task rebuilder    
-class BlankObject(object):
-    def __init__(self):
-        pass # Need an __init__ function to have a __dict__
-
-
-def runner_rebuilder_factory():
-    """
-    Returns a function that turns JSON payloads into TaskRunner objects,
-    according to the "task_type" field in the JSON.  (This function
-    should be passed to the 'object_hook' argument of json.loads.)
-
-    Searches the namespace for all defined subclasses of TaskRunner in
-    order to get the list of valid task types.
-    """
-
-    class_dict = all_subclasses_of(Task)
-    
-    def runner_decoder(s):
-        if s.get('task_type') in class_dict.keys():
-            rebuilt = BlankObject()
-            rebuilt.__dict__.update(**s)
-            rebuilt.__class__ = class_dict[s['task_type']]
-            assert rebuilt.__class__.__name__ == s['task_type'], \
-                "Failed to reconstruct Task subclass %s, instead ended up with %s"%(rebuilt.__class__.__name__, s['task_type'])
-            return rebuilt
-
-        return s
-
-    return runner_decoder        
