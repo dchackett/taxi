@@ -9,8 +9,7 @@ Taxi classes for running "chimera baryons" with fermions in multiple representat
 
 from taxi.mcmc import MCMC
 
-import taxi.fn_conventions
-import mrep_fncs
+from taxi.file import File, InputFile
 
 chimera_input_template = """
 prompt 0
@@ -39,11 +38,20 @@ r0 {r0_6}
 forget_wprop
 EOF"""
 
+def _wijay_volume_postprocessor(parsed):
+    assert parsed.has_key('Ns') and parsed.has_key('Nt'), str(parsed)
+    vol_str = str(parsed['Ns']) + str(parsed['Nt'])
+    assert len(vol_str) == 4, "wijay format doesn't know what to do with '{0}'; len({{Ns}}{{Nt}}) != 4".format(vol_str)
+    parsed['Ns'] = int(vol_str[:2])
+    parsed['Nt'] = int(vol_str[2:])
+    return parsed
+
 class ChimeraTask(MCMC):
-    fout_filename_prefix = 'outCt'
-    fout_filename_convention = mrep_fncs.MrepSpectroWijayFnConvention
-    loadp_filename_convention = mrep_fncs.MrepPropWijayFnConvention
-    output_file_attributes = ['fout']
+    fout = File('outCt_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}gf_{traj:d}')
+    loadp_f = InputFile('prop_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}gf_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    loadp_as = InputFile('prop_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}gf_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    saveg = None
+    
     binary = '/nfs/beowulf03/wijay/mrep/bin/ci_chimera_baryon_spec_only'
     
     def __init__(self,
@@ -84,16 +92,18 @@ class ChimeraTask(MCMC):
         super(ChimeraTask, self).__init__(req_time=req_time, **kwargs)
         
         # Propagator saving/loading
-        self.loadp_f = loadp_f
-        self.loadp_as = loadp_as
-
-        params_f  = self.parse_params_from_loadp(loadp_f)
-        params_as = self.parse_params_from_loadp(loadp_as)
-
+        # Force params to agree
+        params_f  = self.loadp_f.parse_params(loadp_f)
+        params_as = self.loadp_as.parse_params(loadp_as)
         for key in ['beta','Ns','Nt','k4','k6']:
             assert params_f[key] == params_as[key],\
                 "Error: mismatched values for {key} between the props".format(key=key)
 
+        # Parameters are not auto-parsed out of filenames
+        self.loadp_f = loadp_f
+        self.loadp_as = loadp_as
+        
+        # Load manually
         self.beta = params_f['beta']                
         self.k4 = params_f['k4']
         self.k6 = params_f['k6']
@@ -130,22 +140,12 @@ class ChimeraTask(MCMC):
     def verify_output(self):
         super(ChimeraTask, self).verify_output()
     
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             found_running_completed = False
             for line in f:
                 found_running_completed |= ("get_i(0): EOF on input" in line)                
             if not found_running_completed:
                 raise RuntimeError("Spectro ok check fails: running did not complete in " + self.fout)
-    
-    def parse_params_from_loadp(self, fn):
-        if self.loadp_filename_convention is None:
-            return None
-        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadp_filename_convention)
-        if parsed is None:
-            raise ValueError("Specified filename convention(s) {fnc} cannot parse filename {fn}".format(fnc=self.loadp_filename_convention, fn=fn))
-        assert parsed.has_key('traj'), "FileNameConvention must return a key 'traj' when processing a configuration file name"
-        return parsed
-
 
 
 

@@ -3,12 +3,11 @@
 import os
 
 from taxi import expand_path
-from taxi import fixable_dynamic_attribute
+from taxi import fixable_dynamic_attribute, should_save_file, should_load_file
 from taxi.mcmc import ConfigMeasurement
 import taxi.local.local_taxi as local_taxi
 
-import taxi.fn_conventions
-import mrep_fncs
+from taxi.file import File, InputFile
 
 ## local_taxi should specify:
 # - "spectro_binary"
@@ -49,13 +48,20 @@ SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
 
 
 class SpectroTask(ConfigMeasurement):
-    fout_filename_prefix = 'spec'
-    fout_filename_convention = mrep_fncs.PureGaugeSpectroFnConvention
-    loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
-    savep_filename_prefix = 'prop'
-    savep_filename_convention = mrep_fncs.PureGaugeSpectroFnConvention
+    ## File naming conventions
+    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    savep = File('{savep_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg = None
     
-    output_file_attributes = ['fout', 'saveg', 'savep'] # savep in addition to usual MCMC fout and saveg
+    # Dynamical behavior for e.g. "tspec" vs "xspecpa" vs ...
+    def _get_fout_prefix(self):
+        return ('x' if self.screening else 't') + 'spec' + ('pa' if self.p_plus_a else '')
+    def _get_savep_prefix(self):
+        return ('x' if self.screening else 't') + 'prop' + ('pa' if self.p_plus_a else '')
+    fout_prefix = fixable_dynamic_attribute('_fout_prefix', _get_fout_prefix)
+    savep_prefix = fixable_dynamic_attribute('_savep_prefix', _get_savep_prefix)
+    
     
     def __init__(self,
                  # Application-specific required arguments
@@ -63,7 +69,8 @@ class SpectroTask(ConfigMeasurement):
                  # Override ConfigMeasurement defaults
                  req_time=600, 
                  # Application-specific defaults
-                 source_type='gaussian', cgtol=1e-9, maxcgiter=500, loadp=None, savep=None,
+                 source_type='gaussian', cgtol=1e-9, maxcgiter=500, loadp=None,
+                 save_propagator=False,
                  p_plus_a=False, screening=False, compute_baryons=False,
                  Nc=4,
                  # Overrides
@@ -100,7 +107,8 @@ class SpectroTask(ConfigMeasurement):
         
         # Propagator saving/loading
         self.loadp = loadp
-        self.savep = savep
+        self.savep.save = save_propagator
+        
         
         # Physical Flags (used to determine binary)
         self.p_plus_a = p_plus_a
@@ -130,15 +138,15 @@ class SpectroTask(ConfigMeasurement):
         
         input_dict = self.to_dict()
         
-        if self.loadp is None:
-            input_dict['load_prop'] = 'fresh_wprop'
-        else:
+        if should_load_file(self.loadp):
             input_dict['load_prop'] = 'reload_serial_wprop {loadp}'.format(loadp=self.loadp)
-            
-        if self.savep is None:
-            input_dict['save_prop'] = 'forget_wprop'
         else:
+            input_dict['load_prop'] = 'fresh_wprop'
+            
+        if should_save_file(self.savep):
             input_dict['save_prop'] = 'save_serial_wprop {savep}'.format(savep=self.savep)
+        else:
+            input_dict['save_prop'] = 'forget_wprop'
 
         return input_str + spectro_input_template.format(**input_dict)
 
@@ -147,13 +155,13 @@ class SpectroTask(ConfigMeasurement):
         super(SpectroTask, self).verify_output()
     
         # If this job should save a propagator file, that file must exist
-        if getattr(self, 'savep', None) is not None and (not os.path.exists(self.savep)):
+        if should_save_file(self.savep):
             print "Spectro ok check fails: Propagator file {0} doesn't exist.".format(self.savep)
             raise RuntimeError
 
         # Check for well-formed output file
         # Trailing space avoids catching the error_something parameter input
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             found_end_of_header = False
             found_running_completed = False
             for line in f:
@@ -185,7 +193,3 @@ class SpectroTask(ConfigMeasurement):
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
 
-    ## Spectroscopy-specific output: Saved final propagator file
-    def _dynamic_get_savep(self):
-        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
-    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)

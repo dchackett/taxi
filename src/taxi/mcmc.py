@@ -12,40 +12,28 @@ import os
 
 import jobs
 from taxi import sanitized_path, expand_path
+from taxi.file import File, InputFile, should_save_file, should_load_file
 
-import taxi.fn_conventions
-
-
-class BasicMCMCFnConvention(taxi.fn_conventions.FileNameConvention):
-    def __init__(self, prefix=None, *args, **kwargs):
-        self.prefix = prefix
-        
-    def write(self, params):
-        return "{prefix}_{traj}".format(prefix=self.prefix, traj=(params['traj'] if params.has_key('traj') else params['final_traj']))
-    
-    def read(self, fn):
-        words = os.path.basename(fn).split('_')
-        return {
-            'prefix' : words[0],
-            'traj' : words[-1]
-        }
         
 
 
 class MCMC(jobs.Runner):
-    ## Modular file naming convention defaults
+    
+    ## Modular file naming conventions
+    # Output files
     saveg_filename_prefix = 'cfg'
-    saveg_filename_convention = BasicMCMCFnConvention
-    fout_filename_convention = BasicMCMCFnConvention
-    loadg_filename_convention = BasicMCMCFnConvention
+    saveg = File(conventions="{saveg_filename_prefix}_{traj:d}", save=True)
+    saveg_filename_prefix = 'fout'
+    fout = File(conventions="{fout_filename_prefix}_{traj:d}", save=True)
+    # Input files -- Won't be tracked by rollbacker
+    loadg = InputFile(conventions="{loadg_filename_prefix}_{traj:d}", save=False)
     
-    ## For rollbacking
-    output_file_attributes = ['fout', 'saveg']
-    
+ 
     def __init__(self, save_config=True, **kwargs):
         super(MCMC, self).__init__(**kwargs)
         
-        self.save_config = save_config
+        if self.saveg is not None:
+            self.saveg.save = save_config
     
     
     def build_input_string(self):
@@ -53,7 +41,7 @@ class MCMC(jobs.Runner):
         file self.fout
         """
         input_str = super(MCMC, self).build_input_string().strip()
-        input_str += "<< EOF >> " + self.fout + "\n"
+        input_str += "<< EOF >> {0}\n".format(self.fout)
         return input_str
     
     
@@ -81,57 +69,31 @@ class MCMC(jobs.Runner):
         for k, v in cg_dict.items():
             if getattr(self, k, None) is None: # Don't override anything already present
                 setattr(self, k, v)
-            
-        # Load the output configuration of this ConfigGenerator
-        self.loadg = config_generator.saveg
         
         # Need the config generator to run first
         self.depends_on.append(config_generator)
+        
+        # Set loadg without parsing
+        if isinstance(self.loadg, basestring):
+            del self.loadg # Remove any override that is present
+        self.loadg._value_override = config_generator.saveg
             
             
     def start_from_config_file(self, loadg, delay_fn_exists_check=False):
-        loadg = sanitized_path(loadg)
+        assert loadg is not None
+        loadg = sanitized_path(str(loadg))
         
-        # Measure on a stored gauge file
         if not delay_fn_exists_check:
             assert os.path.exists(loadg), "Need a valid path to a configuration; {s} does not exist".format(s=loadg)
-        self.loadg = loadg
         
-        # Steal parameters from parsed filename
-        stolen_params = self.parse_params_from_loadg(self.loadg)
-        if stolen_params is not None:
-            self.__dict__.update(**stolen_params)
+        self.loadg = loadg # Automatically parses out parameters and loads them in to the object
 
             
     def execute(self, cores=None):
-        assert os.path.exists(self.loadg),\
+        assert not should_load_file(self.loadg) or os.path.exists(str(self.loadg)),\
             "Error: file {loadg} does not exist.".format(loadg=self.loadg)
-
-        ## Non-clobbering behavior
-        saveg_exists = self.save_config and getattr(self, 'saveg', None) is not None and os.path.exists(self.saveg)
-        fout_exists = getattr(self, 'fout', None) is not None and os.path.exists(self.fout)
-        if saveg_exists or fout_exists:
-            if saveg_exists:
-                print "WARNING: File saveg={0} already exists, attempting to verify output".format(self.saveg)
-            if fout_exists:
-                print "WARNING: File fout={0} already exists, attempting to verify output".format(self.fout)
-            
-            self.verify_output()
-            # Verify output throws an error and blocks rest of function if output isn't correct
-            print "WARNING: Pre-existing well-formatted output (according to verify_output()) detected; skipping running"
-            return # Never clobber
-        
-        # Keep track of absolute paths of output files created, for rollbacking
-        # For user-friendliness, only have to provide a list of attributes that may contain output filenames
-        # Track these before execution. If output fails, want to have a list of output files that may have been created.
-        for ofa in self.output_file_attributes:
-            if getattr(self, ofa, None) is not None:
-                self.output_files.append(expand_path(getattr(self, ofa)))
-            
+   
         super(MCMC, self).execute(cores=cores)
-        
-        # Only keep track of files that were actually created (unless verify_output kills us in execute, and the line below is never run)
-        self.output_files = [ofn for ofn in self.output_files if os.path.exists(ofn)]
         
     
     
@@ -142,37 +104,16 @@ class MCMC(jobs.Runner):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
         
         # If this job should save a gauge file, that gauge file must exist
-        if self.save_config and getattr(self, 'saveg', None) is not None and (not os.path.exists(self.saveg)):
-            print "MCMC ok check fails: Gauge file {0} doesn't exist.".format(self.saveg)
+        if should_save_file(self.saveg) and not os.path.exists(str(self.saveg)):
+            print "MCMC ok check fails: Config file {0} doesn't exist.".format(self.saveg)
             raise RuntimeError
             
         # If this job should save an output file, that output file must exist
-        if getattr(self, 'fout', None) is not None and (not os.path.exists(self.fout)):
+        if should_save_file(self.fout) and not os.path.exists(str(self.fout)):
             print "MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout)
             raise RuntimeError
             
-        
-    
-    ## Modular file name conventions
-    # Input: Loaded gauge file
-    def parse_params_from_loadg(self, fn):
-        if self.loadg_filename_convention is None:
-            return None
-        parsed = taxi.fn_conventions.parse_with_conventions(fn=fn, conventions=self.loadg_filename_convention)
-        if parsed is None:
-            raise ValueError("Specified filename convention(s) {fnc} cannot parse filename {fn}".format(fnc=self.loadg_filename_convention, fn=fn))
-        assert parsed.has_key('traj'), "FileNameConvention must return a key 'traj' when processing a configuration file name"
-        return parsed
-    
-    # Output: Saved final configuration file       
-    def _dynamic_get_saveg(self):
-        return self.saveg_filename_convention(prefix=self.saveg_filename_prefix).write(self.to_dict())        
-    saveg = taxi.fixable_dynamic_attribute(private_name='_saveg', dynamical_getter=_dynamic_get_saveg)
-    
-    # Output: Binary diagnostic and inline measurement outputs
-    def _dynamic_get_fout(self):
-        return self.fout_filename_convention(prefix=self.fout_filename_prefix).write(self.to_dict())    
-    fout = taxi.fixable_dynamic_attribute(private_name='_fout', dynamical_getter=_dynamic_get_fout)
+
     
     
 
@@ -213,16 +154,27 @@ class ConfigGenerator(MCMC):
             if start_traj is not None:
                 self.start_traj = start_traj
             else:
-                raise NotImplementedError("Don't know how to parse start_traj out of config filename yet.")
+                raise NotImplementedError("Wasn't able to parse 'traj' for 'start_traj' out of config filename '{0}'.".format(starter))
                 
         else:
             raise TypeError("Don't know what to do with starter type: {s}".format(s=type(starter)))
 
-
-    def _get_final_traj(self):
+    @property
+    def final_traj(self):
         return self.start_traj + self.n_traj
-    final_traj = property(fget=_get_final_traj)
-        
+    @final_traj.setter
+    def final_traj(self, value):
+        assert value >= self.start_traj
+        self.n_traj = value - self.start_traj
+    
+    # For compatibility with file naming conventions
+    # WARNING: May lead to unpredictable behavior
+    @property
+    def traj(self):
+        return self.final_traj
+    @traj.setter
+    def traj(self, value):
+        self.start_traj = value
 
 ## Need to be able to steal physical parameters from ConfigGenerator
 ## However, we don't want any of ConfigGenerator's logistical parameters (e.g. fout, seed, trunk?, ...)

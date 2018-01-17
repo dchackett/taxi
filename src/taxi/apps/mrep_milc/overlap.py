@@ -15,11 +15,11 @@ import os
 
 #from taxi import expand_path
 #from taxi import fixable_dynamic_attribute
+from taxi import should_save_file, should_load_file
 from taxi.mcmc import ConfigMeasurement
 #import taxi.local.local_taxi as local_taxi
 
-import taxi.fn_conventions
-import mrep_fncs
+from taxi.file import File, InputFile
 
 overlap_template = """
 prompt 0
@@ -76,7 +76,27 @@ EOF
 SU4_F_irrep_names = [4, '4', 'f', 'F']
 SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
 
+
+def _wijay_volume_postprocessor(parsed):
+    assert parsed.has_key('Ns') and parsed.has_key('Nt'), str(parsed)
+    vol_str = str(parsed['Ns']) + str(parsed['Nt'])
+    assert len(vol_str) == 4, "wijay format doesn't know what to do with '{0}'; len({{Ns}}{{Nt}}) != 4".format(vol_str)
+    parsed['Ns'] = int(vol_str[:2])
+    parsed['Nt'] = int(vol_str[2:])
+    return parsed
+
+
 class OverlapTask(ConfigMeasurement):
+    
+    ## File naming conventions
+    loadg = InputFile('cfg_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{label}_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    saveg = File('cfg_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{label}_{traj:d}')
+    loadp = InputFile('prop_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}gf_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    savep = File('prop_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}gf_{traj:d}')
+    load_h0 = InputFile('h0_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    save_h0 = File('h0_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{traj:d}')
+    load_hov = InputFile('hov_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{traj:d}', postprocessor=_wijay_volume_postprocessor, auto_parse=False)
+    save_hov = File('hov_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{traj:d}')
     
     def __init__(self,
                  number_of_masses, m0, error_for_propagator,
@@ -182,15 +202,15 @@ class OverlapTask(ConfigMeasurement):
         input_dict = self.to_dict()
 
         ## Gauge I/O
-        if self.loadg is None:
-            input_dict['load_gauge'] = 'fresh'
-        else:
+        if should_load_file(self.loadg):
             input_dict['load_gauge'] = 'reload_serial {loadg}'.format(loadg=self.loadg)
-            
-        if self.saveg is None:
-            input_dict['save_gauge'] = 'forget'
         else:
+            input_dict['load_gauge'] = 'fresh'
+            
+        if should_save_file(self.saveg):
             input_dict['save_gauge'] = 'save_serial {saveg}'.format(saveg=self.saveg)
+        else:
+            input_dict['save_gauge'] = 'forget'
 
         ## Gauge fixing
         if self.gauge_fix is None:
@@ -204,63 +224,51 @@ class OverlapTask(ConfigMeasurement):
             raise RuntimeError(msg)
 
         ## Prop I/O
-        if self.loadp is None:
-            input_dict['load_prop'] = 'fresh_wprop'
-        else:
+        if should_load_file(self.loadp):
             input_dict['load_prop'] = 'reload_serial_wprop {loadp}'.format(loadp=self.loadp)
-            
-        if self.savep is None:
-            input_dict['save_prop'] = 'forget_wprop'
         else:
+            input_dict['load_prop'] = 'fresh_wprop'
+            
+        if should_save_file(self.savep):
             input_dict['save_prop'] = 'save_serial_wprop {savep}'.format(savep=self.savep)
+        else:
+            input_dict['save_prop'] = 'forget_wprop'
 
         ## h0 modes I/O
-        if self.load_h0 is None:
-            input_dict['load_h0'] = 'fresh_hr0_modes'
-        else:
+        if should_load_file(self.load_h0):
             # Leading i for 'input'
             input_dict['load_h0'] = 'iserial_hr0_modes {load_h0}'.format(load_h0=self.load_h0)
-
-        if self.save_h0 is None:
-            input_dict['save_h0'] = 'forget_hr0_modes'
         else:
+            input_dict['load_h0'] = 'fresh_hr0_modes'
+
+        if should_save_file(self.save_h0):
             input_dict['save_h0'] = 'serial_hr0_modes {save_h0}'.format(save_h0=self.save_h0)
+        else:
+            input_dict['save_h0'] = 'forget_hr0_modes'
             
         ## hov modes I/O
-        if self.load_hov is None:
-            input_dict['load_hov'] = 'fresh_hov_modes'
-        else:
+        if should_load_file(self.load_hov):
             # Leading i for 'input'
-            input_dict['load_hov'] = 'iserial_hov_modes {load_hov}'.format(load_hov=self.load_hov)          
-
-        if self.save_hov is None:
-            input_dict['save_hov'] = 'forget_hov_modes'
+            input_dict['load_hov'] = 'iserial_hov_modes {load_hov}'.format(load_hov=self.load_hov)
         else:
-            input_dict['save_hov'] = 'serial_hov_modes {save_hov}'.format(save_hov=self.save_hov)       
+            input_dict['load_hov'] = 'fresh_hov_modes'
+
+        if should_save_file(self.save_hov):
+            input_dict['save_hov'] = 'serial_hov_modes {save_hov}'.format(save_hov=self.save_hov)
+        else:
+            input_dict['save_hov'] = 'forget_hov_modes'
 
         return input_str + overlap_template.format(**input_dict)
-    
-    ## Spectroscopy-specific output: Saved final propagator file
-    def _dynamic_get_savep(self):
-        return self.savep_filename_convention(prefix=self.savep_filename_prefix).write(self.to_dict())
-    savep = taxi.fixable_dynamic_attribute(private_name='_savep', dynamical_getter=_dynamic_get_savep)
 
 
 class OverlapPreconditionTask(OverlapTask):
-
-    fout_prefix = 'outModes'
-    saveg_prefix = 'cfgLandau'
-    saveh0_prefix = 'h0ModesOverlap'
-    savehov_prefix = 'hovModesOverlap'
-
-    fout_filename_convention = mrep_fncs.MrepModesOverlapOutputWijayFnConvention
-    saveg_filename_convention = mrep_fncs.MrepGaugeLandauWijayFnConvention
-    saveh0_filename = mrep_fncs.MrepH0WijayFnConvention
-    savehov_filename_convention = mrep_fncs.MrepHovWijayFnConvention
-    # Convention: do input/loading FNCs as lists for user-friendliness
-    loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs)
     
-    output_file_attributes = ['fout', 'saveg', 'saveh0', 'savehov']
+    ## File naming conventions
+    fout = File('outOverlapModes_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{traj:d}')
+    loadp = None
+    savep = None
+    load_h0 = None
+    load_hov = None
         
     binary = '/nfs/beowulf03/wijay/mrep/bin/su3_ov_eig_cg_f_hyp'
     
@@ -380,7 +388,7 @@ class OverlapPreconditionTask(OverlapTask):
         if save_hov is None:
             raise ValueError("Error: Must specify save_hov")
 
-        params = self.parse_params_from_loadg(loadg)
+        params = self.loadg.parse_params(loadg)
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
@@ -458,35 +466,35 @@ class OverlapPreconditionTask(OverlapTask):
         super(OverlapPreconditionTask, self).verify_output()
     
         # Confirm presence of saved gauge file
-        if (not os.path.exists(self.saveg)):
+        if not os.path.exists(str(self.saveg)):
             msg = "OverlapPrecondition verification failure: missing saved gauge config {0}".format(self.saveg)
             raise RuntimeError(msg)
 
         # Confirm presence of saved hov file
-        if (not os.path.exists(self.save_hov)):
+        if not os.path.exists(str(self.save_hov)):
             msg = "OverlapPrecondition verification failure: missing saved hov file {0}".format(self.save_hov)
             raise RuntimeError(msg)
 
         # Confirm presence of saved h0 file
-        if (not os.path.exists(self.save_h0)):
+        if not os.path.exists(str(self.save_h0)):
             msg = "OverlapPrecondition verification failure: missing saved h0 file {0}".format(self.save_h0)
             raise RuntimeError(msg)
 
         # Check for well-formed output file
         # Trailing space avoids catching the error_something parameter input
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             found_end_of_reading = False
             found_running_completed = False            
             for line in f:
                 if "error " in line.lower():
-                    raise RuntimeError("Spectro ok check fails: Error detected in " + self.fout)
+                    raise RuntimeError("Spectro ok check fails: Error detected in " + str(self.fout))
                 found_running_completed |= ("RUNNING COMPLETED" in line)
                 found_end_of_reading |= ("Time to check unitarity" in line)
                 
             if not found_end_of_reading:
-                raise RuntimeError("OverlapPrecondition verification failure: did not find end of reading in " + self.fout)
+                raise RuntimeError("OverlapPrecondition verification failure: did not find end of reading in " + str(self.fout))
             if not found_running_completed:
-                raise RuntimeError("OverlapPrecondition verification failure: running did not complete in " + self.fout)
+                raise RuntimeError("OverlapPrecondition verification failure: running did not complete in " + str(self.fout))
     
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.
 #    def _dynamic_get_binary(self):
@@ -506,21 +514,13 @@ class OverlapPreconditionTask(OverlapTask):
 #    binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
 
 class OverlapPropagatorTask(OverlapTask):
-
-    loadho_prefix = 'h0'
-    loadhov_prefix = 'hov'    
-    fout_prefix = 'outProp'
-    savep_prefix = 'prop'
-
-    loadh0_filename_convention = mrep_fncs.MrepH0WijayFnConvention
-    loadhov_filename_convention = mrep_fncs.MrepHovWijayFnConvention
-    fout_filename_convention = mrep_fncs.MrepPropOverlapOutputWijayFnConvention
-    savep_filename_convention = mrep_fncs.MrepPropOverlapWijayFnConvention    
-    # Convention: do input/loading FNCs as lists for user-friendliness
-    loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs)
+    ## File naming conventions
+    fout = File('outPropOverlap_{Ns:d}{Nt:d}_b{beta:g}_kf{k4:g}_kas{k6:g}_{irrep}_{r0:g}_{traj:d}')
+    saveg = None
+    save_h0 = None
+    save_hov = None
+    loadp = None
     
-    output_file_attributes = ['fout', 'savep', 'loadg', 'loadh0', 'loadhov']
-
     binary = '/nfs/beowulf03/wijay/mrep/bin/su3_ov_eig_cg_multi'
 
     def __init__(self,
@@ -568,13 +568,13 @@ class OverlapPropagatorTask(OverlapTask):
         """ doc string here """
         
         if loadg is None:
-            raise ValueError("Error: Must specfiy loadg")
+            raise ValueError("Error: Must specify loadg")
         if savep is None:
-            raise ValueError("Error: Must specfiy savep")
+            raise ValueError("Error: Must specify savep")
         if load_h0 is None:
-            raise ValueError("Error: Must specfiy load_h0")
+            raise ValueError("Error: Must specify load_h0")
         if load_hov is None:
-            raise ValueError("Error: Must specfiy load_hov")
+            raise ValueError("Error: Must specify load_hov")
 
         number_of_masses = len(m0)
         if len(error_for_propagator) != number_of_masses:
@@ -582,7 +582,7 @@ class OverlapPropagatorTask(OverlapTask):
                 "Error: poorly formatted 'error_for_propagator'; check the length of the list."
             error_for_propagator = [error_for_propagator[0] for _ in m0]
 
-        params = self.parse_params_from_loadg(loadg)
+        params = self.loadg.parse_params(loadg)
         self.beta = params['beta']
         self.Ns = params['Ns']
         self.Nt = params['Nt']
@@ -651,22 +651,22 @@ class OverlapPropagatorTask(OverlapTask):
         super(OverlapPropagatorTask, self).verify_output()
     
         # Confirm presence of saved gauge file
-        if (not os.path.exists(self.savep)):
+        if not os.path.exists(str(self.savep)):
             msg = "OverlapPropagator verification failure: missing saved propagator {0}".format(self.savep)
             raise RuntimeError(msg)
 
         # Check for well-formed output file
         # Trailing space avoids catching the error_something parameter input
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             found_end_of_reading = False
             found_running_completed = False            
             for line in f:
                 if "error " in line.lower():
-                    raise RuntimeError("Spectro ok check fails: Error detected in " + self.fout)
+                    raise RuntimeError("Spectro ok check fails: Error detected in " + str(self.fout))
                 found_running_completed |= ("RUNNING COMPLETED" in line)
                 found_end_of_reading |= ("Time to check unitarity" in line)
                 
             if not found_end_of_reading:
-                raise RuntimeError("OverlapPropagator verification failure: did not find end of reading in " + self.fout)
+                raise RuntimeError("OverlapPropagator verification failure: did not find end of reading in " + str(self.fout))
             if not found_running_completed:
-                raise RuntimeError("OverlapPropagator verification failure: running did not complete in " + self.fout)
+                raise RuntimeError("OverlapPropagator verification failure: running did not complete in " + str(self.fout))

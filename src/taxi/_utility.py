@@ -49,6 +49,15 @@ class work_in_dir:
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
         
+def fixable_dynamic_attribute(private_name, dynamical_getter):
+    def _setter(self, x):
+        setattr(self, private_name, x)
+    def _getter(self):
+        if hasattr(self, private_name):
+            return getattr(self, private_name)
+        else:
+            return dynamical_getter(self)
+    return property(fget=_getter, fset=_setter)
 
 import traceback    
 def print_traceback():

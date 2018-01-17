@@ -259,6 +259,7 @@ class Dispatcher(object):
             taxi_dict[str(my_taxi)] = my_taxi
     
         # Initial desired state is the present state -- idle taxis idle, active taxis active
+        # Desired state is a dict like { str(taxi_name) : (should taxi be active?) }
         desired_state = {}
         for my_taxi in taxi_list:
             desired_state[str(my_taxi)] = my_taxi.status in ['Q', 'R'] # Active means queued or running
@@ -705,8 +706,14 @@ class SQLiteDispatcher(Dispatcher):
             
             rebuilt = BlankObject()
             rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
-            rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
             rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
+            #rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
+            # Deploy payload
+            for k, v in rebuilt.__dict__.pop('payload', {}).items():
+                try:
+                    setattr(rebuilt, k, v)
+                except AttributeError:
+                    pass # For non-settable properties
                 
             res_dict[r['id']] = rebuilt
         

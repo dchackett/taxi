@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-from taxi import fixable_dynamic_attribute
+from taxi import fixable_dynamic_attribute, should_save_file, should_load_file
 from taxi.mcmc import ConfigGenerator
 import taxi.local.local_taxi as local_taxi
 
-from mrep_fncs import MrepFnConvention
+from taxi.file import File, InputFile
 
 
 ## local_taxi should specify:
@@ -120,11 +120,9 @@ resid {cgtol}      # CG stopping condition"""
 
 
 class MultirepHMCJob(ConfigGenerator):
-    saveg_filename_prefix = 'cfg'
-    saveg_filename_convention = MrepFnConvention
-    fout_filename_prefix = 'hmc'
-    fout_filename_convention = MrepFnConvention
-    loadg_filename_convention = [MrepFnConvention] # Convention: do input/loading FNCs as lists for user-friendliness
+    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('hmc_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg = File('cfg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     
     binary = local_taxi.multirep_hmc_binary
     
@@ -218,15 +216,15 @@ class MultirepHMCJob(ConfigGenerator):
         input_dict = self.to_dict()
         
         # Saveg/loadg logic
-        if self.loadg is None:
-            input_dict['load_gauge'] = 'fresh'
-        else:
+        if should_load_file(self.loadg):
             input_dict['load_gauge'] = 'reload_serial {0}'.format(self.loadg)
-
-        if self.saveg is None:
-            input_dict['save_gauge'] = 'forget'
         else:
+            input_dict['load_gauge'] = 'fresh'
+            
+        if should_save_file(self.saveg):
             input_dict['save_gauge'] = 'save_serial {0}'.format(self.saveg)
+        else:
+            input_dict['save_gauge'] = 'forget'
 
         # Hasenbuch logic
         if self.nsteps2 is None:
@@ -253,7 +251,7 @@ class MultirepHMCJob(ConfigGenerator):
 
         # Check for errors
         # Trailing space avoids catching the error_something parameter input
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             for line in f:
                 if "error " in line:
                     raise RuntimeError("HMC ok check fails: Error detected in " + self.fout)
@@ -263,7 +261,7 @@ class MultirepHMCJob(ConfigGenerator):
         count_traj = 0
         count_exit = 0
         count_accept = 0
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             for line in f:
                 if line.startswith("GMES"):
                     count_gmes += 1

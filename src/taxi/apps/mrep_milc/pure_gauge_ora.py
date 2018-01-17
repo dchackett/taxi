@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+from taxi import should_save_file, should_load_file
 from taxi.mcmc import ConfigGenerator
 import taxi.local.local_taxi as local_taxi
 
-from mrep_fncs import PureGaugeFnConvention
+from taxi.file import File, InputFile
 
 
 ## local_taxi should specify:
@@ -37,11 +38,10 @@ EOF
 
 
 class PureGaugeORAJob(ConfigGenerator):
-    saveg_filename_prefix = 'cfgPG'
-    saveg_filename_convention = PureGaugeFnConvention
-    fout_filename_prefix = 'ora'
-    fout_filename_convention = PureGaugeFnConvention
-    loadg_filename_convention = [PureGaugeFnConvention] # Convention: do input/loading FNCs as lists for user-friendliness
+    
+    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('ora_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg = File('cfgPg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     
     binary = local_taxi.pure_gauge_ora_binary
     
@@ -90,16 +90,16 @@ class PureGaugeORAJob(ConfigGenerator):
         
         input_dict = self.to_dict()
         
-        # Loadg/saveg logic
-        if self.loadg is None:
-            input_dict['load_gauge'] = 'fresh'
-        else:
+        # Saveg/loadg logic
+        if should_load_file(self.loadg):
             input_dict['load_gauge'] = 'reload_serial {0}'.format(self.loadg)
-
-        if self.saveg is None:
-            input_dict['save_gauge'] = 'forget'
         else:
+            input_dict['load_gauge'] = 'fresh'
+            
+        if should_save_file(self.saveg):
             input_dict['save_gauge'] = 'save_serial {0}'.format(self.saveg)
+        else:
+            input_dict['save_gauge'] = 'forget'
 
         input_str += pure_gauge_ora_input_template.format(**input_dict)
 
@@ -112,7 +112,7 @@ class PureGaugeORAJob(ConfigGenerator):
 
         # Check for errors
         # Trailing space avoids catching the error_something parameter input
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             for line in f:
                 if "error " in line:
                     raise RuntimeError("ORA ok check fails: Error detected in " + self.fout)
@@ -120,7 +120,7 @@ class PureGaugeORAJob(ConfigGenerator):
         # Check that the appropriate number of GMESes are present
         count_gmes = 0
         count_exit = 0
-        with open(self.fout) as f:
+        with open(str(self.fout)) as f:
             for line in f:
                 if line.startswith("GMES"):
                     count_gmes += 1

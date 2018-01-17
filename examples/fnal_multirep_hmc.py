@@ -5,19 +5,16 @@ import taxi
 import taxi.pool
 import taxi.dispatcher
 import taxi.mcmc as mcmc
-import taxi.apps.mrep_milc.mrep_fncs as mrep_fncs
 import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.hmc_multirep as hmc
 import taxi.apps.mrep_milc.spectro as spectro
 
-import taxi.local.local_queue as local_queue
-
 
 # Plug in desired file-naming conventions
-flow.FlowJob.loadg_filename_convention = mrep_fncs.MrepFnConvention
-flow.FlowJob.fout_filename_convention = mrep_fncs.MrepFnConvention
-spectro.SpectroTask.loadg_filename_convention = mrep_fncs.MrepFnConvention
-spectro.SpectroTask.fout_filename_convention = mrep_fncs.MrepSpectroFnConvention
+flow.FlowJob.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.SpectroTask.loadg.conventions = "{fout_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+flow.FlowJob.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")

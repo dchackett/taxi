@@ -2,9 +2,7 @@
 
 from taxi.mcmc import ConfigMeasurement
 import taxi.local.local_taxi as local_taxi
-
-import taxi.fn_conventions
-import mrep_fncs
+from taxi.file import File, InputFile
 
 ## local_taxi should specify:
 # - "flow_binary"
@@ -30,10 +28,12 @@ forget
 EOF
 """
 
+
 class FlowJob(ConfigMeasurement):
-    fout_filename_prefix = 'flow'
-    fout_filename_convention = mrep_fncs.PureGaugeFnConvention
-    loadg_filename_convention = taxi.fn_conventions.all_conventions_in(mrep_fncs) # Convention: do input/loading FNCs as lists for user-friendliness
+    ## File naming conventions
+    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg = None
     
     binary = local_taxi.flow_binary
     

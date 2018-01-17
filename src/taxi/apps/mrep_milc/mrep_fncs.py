@@ -7,357 +7,35 @@ import os
 import taxi.mcmc
 from taxi.jobs import Copy
 
-## File naming conventions for pure gauge theory
-class PureGaugeFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    def write(self, params):
-        return "{prefix}_{Ns}_{Nt}_{beta}_{label}_{_traj}".format(prefix=self.prefix, 
-                _traj=(params['traj'] if params.has_key('traj') else params['final_traj']), **params)
+from taxi.file import File, InputFile
+
+
+def _convention_metafactory(fmt, postprocessor=None):
+    if not hasattr(fmt, '__iter__'):
+        fmt = [fmt]
+            
+    def _factory(prefix=None, input_file=False):        
+        conventions = [ff.format(prefix=prefix) for ff in fmt]        
+        file_kwargs = dict(conventions=conventions, postprocessor=postprocessor)        
+        return InputFile(**file_kwargs) if input_file else File(**file_kwargs)
     
-    def read(self, fn):
-        words = os.path.basename(fn).split('_')
-        assert len(words) == 6
-        return {
-            'prefix' : words[0],
-            'Ns' : int(words[1]), 'Nt' : int(words[2]),
-            'beta' : float(words[3]),
-            'label' : float(words[5]),
-            'traj' : int(words[5])
-        }
+    return _factory
 
+pure_gauge_fmt = '{prefix}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{label}}_{{traj:d}}'
+pure_gauge = _convention_metafactory(pure_gauge_fmt)
 
-class PureGaugeSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    def write(self, params):
-        # xspec... for screening, tspec... for time-direction; ...spec for normal APBC spectro, ...specpa for P+A spectro
-        prefix = ('x' if params['screening'] else 't') + 'spec' + ('pa' if params['p_plus_a'] else '')
-        
-        return "{prefix}_{irrep}_r{r0}_{Ns}_{Nt}_{beta}_{kappa}_{label}_{_traj}".format(
-                prefix=prefix,
-                _traj=(params['traj'] if params.has_key('traj') else params['final_traj']),
-                **params)
-        
-    def read(self, fn):
-        words = os.path.basename(fn).split('_')
-        assert len(words) == 9
-        assert 'spec' in words[0]
-        return {
-            'file_prefix' : words[0],
-            'p_plus_a' : words[0].endswith('pa'),
-            'screening' : words[0].startswith('x'),
-            'irrep' : words[1],
-            'r0' : float(words[2][1:]),
-            'Ns' : int(words[3]), 'Nt' : int(words[4]),
-            'beta' : float(words[5]),
-            'kappa' : float(words[6]),
-            'label' : words[7],
-            'traj' : int(words[8])
-        }
-        
-        
-        
-## File naming conventions for the SU(4) 2xF 2xA_2 multirep theory
-class MrepFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        k4 = params.get('k4', 0)
-        k6 = params.get('k6', 0)
-        
-        return "{prefix}_{Ns}_{Nt}_{beta}_{_k4}_{_k6}_{label}_{_traj}".format(
-                prefix=self.prefix, _k4=k4, _k6=k6,
-                _traj=(params['traj'] if params.has_key('traj') else params['final_traj']),
-                **params)
-    
-    def read(self, fn):
-        words = os.path.basename(fn).split('_')
-        assert len(words) == 8
-        return {
-            'file_prefix' : words[0],
-            'Ns' : int(words[1]), 'Nt' : int(words[2]),
-            'beta' : float(words[3]),
-            'k4' : float(words[4]),
-            'k6' : float(words[5]),
-            'label' : words[6],
-            'traj' : int(words[7])
-        }
-        
-        
-class MrepSpectroFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    def write(self, params):
-        # xspec... for screening, tspec... for time-direction; ...spec for normal APBC spectro, ...specpa for P+A spectro
-        prefix = ('x' if params['screening'] else 't') + 'spec' + ('pa' if params['p_plus_a'] else '')
-        
-        # Assume each kappa=0 if not specified
-        k4 = params.get('k4', 0)
-        k6 = params.get('k6', 0)
-        
-        return "{prefix}_{irrep}_r{r0}_{Ns}_{Nt}_{beta}_{_k4}_{_k6}_{label}_{_traj}".format(
-                prefix=prefix, _k4=k4, _k6=k6,
-                _traj=(params['traj'] if params.has_key('traj') else params['final_traj']),
-                **params)
-        
-    def read(self, fn):
-        words = os.path.basename(fn).split('_')
-        assert len(words) == 10
-        assert 'spec' in words[0]
-        return {
-            'file_prefix' : words[0],
-            'p_plus_a' : words[0].endswith('pa'),
-            'screening' : words[0].startswith('x'),
-            'irrep' : words[1],
-            'r0' : float(words[2][1:]),
-            'Ns' : int(words[3]), 'Nt' : int(words[4]),
-            'beta' : float(words[5]),
-            'k4' : float(words[6]), 'k6' : float(words[7]),
-            'label' : words[8],
-            'traj' : int(words[9])
-        }
+pure_gauge_spectro_fmt = '{prefix}_{{irrep}}_r{{r0:g}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{kappa:g}}_{{label}}_{{traj:d}}'
+pure_gauge_spectro = _convention_metafactory(pure_gauge_spectro_fmt)
 
-class MrepSpectroWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep spectroscopy filename conventions used by wijay """
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        params['file_prefix'] = 'outCt'
-        params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k6',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
-            format(**params)
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 8),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert words[0] == 'outCt',\
-            "Error: Does filename refer to a correlation function output file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'irrep' : words[5],
-            'r0' : float(words[6].strip('gf')),
-            'traj' : int(words[7]),
-        }
+mrep_dh_fmt = '{prefix}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}'
+mrep_dh = _convention_metafactory(mrep_dh_fmt)
+
+mrep_dh_spectro_fmt = [
+        '{prefix}_{{irrep}}_r{{r0:g}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}',
+        '{prefix}_{{irrep}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}',
+    ]
+mrep_dh_spectro = _convention_metafactory(mrep_dh_spectro_fmt)
         
-class MrepGaugeWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep gauge binary filename conventions used by wijay """
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k6',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
-            format(**params)
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 6),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'cfg'),\
-            "Error: Does filename refer to a gauge binary file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'traj' : int(words[5]),
-        }
-        
-class MrepPropWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep propagator binary filename conventions used by wijay """
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        params['file_prefix'] = 'prop'        
-        params['k4'] = params.get('k4',0)
-        params['k6'] = params.get('k6',0)        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}gf_{traj}".\
-            format(**params)
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 8),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'prop'),\
-            "Error: Does filename refer to a propagator binary file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'irrep' : words[5],
-            'r0' : float(words[6].strip('gf')),
-            'traj' : int(words[7]),
-        }
-
-class MrepModesOverlapOutputWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """
-    Multirep filename convention for text output for eigenmode preconditioning
-    for overlap propagators used by wijay
-    """
-    def write(self, params):
-        params['file_prefix'] = 'outOverlapModes'
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
-            format(**params)
-    
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 6),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'outOverlapModes'),\
-            "Error: Does filename refer to a overlap preconditioning output file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'traj' : int(words[5]),
-        }
-
-class MrepGaugeLandauWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep Landau gauge-fixed gauge binary filename conventions used by wijay """
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        params['file_prefix'] = 'cfgLandau'        
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
-            format(**params)
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 6),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'cfgLandau'),\
-            "Error: Does filename refer to a gauge binary file after fixing to Landau gauge?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'traj' : int(words[5]),
-        }
-
-class MrepH0WijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep H0 eigenmode output binary filename conventions used by wijay """
-    def write(self, params):
-        params['file_prefix'] = 'h0'        
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
-            format(**params)
-
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 6),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'h0'),\
-            "Error: Does filename refer to h0 binary file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'traj' : int(words[5]),
-        }
-
-
-class MrepHovWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep hov eigenmode output binary filename conventions used by wijay """
-    def write(self, params):
-        params['file_prefix'] = 'hov'        
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{traj}".\
-            format(**params)
-
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 6),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'hov'),\
-            "Error: Does filenane refer to hov binary file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'traj' : int(words[5]),
-        }
-
-class MrepPropOverlapWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Multirep propagator binary filename conventions used by wijay """
-    def write(self, params):
-        # Assume each kappa=0 if not specified
-        params['file_prefix'] = 'propOverlap'        
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}_{traj}".\
-            format(**params)
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)
-        assert (len(words) == 8),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'propOverlap'),\
-            "Error: Does filename refer to an overlap propagator binary file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'irrep' : words[5],
-            'r0' : float(words[6]),
-            'traj' : int(words[7]),
-        }
-
-class MrepPropOverlapOutputWijayFnConvention(taxi.mcmc.BasicMCMCFnConvention):
-    """ Output filename convention for overlap propagators used by wijay """
-    def write(self, params):
-        params['file_prefix'] = 'outPropOverlap'
-        assert ('k4' in params),\
-            "Error: missing 'k4', no support for default of zero."
-        assert ('k6' in params),\
-            "Error: missing '64', no support for default of zero."        
-        return "{file_prefix}_{Ns}{Nt}_b{beta}_kf{k4}_kas{k6}_{irrep}_{r0}_{traj}".\
-            format(**params)
-
-    def read(self, fn, delim='_'):
-        words = os.path.basename(fn).split(delim)    
-        assert (len(words) == 8),\
-            "Error: Does filename satisfy wijay conventions?"
-        assert (words[0] == 'outPropOverlap'),\
-            "Error: Does filename refer to an overlap propagator output file?"
-        return {
-            'file_prefix' : words[0],
-            'Ns' : words[1][:2],
-            'Nt' : words[1][2:],
-            'beta' : float(words[2][1:]),
-            'k4' : float(words[3][2:]),
-            'k6' : float(words[4][3:]),
-            'irrep' : words[5],
-            'r0' : float(words[6]),
-            'traj' : int(words[7]),
-        }
 
 def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
     out_dir = taxi.expand_path(out_dir)
@@ -402,6 +80,48 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
             copy_jobs.append(new_copy_job)
     
     return copy_jobs
+
+
+
+def _wijay_volume_postprocessor(parsed):
+    assert parsed.has_key('Ns') and parsed.has_key('Nt'), str(parsed)
+    vol_str = str(parsed['Ns']) + str(parsed['Nt'])
+    assert len(vol_str) == 4, "wijay format doesn't know what to do with '{0}'; len({{Ns}}{{Nt}}) != 4".format(vol_str)
+    parsed['Ns'] = int(vol_str[:2])
+    parsed['Nt'] = int(vol_str[2:])
+    return parsed
+
+        
+mrep_wijay_gauge_fmt = 'cfg_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{label}}_{{traj:d}}'
+mrep_wijay_gauge = _convention_metafactory(mrep_wijay_gauge_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_spectro_fmt = 'outCt_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}gf_{{traj:d}}'
+mrep_wijay_spectro = _convention_metafactory(mrep_wijay_spectro_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_prop_fmt = 'prop_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}gf_{{traj:d}}'
+mrep_wijay_prop = _convention_metafactory(mrep_wijay_prop_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_modes_overlap_output_fmt = 'outOverlapModes_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
+mrep_wijay_modes_overlap_output = _convention_metafactory(mrep_wijay_modes_overlap_output_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_gauge_landau_fmt = 'cfgLandau_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
+mrep_wijay_gauge_landau = _convention_metafactory(mrep_wijay_gauge_landau_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_h0_fmt = 'h0_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
+mrep_wijay_h0 = _convention_metafactory(mrep_wijay_h0_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_hov_fmt = 'hov_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
+mrep_wijay_hov = _convention_metafactory(mrep_wijay_hov_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_prop_overlap_fmt = 'propOverlap_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}_{{traj:d}}'
+mrep_wijay_prop_overlap = _convention_metafactory(mrep_wijay_prop_overlap_fmt, postprocessor=_wijay_volume_postprocessor)
+
+mrep_wijay_prop_overlap_output_fmt = 'outPropOverlap_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}_{{traj:d}}'
+mrep_wijay_prop_overlap_output = _convention_metafactory(mrep_wijay_prop_overlap_output_fmt, postprocessor=_wijay_volume_postprocessor)
+
+
+
+
             
             
             

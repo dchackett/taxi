@@ -6,6 +6,8 @@ import taxi.local.local_taxi as local_taxi
 
 from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list, ensure_path_exists
 
+from taxi.file import File, should_save_file, output_file_attributes_for_task
+
 from copy import copy, deepcopy
 
 import hashlib # For checksum comparisons by Copy
@@ -57,10 +59,13 @@ class Task(object):
             if k in self._currently_evaluating_properties:
                 continue # Don't let evaluating a property depend on evaluating a property
             try: # Try to evaluate property
-                if isinstance(getattr(self.__class__, k), property):
                 # TODO: Switch to a working duck-typed check for 'property'
                 # The current problem is that (at least) instance methods also have __get__
                 # if hasattr(getattr(self.__class__, k), '__get__'):
+                # UPDATE: Trying out checks for '__get__' and '__set__', which should exclude
+                # methods
+                class_attr = getattr(self.__class__, k)
+                if isinstance(class_attr, property) or (hasattr(class_attr, '__get__') and hasattr(class_attr, '__set__')):
                     self._currently_evaluating_properties.add(k)
                     d[k] = getattr(self, k)
             except AttributeError:
@@ -160,7 +165,7 @@ class Runner(Task):
     
     binary = 'echo' # Default: For testing purposes
     
-    def __init__(self, cores=None, use_mpi=None, **kwargs):
+    def __init__(self, cores=None, use_mpi=None, allow_output_clobbering=False, **kwargs):
         super(Runner, self).__init__(**kwargs)
         
         # MPI - Don't clobber anything set by a subclass
@@ -169,6 +174,7 @@ class Runner(Task):
         if not hasattr(self, 'use_mpi'):
             self.use_mpi = use_mpi
             
+        self.allow_output_clobbering = allow_output_clobbering
         self.output_files = []
         
 
@@ -178,7 +184,8 @@ class Runner(Task):
     def verify_output(self):
         pass
     
-    def execute(self, cores=None):          
+    def execute(self, cores=None):    
+        ## Core logic -- reconcile task cores and taxi cores
         if cores is None or self.cores is None:
             if self.cores is not None:
                 cores = self.cores
@@ -189,7 +196,9 @@ class Runner(Task):
         elif cores > self.cores:
             print "WARNING: Running with {n1} cores for task < {n0} cores for taxi.".format(n0=cores, n1=self.cores)
             cores = self.cores
-            
+        
+        
+        ## Prepare to use MPI, if desired
         if self.use_mpi is not None:
             use_mpi = self.use_mpi
         else:
@@ -202,13 +211,44 @@ class Runner(Task):
             exec_str = local_taxi.mpirun_str.format(cores) + " "
         else:
             exec_str = ""
+            
+        
+        ## Non-clobbering behavior
+        if not self.allow_output_clobbering:
+            # Find files that the task intends to save, check if they already exist            
+            to_clobber = []
+            for ofa in output_file_attributes_for_task(self):
+                ofn = getattr(self, ofa, None)
+                if should_save_file(ofn) and os.path.exists(str(ofn)):
+                    print "WARNING: File {0}={1} already exists, attempting to verify output.".format(ofa, ofn)
+                    to_clobber.append(ofn)
+                    
+            if len(to_clobber) > 0:
+                self.verify_output()
+                # Verify output throws an error and blocks rest of function if output isn't correct
+                print "WARNING: Pre-existing well-formatted output (according to verify_output()) detected; skipping running"
+                return # Never clobber
 
+        
+        ## Keep track of absolute paths of output files created, for rollbacking
+        # For user-friendliness, only have to provide a list of attributes that may contain output filenames
+        # Track these before execution. If output fails, want to have a list of output files that may have been created.
+        for ofa in output_file_attributes_for_task(self):
+            ofn = getattr(self, ofa, None)
+            if should_save_file(ofn):
+                self.output_files.append(expand_path(str(ofn)))
+
+        ## Construct binary call and execute
         exec_str += self.binary + " "
         exec_str += self.build_input_string().strip() # Remove leading and trailing whitespace from input string
+
+        # Only keep track of files that were actually created
+        self.output_files = [ofn for ofn in self.output_files if os.path.exists(str(ofn))]
 
         #print "exec:", exec_str
         os.system(exec_str)
 
+        ## Verify output
         self.verify_output()
         
         
@@ -227,7 +267,7 @@ class Runner(Task):
         
             self.output_files = [fn for fn in self.output_files if fn is not None] # Happens when e.g. MCMC passes saveg up, but saveg was None
             
-            for fn in self.output_files:
+            for fn in [str(ss) for ss in self.output_files]:
                 
                 if not os.path.exists(fn):
                     print "Rollback unable to find file: '{0}'".format(fn)
@@ -262,6 +302,10 @@ class Copy(Runner):
     Unlike the usual runner, doesn't call a binary."""
     
     binary = "rsync -Paz"
+    
+    ## Modularized file naming conventions
+    # src = InputFile(...) # Unnecessary to track src, don't ever parse the fn
+    dest = File(conventions=None, save=True) # Let rollbacker know to track this file
     
     def __init__(self, src, dest, allow_overwrite=False, req_time=60, **kwargs):
         super(Copy, self).__init__(req_time=req_time, **kwargs)
@@ -304,11 +348,5 @@ class Copy(Runner):
         
         ensure_path_exists(os.path.dirname(self.dest))       
         print "{0} -> {1}".format(self.src, self.dest)
-        shutil.copy2(self.src, self.dest)
-        
-    
-    def rollback(self, rollback_dir=None, delete_files=False):
-        self.output_files.append(self.dest)
-        
-        super(Copy, self).rollback(rollback_dir=rollback_dir, delete_files=delete_files)
+        shutil.copy2(self.src, self.dest) 
     
