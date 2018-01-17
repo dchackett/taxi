@@ -3,7 +3,6 @@
 # Definition of "Dispatcher" class - manages task forest and assigns tasks to Taxis.
 
 import os
-import time
 import json
 from taxi._utility import LocalEncoder
 
@@ -222,7 +221,7 @@ class Dispatcher(object):
         task_blob = [t for t in task_blob.values() if t.status == 'pending']
         
         if for_taxi is not None:
-            for_taxi = str(taxi)
+            for_taxi = str(for_taxi)
             task_blob = [t for t in task_blob if t.for_taxi == for_taxi] # Specifically jobs for this taxi
         
         N_ready_jobs = 0
@@ -658,15 +657,51 @@ class SQLiteDispatcher(Dispatcher):
         my_pool.update_taxi_dispatch(my_taxi, self.db_path)
 
 
+    def rebuild_json_task(self, r):
+        # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
+        if r.get('depends_on', None) is not None:
+            r['depends_on'] = json.loads(r['depends_on'])
+        
+        # Big complicated dictionary of task args in JSON format
+        if r.has_key('payload'):
+            r['payload'] = json.loads(r['payload'])
+                
+        if self.class_dict.has_key(r['task_type']):
+            task_class = self.class_dict[r['task_type']]
+        else:
+            raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
+            
+        rebuilt = BlankObject()
+        #rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
+        rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
+        #rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
+        
+        # Set attributes appropriately -- set task class first for proper dynamic behavior
+        for k, v in r.items():
+            try:
+                setattr(rebuilt, k, v)
+            except AttributeError:
+                pass # For non-settable properties
+                
+        # Deploy payload
+        for k, v in rebuilt.__dict__.pop('payload', {}).items():
+            try:
+                setattr(rebuilt, k, v)
+            except AttributeError:
+                pass # For non-settable properties
+        
+        return rebuilt
+            
+
     def get_task_blob(self, my_taxi=None, include_complete=True):
-        """Get all incomplete tasks pertinent to this taxi (or to all taxis.)"""
+        """Get all incomplete tasks runnable by specified taxi (my_taxi), or all
+        tasks (if my_taxi is not provided)."""
 
         if (my_taxi is None):
             task_query = """
-                SELECT * FROM tasks
-                WHERE (for_taxi IS null)"""
+                SELECT * FROM tasks """
             if (not include_complete):
-                task_query += """AND (status != 'complete')"""
+                task_query += """ WHERE (status != 'complete')"""
 
             task_res = self.execute_select(task_query)
         else:
@@ -686,36 +721,11 @@ class SQLiteDispatcher(Dispatcher):
 
         # Dictionaryize everything
         task_res = map(dict, task_res)
-        for r in task_res:
-            # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
-            if r['depends_on'] is not None:
-                r['depends_on'] = json.loads(r['depends_on'])
-            
-            # Big complicated dictionary of task args in JSON format
-            if r['payload'] is not None:
-                r['payload'] = json.loads(r['payload'])
-                
         
         # Objectify and package as task_id : task dict
         res_dict = {}
         for r in task_res:
-            if self.class_dict.has_key(r['task_type']):
-                task_class = self.class_dict[r['task_type']]
-            else:
-                raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
-            
-            rebuilt = BlankObject()
-            rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
-            rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
-            #rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
-            # Deploy payload
-            for k, v in rebuilt.__dict__.pop('payload', {}).items():
-                try:
-                    setattr(rebuilt, k, v)
-                except AttributeError:
-                    pass # For non-settable properties
-                
-            res_dict[r['id']] = rebuilt
+            res_dict[r['id']] = self.rebuild_json_task(r)    
         
         
         # Replace ID dependencies with object dependencies

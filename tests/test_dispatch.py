@@ -4,6 +4,7 @@ import unittest
 import mock
 import os
 import sqlite3
+import json
 
 from taxi.dispatcher import *
 from taxi.jobs import *
@@ -35,7 +36,24 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             with self.assertRaises(sqlite3.OperationalError):
                 self.test_dispatch.conn.execute("""SELECT fake_column FROM taxis""")
 
-            
+    def test_json_rebuild(self):
+        json_one = {'task_type': 'Copy', 'src': 'abc', 'dest': 'xyz' }
+        json_two = {'task_type': 'Copy', 'src': 'abc', 'dest': 'xyz', 'bad_arg': 4 }
+        json_three = {'task_type': 'FakeRunner'}
+
+        obj_one = self.test_dispatch.rebuild_json_task(json_one)
+        self.assertTrue(isinstance(obj_one, Copy))
+        self.assertEqual(obj_one.src, 'abc')
+        self.assertEqual(obj_one.dest, 'xyz')
+
+        obj_two = self.test_dispatch.rebuild_json_task(json_two)
+        self.assertTrue(isinstance(obj_two, Copy))
+        self.assertEqual(obj_two.src, 'abc')
+        self.assertEqual(obj_two.dest, 'xyz')
+        
+        with self.assertRaises(TypeError):
+            obj_three = self.test_dispatch.rebuild_json_task(json_three)
+        
     def test_populate_task_pool(self):
         test_job = Task(req_time=33)
         test_job_two = Task(req_time=44)

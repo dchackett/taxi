@@ -346,7 +346,9 @@ class Copy(Runner):
             else:
                 raise Exception("Path '{0}' already exists and overwriting not allowed".format(self.dest))
         
-        ensure_path_exists(os.path.dirname(self.dest))       
+        dest_dirname = os.path.dirname(self.dest)
+        if len(dest_dirname) > 0:
+            ensure_path_exists(os.path.dirname(self.dest))
         print "{0} -> {1}".format(self.src, self.dest)
         shutil.copy2(self.src, self.dest) 
     

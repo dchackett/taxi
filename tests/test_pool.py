@@ -4,10 +4,12 @@ import unittest
 import mock
 import os
 import sqlite3
+import time
 
 import taxi
-from taxi.pool import *
-from taxi.batch_queue import *
+from taxi.pool import Pool, SQLitePool
+from taxi.dispatcher import Dispatcher
+from taxi.batch_queue import BatchQueue
 
 class TestSQLiteBase(unittest.TestCase):
     def setUp(self):
@@ -149,6 +151,8 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
     def setUp(self):
         super(TestSQLitePoolQueueInteraction, self).setUp()
 
+        # Three taxis in pool; taxi_one and taxi_two start with status='I' (default)
+        # taxi_three starts with status='H' (hold)
         with self.test_pool:
             self.taxi_one = taxi.Taxi(time_limit=4000., cores=8, nodes=1, name="one")
             self.taxi_two = taxi.Taxi(time_limit=9999., cores=1, nodes=1, name="two")
@@ -166,9 +170,19 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
     def test_spawn_idle_taxis(self):
         my_queue = BatchQueue()
         my_queue.launch_taxi = mock.MagicMock()
+        # Pool asks queue about taxi statuses; tell Pool that no taxis are present in queue.
+        my_queue.report_taxi_status_by_name = mock.Mock(return_value={'status':'X', 'job_number':None, 'running_time':None})
     
+        # Spoof a Dispatcher
+        my_dispatcher = mock.Mock()
+        # Pool asks Dispatcher which taxis should be running for workload; tell Pool that all are needed
+        my_dispatcher.should_taxis_be_running = mock.Mock(return_value={'one':True, 'two':True, 'three':False})
+        # Spoof context to test SQLitePool without using SQLiteDispatcher
+        my_dispatcher.__enter__ = mock.Mock(return_value=None)
+        my_dispatcher.__exit__ = mock.Mock(return_value=None)        
+        
         with self.test_pool:
-            self.test_pool.spawn_idle_taxis(my_queue)
+            self.test_pool.spawn_idle_taxis(dispatcher=my_dispatcher, queue=my_queue)
 
             taxi_one_return = self.test_pool.get_taxi(self.taxi_one)
             self.assertGreater(taxi_one_return.time_last_submitted, 0.)
@@ -189,6 +203,7 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
     def test_submit_to_queue(self):
         my_queue = BatchQueue()
         my_queue.launch_taxi = mock.MagicMock()
+        my_queue.report_taxi_status_by_name = mock.Mock(return_value={'status' : 'Q', 'job_number' : 1, 'running_time' : 0})
 
         with self.test_pool:
             self.test_pool.update_taxi_last_submitted(self.taxi_two, time.time())
@@ -252,16 +267,16 @@ class TestSQLitePoolQueueInteraction(TestSQLiteBase):
         with self.test_pool:
             self.test_pool.update_taxi_status(self.taxi_two, 'R')
 
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'I')
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'R')
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'I') # vs. Q on queue
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'R') # vs. X on queue
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H') # vs. X on queue
 
             my_queue.report_taxi_status = mock.MagicMock(side_effect=status_list)
             self.test_pool.update_all_taxis_queue_status(my_queue)
 
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'Q')
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'I')
-            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H')
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_one).status, 'Q') # Pool spawned idle taxi
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_two).status, 'M') # Taxi should have been running, but was MIA
+            self.assertEqual(self.test_pool.get_taxi(self.taxi_three).status, 'H') # Taxi was held, and isn't on queue -- ok!
     
 
 

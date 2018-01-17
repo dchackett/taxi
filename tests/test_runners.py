@@ -6,28 +6,12 @@ import os
 #import sqlite3
 import json
 
-from taxi.jobs import * # Must import * to get all Job classes in globals() scope
+from taxi.jobs import Copy # Must import * to get all Job classes in globals() scope
 import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.pure_gauge_ora as pure_gauge_ora
 
 class TestBaseTaskRunner(unittest.TestCase):
-    
-    def test_json_rebuild(self):
-        json_one = json.dumps({'task_type': 'Copy', 'src': 'abc', 'dest': 'xyz' })
-        json_two = json.dumps({'task_type': 'Copy', 'src': 'abc', 'dest': 'xyz', 'bad_arg': 4 })
-        json_three = json.dumps({'task_type': 'FakeRunner'})
-
-        runner_parser = runner_rebuilder_factory()
-
-        obj_one = json.loads(json_one, object_hook=runner_parser)
-        self.assertTrue(isinstance(obj_one, Copy))
-        self.assertEqual(obj_one.dest, 'xyz')
-
-        obj_two = json.loads(json_two, object_hook=runner_parser)
-        self.assertTrue(isinstance(obj_two, Copy))
-
-        obj_three = json.loads(json_three, object_hook=runner_parser)
-        self.assertTrue(isinstance(obj_three, dict))
+    pass
 
 
 class TestCopy(unittest.TestCase):
@@ -36,8 +20,6 @@ class TestCopy(unittest.TestCase):
         self.src = 'test_file_abc'
         self.dest = 'test_file_xyz'
 
-        self.runner_parser = runner_rebuilder_factory()
-
         os.system("touch {}".format(self.src))
 
     def tearDown(self):
@@ -45,10 +27,7 @@ class TestCopy(unittest.TestCase):
         os.remove(self.dest)
 
     def test_copy(self):
-        json_copy = json.dumps({'task_type': 'Copy', 'src': self.src, 'dest': self.dest,
-                                'use_mpi' : False, 'binary' : 'rsync -Paz', 'cores' : None})
-
-        copy_run = json.loads(json_copy, object_hook=self.runner_parser)
+        copy_run = Copy(src=self.src, dest=self.dest)
         copy_run.execute(cores=1)
 
         self.assertTrue(os.path.exists(self.dest))

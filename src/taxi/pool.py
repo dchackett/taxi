@@ -110,6 +110,7 @@ class Pool(object):
             traceback.print_exc()
         
         self.update_taxi_last_submitted(my_taxi, time.time())
+        self.update_taxi_queue_status(my_taxi, queue=queue) # 'I' -> 'Q' or 'E', depending on if submission worked
 
 
     def remove_taxi_from_queue(self, my_taxi, queue=None):
@@ -189,7 +190,7 @@ class Pool(object):
         # Ask dispatcher which taxis should be running
         with dispatcher:
             should_be_running = dispatcher.should_taxis_be_running(taxi_list)
-        
+
         # Look through the taxis in the pool, put them in active/inactive states as desired
         for my_taxi in taxi_list:
             if not should_be_running.has_key(str(my_taxi)):

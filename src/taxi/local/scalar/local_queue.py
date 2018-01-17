@@ -108,7 +108,7 @@ class LocalQueue(BatchQueue):
 
         self.execute_update(taxi_launch_query, taxi.name, 'Q', taxi_args_str)
         
-        return self.report_taxi_status_by_name(self, taxi.name)['job_number']
+        return self.report_taxi_status_by_name(taxi.name)['job_number']
 
 
     def cancel_job(self, job_number):

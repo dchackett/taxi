@@ -49,11 +49,11 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         self.squeue = qrun.SQLiteSerialQueue()
 
         ## Set up test pool
-        self.my_taxi = taxi.Taxi(name='test1', pool_name='test_pool', time_limit=120, nodes=1, cores=1)
+        self.my_taxi = taxi.Taxi(name='test1', time_limit=120, nodes=1, cores=1)
 
         self.pool_path = './test_run/test-pool.sqlite'
-        self.pool_wd = './test_run/pool'
-        self.pool_ld = './test_run/pool/log'
+        self.pool_wd = './test_run/'
+        self.pool_ld = './test_run/log'
         self.my_pool = taxi.pool.SQLitePool(self.pool_path, 'test_pool', self.pool_wd, self.pool_ld)
 
         ## Set up test dispatch
@@ -170,7 +170,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(pool_stat[0].time_last_submitted, None)
         
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi)
+            task_blob = self.my_disp.get_task_blob()
             self.assertEqual(task_blob[1].status, 'pending')
             self.assertEqual(task_blob[1].run_time, -1.0)
 
@@ -194,6 +194,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         ## Check for successful copy
         files = os.listdir('./test_run')
+        print files
         self.assertTrue(self.dst_files[0].split('/')[-1] in files)
 
         ## Check for correct pool status
@@ -258,34 +259,46 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test re-launch detection for idle taxis
     def test_taxi_relaunch(self):
+        print map(dict, self.my_queue.execute_select("SELECT * FROM queue"))
+        print map(dict, self.my_disp.execute_select("SELECT * FROM tasks"))
+        
         # Set up single copy task pool, registered to test1
         test_job = taxi.jobs.Copy(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
 
         with self.my_disp:
             self.my_disp.initialize_new_job_pool([test_job])
-
+        
         # Add a second taxi to the pool and queue it
-        taxi_two = taxi.Taxi(name='test2', pool_name='test_pool', time_limit=120, nodes=1, cores=1)
+        taxi_two = taxi.Taxi(name='test2', time_limit=120, nodes=1, cores=1)
         with self.my_pool:
             self.my_pool.register_taxi(taxi_two)
             self.my_disp.register_taxi(taxi_two, self.my_pool)
             self.my_pool.submit_taxi_to_queue(taxi_two, self.my_queue)
-
+        
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
-
+            
+        with self.my_pool:
+            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
+        
         # Run queue with the second, jobless taxi
+        # During this step: taxi_two should detect that there is a job it cannot
+        # run, and launch my_taxi to run it.
         with self.squeue:
             self.squeue.run_next_job()
-
+            
+        with self.my_pool:
+            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
+    
         # After one step, the second taxi should be held, the first still idle
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
-            self.assertEqual(pool_stat[0].status, 'I')
+            self.assertEqual(pool_stat[0].status, 'Q')
             self.assertEqual(pool_stat[1].status, 'H')
 
         # The first taxi should now be queued into the 'batch' system
         qstat = self.my_queue.report_taxi_status(self.my_taxi)
+        self.assertEqual(qstat['status'], 'Q')
         self.assertEqual(qstat['job_number'], 2)
 
         # And the copy task should still be unfinished
@@ -302,6 +315,9 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             pool_stat = self.my_pool.get_all_taxis_in_pool()
             self.assertEqual(pool_stat[0].status, 'H')
             self.assertEqual(pool_stat[1].status, 'H')
+            
+        with self.my_pool:
+            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
 
         # The task should be finished
         with self.my_disp:
