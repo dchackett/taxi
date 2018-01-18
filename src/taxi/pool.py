@@ -11,7 +11,13 @@ import traceback
 import taxi.local.local_queue
 
 class Pool(object):
-
+    """Abstract implementation of a Pool of Taxis. The Pool keeps track of the status
+    of individual taxis (i.e., which taxis are running, queued, idled, or have been
+    put on hold, died due to some error, or is missing from the queue). The Pool
+    also manages submission of taxis, and communicates with a Dispatcher to
+    determine which taxis should be running.
+    """
+    
     taxi_status_codes = [
         'Q',    # queued
         'R',    # running
@@ -39,27 +45,48 @@ class Pool(object):
     ### Backend interaction ###
     
     def __enter__(self):
+        """Context-manager infrastructure. Pool probably connects to a DB; useful
+        to keep connection open for multiple operations, but not leave it open
+        constantly."""
         raise NotImplementedError
         
     def __exit__(self):
+        """Context-manager infrastructure. Pool probably connects to a DB; useful
+        to keep connection open for multiple operations, but not leave it open
+        constantly."""
         raise NotImplementedError
     
     def get_all_taxis_in_pool(self):
+        """Returns a list of Taxi objects for all taxis in this pool.
+        
+        The returned taxi objects are not synchronized with the pool; any changes made to them
+        will not be reflected in the pool unless they are written back in."""
         raise NotImplementedError
 
     def get_taxi(self, my_taxi):
+        """Retrieves a specific taxi object, provided the name.
+        
+        The returned taxi object is not synchronized with the pool; any changes made to it
+        will not be reflected in the pool unless they are written back in."""
         raise NotImplementedError
     
     def update_taxi_status(self, my_taxi, status):
+        """Changes the status for taxi my_taxi (either name or Taxi object) in the
+        pool to the provided status."""
         raise NotImplementedError
 
     def update_taxi_last_submitted(self, my_taxi, last_submit_time):
+        """Updates the time when the taxi my_taxi (either name or Taxi object)
+        in the pool to the provided time (e.g. time.time())."""
         raise NotImplementedError
 
-    def register_new_taxi(self, my_taxi):
+    def register_taxi(self, my_taxi):
+        """Adds the taxi (Taxi object) my_taxi to the pool.  Also, tells my_taxi which pool
+        it is associated with."""
         raise NotImplementedError
 
     def delete_taxi_from_pool(self, my_taxi):
+        """Remove my_taxi from the pool."""
         # Pseudocode:
         # If taxi is a taxi object, extract id.
         # Otherwise, if it's an integer assume it's already an id.
@@ -70,6 +97,10 @@ class Pool(object):
     ### Queue interaction ###
 
     def check_for_thrashing(self, my_taxi):
+        """Makes sure my_taxi hasn't been submitted multiple times in quick succession, which
+        can quickly burn off an allocation if left unchecked.
+        
+        'Quick succession' is defined by Pool.thrash_delay, a value in seconds."""
         last_submit = self.get_taxi(my_taxi).time_last_submitted
 
         if last_submit is None:
@@ -84,6 +115,9 @@ class Pool(object):
 
 
     def submit_taxi_to_queue(self, my_taxi, queue=None, **kwargs):
+        """Submits the Taxi object my_taxi to the batch queue.  If no queue is provided,
+        instantiates local_queue.LocalQueue."""
+        
         print "LAUNCHING TAXI {0}".format(my_taxi)
         
         if queue is None:
@@ -114,7 +148,8 @@ class Pool(object):
 
 
     def remove_taxi_from_queue(self, my_taxi, queue=None):
-        """Remove all jobs from the queue associated with the given taxi.
+        """Remove all jobs from the queue associated with my_taxi.  If no queue is provided,
+        instantiates local_queue.LocalQueue.
         """
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
@@ -124,12 +159,18 @@ class Pool(object):
         for job in taxi_status['job_numbers']:
             queue.cancel_job(job)
 
-        return
-
 
     ### Control logic ###
 
     def update_all_taxis_queue_status(self, queue=None, dispatcher=None):
+        """Looks at the queue and updates the status of all of the taxis in the pool,
+        depending on whether the taxis are in the queue running or queued, or absent
+        from the queue.
+        
+        If no queue is provided, instantiates local_queue.LocalQueue.  If no dispatcher
+        is provided, won't be able to mark tasks as abandoned when missing taxis are
+        detected.
+        """
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
@@ -139,6 +180,15 @@ class Pool(object):
 
 
     def update_taxi_queue_status(self, my_taxi, queue=None, dispatcher=None):
+        """Checks the status of taxi my_taxi in the batch queue, and updates the
+        status in the pool.  If no queue is provided, instantiates local_queue.LocalQueue.
+        If no dispatcher is provided, cannot mark tasks as abandoned when missing taxis
+        are detected.
+        
+        If a taxi is supposed to be either queued or running, but is absent from the
+        batch queue, it is marked missing 'M' in the pool.  If a dispatcher is provided,
+        the missing taxi's tasks are marked abandoned.
+        """
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
@@ -180,6 +230,13 @@ class Pool(object):
 
 
     def spawn_idle_taxis(self, dispatcher, queue=None):
+        """Pool communicates with the provided dispatcher to figure out which taxis
+        should be running.  If the dispatcher determines that the workload can support
+        additional taxis, it will tell the pool to activate some of its idle taxis.
+        If specific taxis are needed to run part of the workload, but they are idle,
+        the dispatcher will tell the pool to activate those taxis.
+        """
+        
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
@@ -226,10 +283,22 @@ class SQLitePool(Pool):
                  allocation=None, queue=None,
                  thrash_delay=300):
         """
-        Argument options: either [db_path, pool_name(, thrash_delay)] are specified, or
-        [work_dir, log_dir(, thrash_delay)] are specified.  If all are specified,
-        then [db_path, pool_name] takes priority and the remaining inputs
-        are ignored.
+        Argument options: either [db_path(, pool_name, thrash_delay)] are specified,
+        which specifies the location of an existing pool; or,
+        [work_dir, log_dir(, pool_name, thrash_delay)] are specified, which specifies
+        where to create a new pool.  If all are specified,
+        then [db_path, pool_name] takes priority (e.g., access existing pool
+        behavior) and the remaining inputs are ignored.
+        
+        If no pool_name is provided when accessing an existing DB, and there is only
+        one pool in the pool DB, then it accesses that one.  If more than one pool
+        is present, must specify pool_name.
+        
+        If creating a new pool DB, and pool_name is not specified, names the pool
+        'default'.
+        
+        queue specifies which queue/machine to submit to, if relevant
+        (e.g., bc or ds on the USQCD machines).
         """
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
              thrash_delay=thrash_delay, allocation=allocation, queue=queue)
@@ -322,6 +391,9 @@ class SQLitePool(Pool):
     ## This automatically takes care of setup/teardown without any try/finally clause.
     
     def __enter__(self):
+        """Context interface: connect to SQLite Pool DB.  If performing multiple operations,
+        faster to leave a "connection" open than to open and close it repeatedly; dangerous
+        to leave a connection open constantly."""
         # Don't allow layered entry
         if self._in_context:
             return
@@ -336,6 +408,9 @@ class SQLitePool(Pool):
         taxi.ensure_path_exists(taxi.expand_path(self.log_dir)) # Dig out log directory if it doesn;t exist
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
+        """Context interface: connect to SQLite Pool DB.  If performing multiple operations,
+        faster to leave a "connection" open than to open and close it repeatedly; dangerous
+        to leave a connection open constantly."""
         self.conn.close()
 #        os.chdir(self.backup_cwd) # restore original working directory
         self._in_context = False
@@ -359,6 +434,14 @@ class SQLitePool(Pool):
 
 
     def execute_select(self, query, *query_args):
+        """Executes a select query on the attached pool DB.
+        
+        If pool is not in context, opens connection to the pool DB before making the
+        query; if only executing one DB operation, this can save writing, but will
+        be substantially slower for multiple operations than opening a context.
+        
+        Often best to do map(dict, ...) on the results."""
+        
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
@@ -375,6 +458,12 @@ class SQLitePool(Pool):
 
 
     def execute_update(self, query, *query_args):
+        """Executes a select query on the attached pool DB.
+        
+        If pool is not in context, opens connection to the pool DB before making the
+        query; if only executing one DB operation, this can save writing, but will
+        be substantially slower for multiple operations than opening a context."""
+        
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
@@ -392,8 +481,6 @@ class SQLitePool(Pool):
             print query_args
             raise
 
-        return
-
 
     def get_all_taxis_in_pool(self):
         """Queries the pool DB to get all taxis in the pool.
@@ -407,6 +494,11 @@ class SQLitePool(Pool):
 
 
     def get_taxi(self, my_taxi):
+        """Retrieves the taxi my_taxi (specified as either a Taxi object or the
+        name of that taxi) from the pool (version in the pool may be different
+        than some previously-extracted Taxi object in my_taxi, as my_taxi
+        and the representation of that taxi in the pool DB are not synchronized
+        and either may be changed)."""
         taxi_name = str(my_taxi)
 
         query = """SELECT * FROM taxis WHERE name == ?"""
@@ -423,6 +515,8 @@ class SQLitePool(Pool):
     
     
     def update_taxi_status(self, my_taxi, status):
+        """Updates the status of the taxi my_taxi (Taxi object or name of taxi)
+        in the SQLite pool DB."""
         taxi_name = str(my_taxi)
 
         update_query = """UPDATE taxis SET status = ? WHERE name = ?"""
@@ -432,6 +526,8 @@ class SQLitePool(Pool):
 
 
     def update_taxi_last_submitted(self, my_taxi, last_submit_time):
+        """Update when the taxi my_taxi (Taxi object or name of taxi) was last
+        submitted in the SQLite pool DB."""
         taxi_name = str(my_taxi)
         
         update_query = """UPDATE taxis SET time_last_submitted = ? WHERE name = ?"""
@@ -441,6 +537,8 @@ class SQLitePool(Pool):
 
 
     def update_taxi_dispatch(self, my_taxi, dispatch_path):
+        """Update which dispatch (i.e., the path to the dispatch DB) the taxi
+        my_taxi (Taxi object or name of taxi) is associated with in the SQLite pool DB."""
         taxi_name = str(my_taxi)
 
         update_query = """UPDATE taxis SET dispatch = ? WHERE name = ?"""
@@ -450,7 +548,11 @@ class SQLitePool(Pool):
     def register_taxi(self, my_taxi):
         """
         Register a taxi with the pool.  (Adds to the pool if the taxi is new;
-        otherwise, sets taxi pool attributes.)
+        otherwise, sets taxi pool attributes.) Sets (in the pool DB representation
+        of the taxi) which pool the taxi my_taxi is associated.
+        
+        If no taxi name is provided (i.e., my_taxi.name is not set), a name will automatically be generated like
+        {name of pool}{first available integer}, e.g., pg10 for the 10th taxi in pool 'pg'.
         """
         my_taxi.pool_name = self.pool_name
         my_taxi.pool_path = self.db_path
@@ -473,6 +575,9 @@ class SQLitePool(Pool):
         
         
     def get_next_unused_taxi_name(self):
+        """Convenience function: determines the next available taxi name of the
+        form {name of pool}{first available integer}, e.g., pg10 for the 10th
+        taxi in pool 'pg'."""
         taxis = self.get_all_taxis_in_pool()
         taxi_names = [t.name for t in taxis]
         
@@ -487,8 +592,8 @@ class SQLitePool(Pool):
 
 
     def _add_taxi_to_pool(self, my_taxi):
-        """Add an already-initialized taxi to the pool.
-        To be used by register_new_taxi and potentially
+        """Add (or update) an already-initialized taxi to the pool.
+        To be used by register_taxi and potentially
         other helper functions down the road.
         """
 
