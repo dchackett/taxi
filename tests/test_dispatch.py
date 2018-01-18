@@ -7,7 +7,7 @@ import sqlite3
 import json
 
 from taxi.dispatcher import *
-from taxi.jobs import *
+from taxi.tasks import *
 
 class TestSQLiteBase(unittest.TestCase):
     def setUp(self):
@@ -55,17 +55,17 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             obj_three = self.test_dispatch.rebuild_json_task(json_three)
         
     def test_populate_task_pool(self):
-        test_job = Task(req_time=33)
-        test_job_two = Task(req_time=44)
+        test_task = Task(req_time=33)
+        test_task_two = Task(req_time=44)
         
-        test_job.trunk = True
-        test_job.status = 'complete'
-        test_job_two.is_recurring = True
+        test_task.trunk = True
+        test_task.status = 'complete'
+        test_task_two.is_recurring = True
 
-        test_job_pool = [test_job, test_job_two]
+        test_task_pool = [test_task, test_task_two]
 
         with self.test_dispatch:
-            self.test_dispatch.initialize_new_job_pool(test_job_pool)
+            self.test_dispatch.initialize_new_task_pool(test_task_pool)
 
             task_blob = self.test_dispatch.get_task_blob(None, include_complete=True)
             read_task = task_blob[1]
@@ -73,7 +73,7 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
 
             self.assertEqual(read_task.status, 'complete')
             self.assertEqual(read_task_two.is_recurring, True)
-            self.assertEqual(read_task_two.status, test_job_two.status)
+            self.assertEqual(read_task_two.status, test_task_two.status)
 
             task_blob_no_complete = self.test_dispatch.get_task_blob(None, include_complete=False)
 

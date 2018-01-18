@@ -10,7 +10,7 @@ import datetime
 import taxi
 import taxi.dispatcher
 import taxi.pool
-import taxi.jobs
+import taxi.tasks
 
 import taxi.local.local_queue as local_queue
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         
             ### Check with dispatch for tasks to execute
             with my_dispatch:
-                # Ask dispatcher for next job
+                # Ask dispatcher for next task
                 task = my_dispatch.request_next_task(for_taxi=taxi_obj)
         
                 # Flag task for execution
@@ -124,12 +124,12 @@ if __name__ == '__main__':
             flush_output()
             
             ## Special behavior -- Die/Sleep
-            if isinstance(task, taxi.jobs.Die) or isinstance(task, taxi.jobs.Sleep):
+            if isinstance(task, taxi.tasks.Die) or isinstance(task, taxi.tasks.Sleep):
                 ## "Die" and "Sleep" are special tasks
                 print task.message # Print reason why we're dying or sleeping
 
                 with my_pool:
-                    if isinstance(task, taxi.jobs.Die):
+                    if isinstance(task, taxi.tasks.Die):
                         my_pool.update_taxi_status(taxi_obj, 'H')
                     else:
                         my_pool.update_taxi_status(taxi_obj, 'I')
@@ -138,7 +138,7 @@ if __name__ == '__main__':
                 keep_running = False
                 
             ## Special behavior -- Respawning
-            elif isinstance(task, taxi.jobs.Respawn):
+            elif isinstance(task, taxi.tasks.Respawn):
                 print "RESPAWNING", taxi_obj
                 
                 with my_pool:

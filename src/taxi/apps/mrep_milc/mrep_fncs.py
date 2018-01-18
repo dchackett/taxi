@@ -5,7 +5,7 @@
 import os
 
 import taxi.mcmc
-from taxi.jobs import Copy
+from taxi.tasks import Copy
 
 from taxi.file import File, InputFile
 
@@ -37,12 +37,12 @@ mrep_dh_spectro_fmt = [
 mrep_dh_spectro = _convention_metafactory(mrep_dh_spectro_fmt)
         
 
-def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
+def copy_tasks_for_multirep_outputs(task_pool, out_dir, gauge_dir):
     out_dir = taxi.expand_path(out_dir)
     gauge_dir = taxi.expand_path(gauge_dir)
     
-    copy_jobs = []
-    for task in job_pool:
+    copy_tasks = []
+    for task in task_pool:
         if not isinstance(task, taxi.mcmc.MCMC):
             continue
         volume_subpath = "{ns}x{nt}/".format(ns=task.Ns, nt=task.Nt)
@@ -51,9 +51,9 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
             if getattr(task, 'saveg', None) is not None:
                 saveg_dest = os.path.join(gauge_dir, volume_subpath, param_subpath, task.saveg)
                 
-                new_copy_job = Copy(src=task.saveg, dest=saveg_dest)
-                new_copy_job.depends_on = [task]
-                copy_jobs.append(new_copy_job)
+                new_copy_task = Copy(src=task.saveg, dest=saveg_dest)
+                new_copy_task.depends_on = [task]
+                copy_tasks.append(new_copy_task)
         
         if getattr(task, 'fout', None) is not None:
             words = os.path.basename(task.fout).split('_')
@@ -75,11 +75,11 @@ def copy_jobs_for_multirep_outputs(job_pool, out_dir, gauge_dir):
                 type_subpath = 'flow'
             
             fout_dest = os.path.join(out_dir, volume_subpath, type_subpath, param_subpath, os.path.basename(task.fout))
-            new_copy_job = Copy(src=task.fout, dest=fout_dest)
-            new_copy_job.depends_on = [task]
-            copy_jobs.append(new_copy_job)
+            new_copy_task = Copy(src=task.fout, dest=fout_dest)
+            new_copy_task.depends_on = [task]
+            copy_tasks.append(new_copy_task)
     
-    return copy_jobs
+    return copy_tasks
 
 
 

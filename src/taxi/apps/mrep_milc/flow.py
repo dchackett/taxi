@@ -29,7 +29,7 @@ EOF
 """
 
 
-class FlowJob(ConfigMeasurement):
+class FlowTask(ConfigMeasurement):
     ## File naming conventions
     loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
@@ -65,7 +65,7 @@ class FlowJob(ConfigMeasurement):
             mindE: Terminate flow when <t d/dt t^2 E(t)> >= mindE
         """
         
-        super(FlowJob, self).__init__(req_time=req_time, **kwargs)
+        super(FlowTask, self).__init__(req_time=req_time, **kwargs)
 
         # Physical parameters
         self.tmax = tmax
@@ -87,7 +87,7 @@ class FlowJob(ConfigMeasurement):
         
     
     def build_input_string(self):
-        input_str = super(FlowJob, self).build_input_string()
+        input_str = super(FlowTask, self).build_input_string()
         
         input_dict = self.to_dict()
         

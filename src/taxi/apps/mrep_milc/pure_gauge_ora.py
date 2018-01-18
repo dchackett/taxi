@@ -37,7 +37,7 @@ EOF
 
 
 
-class PureGaugeORAJob(ConfigGenerator):
+class PureGaugeORATask(ConfigGenerator):
     
     loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('ora_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
@@ -72,7 +72,7 @@ class PureGaugeORAJob(ConfigGenerator):
             warms (int): Number of warmup trajectories to run
             label (str): Text label for the ensemble
         """
-        super(PureGaugeORAJob, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
+        super(PureGaugeORATask, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
 
         self.Ns = Ns
         self.Nt = Nt
@@ -86,7 +86,7 @@ class PureGaugeORAJob(ConfigGenerator):
         
 
     def build_input_string(self):
-        input_str = super(PureGaugeORAJob, self).build_input_string()
+        input_str = super(PureGaugeORATask, self).build_input_string()
         
         input_dict = self.to_dict()
         
@@ -108,7 +108,7 @@ class PureGaugeORAJob(ConfigGenerator):
 
     def verify_output(self):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
-        super(PureGaugeORAJob, self).verify_output()
+        super(PureGaugeORATask, self).verify_output()
 
         # Check for errors
         # Trailing space avoids catching the error_something parameter input

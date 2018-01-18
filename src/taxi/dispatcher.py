@@ -10,7 +10,7 @@ import imp # For dynamical imports
 import __main__ # To get filename of calling script
 
 import taxi
-import taxi.jobs as jobs
+import taxi.tasks as tasks
 
 ## Need to be able to make blank objects to reconstruct Tasks from JSON payloads
 class BlankObject(object):
@@ -41,6 +41,11 @@ class Dispatcher(object):
     def __init__(self):
         pass
 
+    def __enter__(self):
+        raise NotImplementedError
+        
+    def __exit__(self):
+        raise NotImplementedError
 
     def _create_new_dispatch(self):
         pass
@@ -52,7 +57,7 @@ class Dispatcher(object):
         self._imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(self.imports)]
         
         # Print valid task classes that have been loaded
-        print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.jobs.Task)
+        print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.tasks.Task)
         
 
     def get_task_blob(self, my_taxi=None, include_complete=True):
@@ -61,9 +66,9 @@ class Dispatcher(object):
 
 
     def check_task_status(self, task):
-        """Quick query of task status for task with id=task_id from job forest DB.
+        """Quick query of task status for task with id=task_id from task forest DB.
 
-        For last-minute checks that job hasn't been claimed by another job."""
+        For last-minute checks that task hasn't been claimed by another task."""
 
         raise NotImplementedError
 
@@ -113,7 +118,7 @@ class Dispatcher(object):
         if N_pending_tasks == 0:
             ## TODO: I think this will break both the with: and the outer while True:,
             ## but add a test case!
-            return jobs.Die(message="WORK COMPLETE: no tasks pending")
+            return tasks.Die(message="WORK COMPLETE: no tasks pending")
             
         if not found_ready_task:
             ## TODO: we could add another status code that puts the taxi to sleep,
@@ -125,10 +130,10 @@ class Dispatcher(object):
             ## which we should maybe track separately.
             if N_blocked_by_time > 0:
                 # Just need more time -- tell this taxi to resubmit itself!
-                return jobs.Respawn()
+                return tasks.Respawn()
             else:
                 # Something is wrong other than not having enough time.
-                return jobs.Sleep(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
+                return tasks.Sleep(message="WORK COMPLETE: no tasks ready, but %d pending"%N_pending_tasks)
         
         # If we've gotten this far, successfully found a pending task.
         return task
@@ -181,14 +186,14 @@ class Dispatcher(object):
         """Determines the number of trunks that are available to work on (roughly,
         the number of taxis that should be actively working on a task forest).
         
-        Returns an int, which is the count of running or pending-but-ready trunk jobs.
+        Returns an int, which is the count of running or pending-but-ready trunk tasks.
         """
         if task_blob is None or len(task_blob) == 0:
             return 0
         
         task_blob = [t for t in task_blob.values() if t.trunk] # filter out non-trunks, task_blob is now list(task)
         
-        # If we're asking about a particular taxi, filter for jobs that taxi can run
+        # If we're asking about a particular taxi, filter for tasks that taxi can run
         if for_taxi is not None:
             for_taxi = str(taxi)
             task_blob = [t for t in task_blob if t.for_taxi==for_taxi]
@@ -217,20 +222,20 @@ class Dispatcher(object):
         if task_blob is None or len(task_blob) == 0:
             return 0
         
-        # Filter for jobs that are pending and only for the taxi specified
+        # Filter for tasks that are pending and only for the taxi specified
         task_blob = [t for t in task_blob.values() if t.status == 'pending']
         
         if for_taxi is not None:
             for_taxi = str(for_taxi)
-            task_blob = [t for t in task_blob if t.for_taxi == for_taxi] # Specifically jobs for this taxi
+            task_blob = [t for t in task_blob if t.for_taxi == for_taxi] # Specifically tasks for this taxi
         
-        N_ready_jobs = 0
+        N_ready_tasks = 0
         for task in task_blob:
             # Check whether task is ready to go, and taxi can run it
             N_unresolved, N_failed = task.count_unresolved_dependencies()
             if N_unresolved == 0:
-                N_ready_jobs += 1
-        return N_ready_jobs
+                N_ready_tasks += 1
+        return N_ready_tasks
     
     
     def should_taxis_be_running(self, taxi_list):
@@ -263,7 +268,7 @@ class Dispatcher(object):
         for my_taxi in taxi_list:
             desired_state[str(my_taxi)] = my_taxi.status in ['Q', 'R'] # Active means queued or running
         
-        # If taxi has a trunk only it can run, or some jobs are ready that only this taxi can run, it must be running
+        # If taxi has a trunk only it can run, or some tasks are ready that only this taxi can run, it must be running
         for my_taxi in taxi_list:
             if self._trunk_number(task_blob, for_taxi=my_taxi) > 0:
                 desired_state[str(my_taxi)] = True
@@ -278,7 +283,7 @@ class Dispatcher(object):
         
         N_active_trunks = self._trunk_number(task_blob)
         
-        # Even without trunks, if we have jobs that are ready, we need at least one taxi
+        # Even without trunks, if we have tasks that are ready, we need at least one taxi
         N_ready_tasks = self._N_ready_tasks(task_blob)
         if N_active_trunks == 0 and N_ready_tasks:
             N_active_trunks = N_ready_tasks # Correct behavior for trunkless task forests
@@ -293,41 +298,41 @@ class Dispatcher(object):
         return desired_state
         
         
-    def _invert_dependency_graph(self, job_pool):
+    def _invert_dependency_graph(self, task_pool):
         # Give each task an identifier, reset dependents
-        for jj, job in enumerate(job_pool):
-            job._dependents = []
+        for jj, task in enumerate(task_pool):
+            task._dependents = []
 
         # Let dependencies know they have a dependent
-        for job in job_pool:
-            if job.depends_on is None:
+        for task in task_pool:
+            if task.depends_on is None:
                 continue
-            for dependency in job.depends_on:
-                dependency._dependents.append(job)
+            for dependency in task.depends_on:
+                dependency._dependents.append(task)
                 
 
     ## Initialization
-    def find_branches(self, job_pool):
+    def find_branches(self, task_pool):
         ## Scaffolding
-        self._invert_dependency_graph(job_pool)
+        self._invert_dependency_graph(task_pool)
                 
-        ## Break apart jobs into separate trees
+        ## Break apart tasks into separate trees
         # First, find all roots
         trees = []
-        for job in job_pool:
-            if job.depends_on is None or len(job.depends_on) == 0:
-                trees.append([job])
+        for task in task_pool:
+            if task.depends_on is None or len(task.depends_on) == 0:
+                trees.append([task])
 
         ## Build out from roots
         # TODO:
         # - If dependent has different number of nodes, make it a new tree
-        # - If job is a trunk job and two dependents are trunk jobs, make one of them a new tree
+        # - If task is a trunk task and two dependents are trunk tasks, make one of them a new tree
         for tree in trees:
-            for tree_job in tree:
-                if not tree_job.trunk:
+            for tree_task in tree:
+                if not tree_task.trunk:
                     continue
                 n_trunks_found = 0
-                for d in tree_job._dependents:
+                for d in tree_task._dependents:
                     # Count number of trunk tasks encountered in dependents, fork if this isn't the first
                     if d.trunk:
                         n_trunks_found += 1
@@ -339,18 +344,18 @@ class Dispatcher(object):
         
         return trees
                 
-    def _find_lowest_job_priority(self, job_pool):
+    def _find_lowest_task_priority(self, task_pool):
         lowest_priority = 0
-        for job in job_pool:
-            if job.priority > lowest_priority:
-                lowest_priority = job.priority
+        for task in task_pool:
+            if task.priority > lowest_priority:
+                lowest_priority = task.priority
 
         return lowest_priority
 
 
-    def _assign_priorities(self, job_pool, priority_method):
+    def _assign_priorities(self, task_pool, priority_method):
         """
-        Assign task priorities to the newly tree-structured job pool.  Respects
+        Assign task priorities to the newly tree-structured task pool.  Respects
         any user-assigned priority values that already exist.  All auto-assigned
         tasks have lower priority than user-chosen ones.
 
@@ -358,7 +363,7 @@ class Dispatcher(object):
         Currently, the following options are available:
 
         - 'tree': Tree-first priority: the workflow will attempt to finish an entire tree
-        of jobs, before moving on to the next one.
+        of tasks, before moving on to the next one.
         - 'trunk': Trunk-first priority: the workflow will attempt to finish all available
         tasks at the same tree depth, before moving deeper.
         - 'canvas': Or "anti-trunk".  Workflow will work on trunk tasks last, working through
@@ -367,35 +372,35 @@ class Dispatcher(object):
         priorities, the tasks will be run in arbitrary order, except that dependencies will be
         resolved first.
         """
-        lowest_priority = self._find_lowest_job_priority(job_pool)
+        lowest_priority = self._find_lowest_task_priority(task_pool)
 
         if priority_method == 'tree':
             for tree in self.trees:
                 tree_priority = lowest_priority + 1
                 lowest_priority = tree_priority
 
-                for tree_job in tree:
-                    if (tree_job.priority < 0):
-                        tree_job.priority = tree_priority
+                for tree_task in tree:
+                    if (tree_task.priority < 0):
+                        tree_task.priority = tree_priority
             
             return
 
         elif priority_method == 'trunk':
-            for job in job_pool:
-                if job.priority < 0:
-                    if job.trunk:
-                        job.priority = lowest_priority + 1
+            for task in task_pool:
+                if task.priority < 0:
+                    if task.trunk:
+                        task.priority = lowest_priority + 1
                     else:
-                        job.priority = lowest_priority + 2
+                        task.priority = lowest_priority + 2
             return
 
         elif priority_method == 'canvas':
-            for job in job_pool:
-                if job.priority < 0:
-                    if job.trunk:
-                        job.priority = lowest_priority + 2
+            for task in task_pool:
+                if task.priority < 0:
+                    if task.trunk:
+                        task.priority = lowest_priority + 2
                     else:
-                        job.priority = lowest_priority + 1
+                        task.priority = lowest_priority + 1
             return
             
         elif priority_method == 'anarchy':
@@ -406,14 +411,14 @@ class Dispatcher(object):
             raise ValueError("Invalid choice of priority assignment method: {0}".format(priority_method))
 
 
-    def _assign_task_ids(self, job_pool):
+    def _assign_task_ids(self, task_pool):
         # If we are adding a new pool to an existing dispatcher, 
         # start enumerating task IDs at the end
         start_id = self._get_max_task_id()
         
-        # Give each job an integer id
-        for jj, job in enumerate(job_pool):
-            job.id = jj + start_id + 1
+        # Give each task an integer id
+        for jj, task in enumerate(task_pool):
+            task.id = jj + start_id + 1
             
 
     def _populate_task_table(self, task_pool):
@@ -428,7 +433,7 @@ class Dispatcher(object):
         raise NotImplementedError
 
 
-    def initialize_new_job_pool(self, job_pool, priority_method='canvas', imports=None):
+    def initialize_new_task_pool(self, task_pool, priority_method='canvas', imports=None):
         ## imports: Dispatcher needs to be able to import relevant runners.
         ## Convenient default behavior: import the calling script (presumably, the run-spec script)
         if imports is None:
@@ -439,10 +444,10 @@ class Dispatcher(object):
         self._store_imports()
             
         ## Build dispatch
-        self.trees = self.find_branches(job_pool)
-        self._assign_priorities(job_pool, priority_method=priority_method)
-        self._assign_task_ids(job_pool)
-        self._populate_task_table(job_pool)
+        self.trees = self.find_branches(task_pool)
+        self._assign_priorities(task_pool, priority_method=priority_method)
+        self._assign_task_ids(task_pool)
+        self._populate_task_table(task_pool)
 
 
     ## Cascading rollback
@@ -569,7 +574,7 @@ class SQLiteDispatcher(Dispatcher):
             
         ## Get/update a dictionary of all Task subclasses in the global scope, to
         ## rebuild objects from JSON payloads
-        self.class_dict = taxi.all_subclasses_of(taxi.jobs.Task)
+        self.class_dict = taxi.all_subclasses_of(taxi.tasks.Task)
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
@@ -740,9 +745,9 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def check_task_status(self, task):
-        """Quick query of task status for task with id=task_id from job forest DB.
+        """Quick query of task status for task with id=task_id from task forest DB.
 
-        For last-minute checks that job hasn't been claimed by another job."""
+        For last-minute checks that task hasn't been claimed by another task."""
         
         if not hasattr(task, 'id'):
             ## Case: Dispatcher returns 'Die' to a taxi when it wants it to stop running.
@@ -787,8 +792,8 @@ class SQLiteDispatcher(Dispatcher):
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
-        # JSON serialize all jobs
-        compiled_tasks = [job.compiled() for job in tasks]
+        # JSON serialize all tasks
+        compiled_tasks = [task.compiled() for task in tasks]
         
         # Build list to insert
         upsert_data = []

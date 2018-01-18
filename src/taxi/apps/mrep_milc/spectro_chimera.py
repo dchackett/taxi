@@ -69,7 +69,7 @@ class ChimeraTask(MCMC):
         Args:
             loadp_f: str, full path to the fundamental propagator binary file
             loadp_as: str, full path to the sextet propagator binary file
-            req_time: int, the requested time for the job in seconds, \
+            req_time: int, the requested time for the task in seconds, \
                 default is 1 hour
             Ns: int, spatial lattice size, default is None \
                 (parses from input filename)

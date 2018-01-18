@@ -119,7 +119,7 @@ rstrt 10           # CG restarts
 resid {cgtol}      # CG stopping condition"""
 
 
-class MultirepHMCJob(ConfigGenerator):
+class MultirepHMCTask(ConfigGenerator):
     loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('hmc_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg = File('cfg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
@@ -167,7 +167,7 @@ class MultirepHMCJob(ConfigGenerator):
             safe_factor (int): Safe trajectories have safe_factor*nsteps1 many outermost steps
             tpm (int): Trajectories per measurement (1=every traj, 2=every other traj, etc.)
             warms (int): Number of warmup trajectories to run
-            minAR (int): Minimum number of accepts for job to succeed
+            minAR (int): Minimum number of accepts for task to succeed
             
             maxcgobs (int): Maximum number of CG iterations to run for fermion observables.
             maxcgpf (int): Maximum number of CG iterations to run for pseudofermions.
@@ -175,7 +175,7 @@ class MultirepHMCJob(ConfigGenerator):
 
             
         """
-        super(MultirepHMCJob, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
+        super(MultirepHMCTask, self).__init__(req_time=req_time, n_traj=n_traj, **kwargs)
 
         self.Ns = Ns
         self.Nt = Nt
@@ -211,7 +211,7 @@ class MultirepHMCJob(ConfigGenerator):
         
     
     def build_input_string(self):
-        input_str = super(MultirepHMCJob, self).build_input_string()
+        input_str = super(MultirepHMCTask, self).build_input_string()
         
         input_dict = self.to_dict()
         
@@ -247,7 +247,7 @@ class MultirepHMCJob(ConfigGenerator):
 
     def verify_output(self):
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
-        super(MultirepHMCJob, self).verify_output()
+        super(MultirepHMCTask, self).verify_output()
 
         # Check for errors
         # Trailing space avoids catching the error_something parameter input

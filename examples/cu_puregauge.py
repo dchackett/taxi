@@ -10,8 +10,8 @@ import taxi.apps.mrep_milc.pure_gauge_ora as pg_ora
 
 
 # Plug in desired file-naming conventions
-flow.FlowJob.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-flow.FlowJob.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
 
 # Specify paths to Dispatch and Pools DBS
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     ## Set up HMC streams
     # First stream, start from fresh
     seed_stream = mcmc.make_config_generator_stream(
-        config_generator_class=pg_ora.PureGaugeORAJob,
+        config_generator_class=pg_ora.PureGaugeORATask,
         streamseed=1,
         N=10,
         Ns=4,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     
     # Second stream forks from the first
     fork_stream = mcmc.make_config_generator_stream(
-        config_generator_class=pg_ora.PureGaugeORAJob,
+        config_generator_class=pg_ora.PureGaugeORATask,
         streamseed=2,
         N=5,
         Ns=4,
@@ -55,14 +55,14 @@ if __name__ == '__main__':
     
     ## Add Wilson flow tasks for both streams
     flow_pool = mcmc.measure_on_config_generators(
-        config_measurement_class=flow.FlowJob,
+        config_measurement_class=flow.FlowTask,
         measure_on=hmc_pool,
         req_time=60,
         tmax=1,
         start_at_traj=200
     )
     
-    job_pool = hmc_pool + flow_pool
+    task_pool = hmc_pool + flow_pool
     
     ## Set up pool and feed it taxis
     pool_name = "pg_test"
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     
     ## Initialize task pool with the dispatch
     with my_disp:
-        my_disp.initialize_new_job_pool(job_pool)
+        my_disp.initialize_new_task_pool(task_pool)
     
     # Create taxi(s) to run the job
     taxi_list = []

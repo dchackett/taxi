@@ -3,7 +3,7 @@
 import unittest
 
 
-from taxi.jobs import Task
+from taxi.tasks import Task
 from taxi.file import File, InputFile
 
 

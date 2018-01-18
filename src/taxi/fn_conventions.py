@@ -4,7 +4,7 @@ Base classes for modularized naming conventions.
 """
 
 from taxi import all_subclasses_of
-from taxi.jobs import Task
+from taxi.tasks import Task
 
 def _is_dictlike(x):
     return isinstance(x, dict) or hasattr(x, "__getitem__")

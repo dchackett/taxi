@@ -154,7 +154,7 @@ class SpectroTask(ConfigMeasurement):
     def verify_output(self):
         super(SpectroTask, self).verify_output()
     
-        # If this job should save a propagator file, that file must exist
+        # If this task should save a propagator file, that file must exist
         if should_save_file(self.savep):
             print "Spectro ok check fails: Propagator file {0} doesn't exist.".format(self.savep)
             raise RuntimeError

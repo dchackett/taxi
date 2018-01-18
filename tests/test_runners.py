@@ -6,7 +6,7 @@ import os
 #import sqlite3
 import json
 
-from taxi.jobs import Copy # Must import * to get all Job classes in globals() scope
+from taxi.tasks import Copy # Must import * to get all Task classes in globals() scope
 import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.pure_gauge_ora as pure_gauge_ora
 
@@ -58,15 +58,15 @@ class TestFlowRunner(unittest.TestCase):
             'label': 'test_run',
         }
 
-        self.hmc_job = pure_gauge_ora.PureGaugeORAJob(req_time=360, **self.hmc_spec)
+        self.hmc_task = pure_gauge_ora.PureGaugeORATask(req_time=360, **self.hmc_spec)
 
     def tearDown(self):
         pass
 
-    def test_create_aux_job(self):
-        hmc_flow_job = flow.FlowJob(measure_on=self.hmc_job, req_time=60, tmax=4.0)
+    def test_create_aux_task(self):
+        hmc_flow_task = flow.FlowTask(measure_on=self.hmc_task, req_time=60, tmax=4.0)
 
-        self.assertEqual(hmc_flow_job.Ns, 16)
+        self.assertEqual(hmc_flow_task.Ns, 16)
 
 
     def test_generate_input(self):

@@ -98,7 +98,7 @@ class Task(object):
         
         compiled['task_type'] = self.__class__.__name__ # e.g., 'Task'
         
-        # Get dependencies in job_id format
+        # Get dependencies in task_id format
         if not hasattr(self, 'depends_on') or self.depends_on is None or len(self.depends_on) == 0:
             compiled['depends_on'] = None
         else:
@@ -108,8 +108,8 @@ class Task(object):
     
     
     def count_unresolved_dependencies(self):
-        """Looks at the status of all jobs in the job forest DB that 'task' depends upon.
-        Counts up number of jobs that are not complete, and number of jobs that are failed.
+        """Looks at the status of all tasks in the task forest DB that 'task' depends upon.
+        Counts up number of tasks that are not complete, and number of tasks that are failed.
         Returns tuple (n_unresolved, n_failed)"""
         
         # Sensible behavior for dependency-tree roots
@@ -136,7 +136,7 @@ class Task(object):
         self.status = 'pending'
 
         
-### Special jobs
+### Special tasks
 class Die(Task):
     """Tells taxi to die"""
     

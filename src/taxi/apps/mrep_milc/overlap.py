@@ -321,7 +321,7 @@ class OverlapPreconditionTask(OverlapTask):
         
         Args:
             # Required arguments            
-            req_time: int, the requested time (in seconds) for the job
+            req_time: int, the requested time (in seconds) for the task
             beta: float, the inverse gauge coupling
             loadg: str, the full path to the gauge file to load
             saveg: str, the full path for saving the gauge file. 

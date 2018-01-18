@@ -10,14 +10,14 @@ from random import seed, randint
 
 import os
 
-import jobs
+import tasks
 from taxi import sanitized_path, expand_path
 from taxi.file import File, InputFile, should_save_file, should_load_file
 
         
 
 
-class MCMC(jobs.Runner):
+class MCMC(tasks.Runner):
     
     ## Modular file naming conventions
     # Output files
@@ -57,7 +57,7 @@ class MCMC(jobs.Runner):
         cg_dict = config_generator.to_dict()
         
         # Remove metainfo from cg_dict
-        for special_key in jobs.special_keys:
+        for special_key in tasks.special_keys:
             cg_dict.pop(special_key, None)
         
         # Rename certain dangerously-named parameters like '...'->'cg_...'
@@ -103,12 +103,12 @@ class MCMC(jobs.Runner):
         
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
         
-        # If this job should save a gauge file, that gauge file must exist
+        # If this task should save a gauge file, that gauge file must exist
         if should_save_file(self.saveg) and not os.path.exists(str(self.saveg)):
             print "MCMC ok check fails: Config file {0} doesn't exist.".format(self.saveg)
             raise RuntimeError
             
-        # If this job should save an output file, that output file must exist
+        # If this task should save an output file, that output file must exist
         if should_save_file(self.fout) and not os.path.exists(str(self.fout)):
             print "MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout)
             raise RuntimeError
@@ -249,23 +249,23 @@ def make_config_generator_stream(config_generator_class, N,
         seed(streamseed%10000)      
         seeds = [randint(0, 9999) for nn in range(N)]
         
-    # For first job in stream, restart trajectory counting (don't just continue from last stream)
+    # For first task in stream, restart trajectory counting (don't just continue from last stream)
     kwargs['start_traj'] = start_traj
     
     ## Assemble stream
     stream = []
     for cc in range(N):
-        # Make new job and add it to list
-        new_job = config_generator_class(starter=starter, seed=seeds[cc], **kwargs)
-        stream.append(new_job)
+        # Make new task and add it to list
+        new_task = config_generator_class(starter=starter, seed=seeds[cc], **kwargs)
+        stream.append(new_task)
         
         # Next ConfigGenerator will depend on this ConfigGenerator
-        starter = new_job
+        starter = new_task
         
         # After first task, don't want to reset start_traj each time
         kwargs.pop('start_traj', None)
         
-    # Let the first job know it's the beginning of a new branch/sub-trunk
+    # Let the first task know it's the beginning of a new branch/sub-trunk
     stream[0].branch_root = True
         
     return stream  

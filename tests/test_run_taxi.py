@@ -6,7 +6,7 @@ import os
 #import sqlite3
 import time
 
-import taxi.jobs
+import taxi.tasks
 import taxi.pool
 import taxi.dispatcher
 import taxi
@@ -19,7 +19,7 @@ import taxi.local.local_taxi as local_taxi
 import taxi.local.sqlite_queue_runner as qrun
 
 ## TaskRunner that always fails, for testing purposes
-class FailRunner(taxi.jobs.Runner):
+class FailRunner(taxi.tasks.Runner):
     def execute(self):
         raise BaseException
 
@@ -31,7 +31,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         if not os.path.exists('./test_run'):
             ensure_path_exists('./test_run')
  
-        ## Source/destination for copy test jobs
+        ## Source/destination for copy test tasks
         self.src_files = ['./test_run/test_ab', './test_run/test_cd', './test_run/test_ef']
         self.dst_files = ['./test_run/test_uv', './test_run/test_wx', './test_run/test_yz']
         
@@ -98,14 +98,14 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         self.assertEqual(len(pool_stat), 1)
 
-    ## Test 'die' job
+    ## Test 'die' task
     def test_die(self):
-        test_job = taxi.jobs.Die(message="Testing", for_taxi=self.my_taxi.name)
+        test_task = taxi.tasks.Die(message="Testing", for_taxi=self.my_taxi.name)
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
             self.assertEqual(task_blob, None)
 
-            self.my_disp.initialize_new_job_pool([test_job])
+            self.my_disp.initialize_new_task_pool([test_task])
             
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
             self.assertEqual(len(task_blob.keys()), 1)
@@ -138,7 +138,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
             self.assertEqual(task_blob[1].task_type, 'Die')
-            self.assertTrue(task_blob[1], taxi.jobs.Die)
+            self.assertTrue(task_blob[1], taxi.tasks.Die)
             self.assertEqual(task_blob[1].status, 'complete')
             self.assertGreater(task_blob[1].run_time, 0.0)
             self.assertEqual(task_blob[1].by_taxi, 'test1')
@@ -147,9 +147,9 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test taxi hold by user
     def test_user_hold(self):
-        test_job = taxi.jobs.Copy(self.src_files[0], self.dst_files[0])
+        test_task = taxi.tasks.Copy(self.src_files[0], self.dst_files[0])
         with self.my_disp:
-            self.my_disp.initialize_new_job_pool([test_job])
+            self.my_disp.initialize_new_task_pool([test_task])
         
         with self.my_pool:
             self.my_pool.update_taxi_status(self.my_taxi, 'H')
@@ -174,17 +174,17 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(task_blob[1].status, 'pending')
             self.assertEqual(task_blob[1].run_time, -1.0)
 
-    ## Test single copy job, round-trip
+    ## Test single copy task, round-trip
     def test_single_copy(self):
 
         ## Target file shouldn't exist yet
         files = os.listdir('./test_run')
         self.assertFalse(self.dst_files[0].split('/')[-1] in files)
 
-        test_job = taxi.jobs.Copy(self.src_files[0], self.dst_files[0])
+        test_task = taxi.tasks.Copy(self.src_files[0], self.dst_files[0])
 
         with self.my_disp:
-            self.my_disp.initialize_new_job_pool([test_job])
+            self.my_disp.initialize_new_task_pool([test_task])
 
         with self.my_pool:
             self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
@@ -212,23 +212,23 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(task_blob.values()[0].task_type, 'Copy')
 
 
-    ## Test multiple copy jobs, with dependency
+    ## Test multiple copy tasks, with dependency
     def test_copy_with_dependency(self):
 
         files = os.listdir('./test_run')
         for i in range(3):
             self.assertFalse(self.dst_files[i].split('/')[-1] in files)
 
-        job_pool = []
+        task_pool = []
         for i in range(3):
-            job_pool.append(taxi.jobs.Copy(self.src_files[i], self.dst_files[i]))
+            task_pool.append(taxi.tasks.Copy(self.src_files[i], self.dst_files[i]))
 
-        job_pool[1].depends_on = [job_pool[0]]
-        job_pool[2].depends_on = [job_pool[0], job_pool[1]]
-        job_pool.reverse()  ## Reversing so the execution order doesn't trivially match the dependency
+        task_pool[1].depends_on = [task_pool[0]]
+        task_pool[2].depends_on = [task_pool[0], task_pool[1]]
+        task_pool.reverse()  ## Reversing so the execution order doesn't trivially match the dependency
 
         with self.my_disp:
-            self.my_disp.initialize_new_job_pool(job_pool)
+            self.my_disp.initialize_new_task_pool(task_pool)
             task_blob = self.my_disp.get_task_blob(self.my_taxi)
         
         with self.my_pool:
@@ -249,7 +249,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             for task in task_blob.values():
                 self.assertEqual(task.status, 'complete')
 
-            # Should have run in reverse order, since we reversed the job pool above
+            # Should have run in reverse order, since we reversed the task pool above
             self.assertGreater(task_blob[1].start_time, task_blob[2].start_time)
             self.assertGreater(task_blob[2].start_time, task_blob[3].start_time)
 
@@ -263,10 +263,10 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         print map(dict, self.my_disp.execute_select("SELECT * FROM tasks"))
         
         # Set up single copy task pool, registered to test1
-        test_job = taxi.jobs.Copy(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
+        test_task = taxi.tasks.Copy(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
 
         with self.my_disp:
-            self.my_disp.initialize_new_job_pool([test_job])
+            self.my_disp.initialize_new_task_pool([test_task])
         
         # Add a second taxi to the pool and queue it
         taxi_two = taxi.Taxi(name='test2', time_limit=120, nodes=1, cores=1)
@@ -281,8 +281,8 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         with self.my_pool:
             print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
         
-        # Run queue with the second, jobless taxi
-        # During this step: taxi_two should detect that there is a job it cannot
+        # Run queue with the second, taskless taxi
+        # During this step: taxi_two should detect that there is a task it cannot
         # run, and launch my_taxi to run it.
         with self.squeue:
             self.squeue.run_next_job()
