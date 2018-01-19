@@ -18,6 +18,8 @@ from taxi.file import File, InputFile, should_save_file, should_load_file
 
 
 class MCMC(tasks.Runner):
+    """Abstract superclass for Runners that run binaries from typical MCMC suites
+    (e.g., MILC)."""
     
     ## Modular file naming conventions
     # Output files
@@ -25,7 +27,7 @@ class MCMC(tasks.Runner):
     saveg = File(conventions="{saveg_filename_prefix}_{traj:d}", save=True)
     saveg_filename_prefix = 'fout'
     fout = File(conventions="{fout_filename_prefix}_{traj:d}", save=True)
-    # Input files -- Won't be tracked by rollbacker
+    # Input files -- Won't be tracked by rollbacker, automatically parse and load parameters
     loadg = InputFile(conventions="{loadg_filename_prefix}_{traj:d}", save=False)
     
  
@@ -80,6 +82,11 @@ class MCMC(tasks.Runner):
             
             
     def start_from_config_file(self, loadg, delay_fn_exists_check=False):
+        """Sets up MCMC task to run the specified config file loadg.  Uses file
+        naming conventions (see taxi.file) to parse parameters from the filename.
+        Specified config file must exist at time of task specification unless
+        self.delay_fn_exists_check.
+        """
         assert loadg is not None
         loadg = sanitized_path(str(loadg))
         
@@ -90,6 +97,8 @@ class MCMC(tasks.Runner):
 
             
     def execute(self, cores=None):
+        """Versus Runner, checks to make sure loadg exists before running.
+        """
         assert not should_load_file(self.loadg) or os.path.exists(str(self.loadg)),\
             "Error: file {loadg} does not exist.".format(loadg=self.loadg)
    
@@ -99,6 +108,9 @@ class MCMC(tasks.Runner):
     
     ## Standard output verification
     def verify_output(self):
+        """Checks to make sure that output file fout and output gauge configuration
+        saveg exist after running.
+        """
         super(MCMC, self).verify_output()
         
         ## In the future, we can define custom exceptions to distinguish the below errors, if needed
@@ -126,7 +138,23 @@ class ConfigGenerator(MCMC):
     def __init__(self, seed, n_traj=1,
                  starter=None,
                  start_traj=None, **kwargs):
+        """Specify a task that will call a binary that generates configurations.
         
+        Args:
+            seed - Random seed; no default to prevent accidentally repeating computations.
+            n_traj - Number of trajectories/sweeps/etc. for the binary to run.
+            start_traj - What trajectory to start counting at? If not specified,
+             determined based on starter: if fresh start, initial traj is traj 0;
+             if starting from a ConfigGenerator, initial trja is final_traj for
+             that ConfigGenerator; if starting from a file, initial traj is parsed
+             out of the filename (must be returned as 'traj').
+            starter - Specifies where to get the starting configuration for the
+            ConfigGenerator.  If None, fresh start; if a ConfigGenerator, start
+            from the field output by that ConfigGenerator, stealing physical parameters
+            from that ConfigGenerator (to continue an MCMC sequence); if a stored
+            config file, start from that field, stealing physical parameters from
+            the filename as parsed by file naming conventions (see taxi.file).
+        """
         super(ConfigGenerator, self).__init__(**kwargs)
         
         self.n_traj = n_traj
@@ -191,6 +219,21 @@ class ConfigMeasurement(MCMC):
     fout_filename_prefix = 'meas'
         
     def __init__(self, measure_on, save_config=False, delay_fn_exists_check=False, **kwargs):
+        """Specify a task to perform a measurement on a field configuration.
+        
+        Args:
+            measure_on - Where to find the field configuration to perform the
+             measurement on. If a ConfigGenerator or ConfigMeasurement, perform
+             the measurement on the output configuration, stealing physical parameters
+             from the specified object; if a configuration file, perform the measurement
+             on that file, stealing physical parameters from the specified filename
+             using file naming conventions (see taxi.file). Compare with starter
+             for ConfigGenerator.__init__.
+            delay_fn_exists_check - If measure_on is a file, usually check at time
+             of task specification that the file exists. However, sometimes, might
+             want to delay checking until time of executing. If True, don't check
+             that input file exists until executing the binary.
+        """
         
         super(ConfigMeasurement, self).__init__(save_config=save_config, **kwargs)
         
