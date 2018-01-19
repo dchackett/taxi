@@ -458,7 +458,7 @@ class SQLitePool(Pool):
 
 
     def execute_update(self, query, *query_args):
-        """Executes a select query on the attached pool DB.
+        """Executes a write or update on the attached pool DB.
         
         If pool is not in context, opens connection to the pool DB before making the
         query; if only executing one DB operation, this can save writing, but will

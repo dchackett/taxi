@@ -42,16 +42,31 @@ class Dispatcher(object):
         pass
 
     def __enter__(self):
+        """Context-manager infrastructure. Dispatcher probably connects to a DB; useful
+        to keep connection open for multiple operations, but not leave it open
+        constantly."""
         raise NotImplementedError
         
     def __exit__(self):
+        """Context-manager infrastructure. Dispatcher probably connects to a DB; useful
+        to keep connection open for multiple operations, but not leave it open
+        constantly."""
         raise NotImplementedError
 
     def _create_new_dispatch(self):
+        """Creates a new dispatch (i.e., stored task information), probably by
+        instantiating a database."""
         pass
         
     
     def _load_existing_dispatch(self):
+        """Opens access to an existing dispatch (i.e., stored task information),
+        probably by connecting and synchronizing with an existing DB.
+        
+        Dynamically imports the files specified in self._imported; used to get the
+        Task subclasses needed to execute the tasks in the dispatch in to the global
+        scope, so that they are available for running.
+        """
         # Just need to get these in to the global namespace somewhere so the
         # task subclasses can be found
         self._imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(self.imports)]
@@ -61,7 +76,11 @@ class Dispatcher(object):
         
 
     def get_task_blob(self, my_taxi=None, include_complete=True):
-        """Get all incomplete tasks pertinent to this taxi."""
+        """Retrieve tasks from dispatch (i.e., stored task information). If my_taxi
+        is specified, retrieves tasks that my_taxi can run; otherwise, retrieves all tasks.
+        If include_complete=False, retrieves only incomplete tasks.
+        
+        Returns a dictionary like {id : (Task instance)}."""
         raise NotImplementedError
 
 
@@ -75,7 +94,17 @@ class Dispatcher(object):
 
     ## Taxi interface
     def request_next_task(self, for_taxi):
-        """Determines the next task to be executed by the given taxi."""
+        """Determines the next task to be executed by taxi for_taxi.
+        
+        Returns a Task instance to be run by the taxi for_taxi.  Tasks are selected
+        based on whether or not for_taxi can run the task, whether for_taxi has
+        enough time remaining to run a task before needing to resubmit, and whether
+        task dependencies are satisfied. If work is complete,
+        tells taxi to die by returning an instance of Die.  If no tasks for the taxi
+        for_taxi are available to run, but there are tasks that it could run if it
+        had more time remaining, tells the taxi to Respawn.  If no tasks for the taxi
+        for_taxi are available to run given infinite time, but there are incomplete
+        tasks remaining, tells the taxi to Sleep."""
         
         task_blob = self.get_task_blob(for_taxi, include_complete=False)
 
@@ -140,14 +169,27 @@ class Dispatcher(object):
         
 
     def write_tasks(self, tasks):
+        """Stores (i.e., adds or updates) the Task instances specified in tasks
+        to the dispatch (i.e., repository of stored task information, usually a DB)."""
         raise NotImplementedError
 
 
     def claim_task(self, my_taxi, task):
+        """Attempt to claim task for a given taxi.  Fails if the status of task
+        has been changed from pending."""
         raise NotImplementedError
 
 
     def finalize_task_run(self, my_taxi, task):
+        """Called by my_taxi when it has completed running task. Any information
+        stored in the Task instance task while my_taxi was executing it will
+        be stored in the dispatch for later inspection. Also marks the task
+        complete or failed, allowing the depedency forest to be resolved.
+        
+        If a task is recurring (task.recurring == True), then the task will be set
+        to pending instead of complete, but may still fail.
+        """
+        
         if task.status != 'failed':
             if task.is_recurring:
                 task.status = 'pending'
@@ -161,7 +203,7 @@ class Dispatcher(object):
             
             
     def mark_abandoned_task(self, by_taxi):
-        """Method for when a Taxi has died unexpectedly.  When this occurs, it often means
+        """Method to handle the case when a Taxi has died unexpectedly.  When this occurs, it often means
         a task is left marked 'active', but has in fact failed(/been abandoned).  This method marks that task
         abandoned.
         """
@@ -241,7 +283,9 @@ class Dispatcher(object):
     def should_taxis_be_running(self, taxi_list):
         """Determines whether tasks are available for each taxi to run.
         
-        Taxis should be run if there are trunks available for them
+        Taxis should be run if there are trunks available for them.  If there are
+        no active trunks in the forest, but there are tasks ready to run, tells
+        Pool to run enough taxis to work on all ready tasks.
         
         Args:
             taxi_list: List of taxi objects; are there tasks available for these taxis to run?
@@ -313,6 +357,12 @@ class Dispatcher(object):
 
     ## Initialization
     def find_branches(self, task_pool):
+        """Finds all branches in the task forest.  A branch is defined as a sequence
+        of trunk tasks, and all tasks that depend on the trunk tasks out to the leaves.
+        If a new trunk forks off of a sequence of trunk tasks, this is a new branch.
+        
+        Returns a list of lists of Task instances.  Each sublist is a branch.
+        """
         ## Scaffolding
         self._invert_dependency_graph(task_pool)
                 
@@ -434,6 +484,12 @@ class Dispatcher(object):
 
 
     def initialize_new_task_pool(self, task_pool, priority_method='canvas', imports=None):
+        """Loads the tasks from task_pool in to an empty dispatcher by compiling
+        the specified tasks (i.e., assigning IDs and priorities, rendering them in
+        to storable format (e.g., JSON)) and storing them in the dispatch (usually a DB).
+        
+        See Dispatcher._assign_priorities for priority_method options.
+        """
         ## imports: Dispatcher needs to be able to import relevant runners.
         ## Convenient default behavior: import the calling script (presumably, the run-spec script)
         if imports is None:
@@ -453,6 +509,10 @@ class Dispatcher(object):
     ## Cascading rollback
     def rollback(self, tasks, delete_files=False, rollback_dir=None):
         """Rolls back a task (or tasks) and any tasks that depend on it, and any tasks that depend on those, etc.
+        
+        Any task rolled back will have its status changed back to pending and any output files removed.
+        If delete_files==True, output files will be deleted. If rollback_dir is specified,
+        output files will be moved to rollback_dir.
         """
         
         if not hasattr(tasks, '__iter__'): # Passed a single task, presumably
@@ -538,12 +598,17 @@ class SQLiteDispatcher(Dispatcher):
     
 
     def _create_new_dispatch(self):
+        """Creates a new SQLite dispatch DB at the path specified in self.db_path."""
         self.write_table_structure()
         
         super(SQLiteDispatcher, self)._create_new_dispatch()
         
         
     def _load_existing_dispatch(self):
+        """Opens access to an existing SQLite dispatch DB specified in self.db_path.
+        
+        Retrieves list of imports necessary to run the tasks in the dispatch DB,
+        then calls superclass to import Task subclasses and get them in the global scope."""
         ## Get imports
         imports_query = """SELECT * FROM imports"""
         self.imports = [ii['import'] for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
@@ -554,6 +619,9 @@ class SQLiteDispatcher(Dispatcher):
 
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
     def __enter__(self):
+        """Context interface: connect to SQLite Dispatch DB.  If performing multiple operations,
+        faster to leave a "connection" open than to open and close it repeatedly; dangerous
+        to leave a connection open constantly."""
         # Don't allow layered entry
         if self._in_context:
             return
@@ -578,11 +646,19 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
+        """Context interface: connect to SQLite Dispatch DB.  If performing multiple operations,
+        faster to leave a "connection" open than to open and close it repeatedly; dangerous
+        to leave a connection open constantly."""
         self.conn.close()
         self._in_context = False
 
 
     def write_table_structure(self):
+        """Method to create necessary tables in a new dispatch DB: tasks, which
+        contains all information about tasks to run; and imports, which contains
+        a list of all files which need to be imported to get the required Task
+        subclasses in the global scope.
+        """
         create_task_str = """
             CREATE TABLE IF NOT EXISTS tasks (
                 id integer PRIMARY KEY,
@@ -611,10 +687,15 @@ class SQLiteDispatcher(Dispatcher):
             self.conn.execute(create_task_str)
             self.conn.execute(create_imports_str)
 
-        return
-
 
     def execute_select(self, query, *query_args):
+        """Executes a select query on the attached dispatch DB.
+        
+        If dispatcher is not in context, opens connection to the dispatch DB before making the
+        query; if only executing one DB operation, this can save writing, but will
+        be substantially slower for multiple operations than opening a context.
+        
+        Often best to do map(dict, ...) on the results."""
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
@@ -631,6 +712,12 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def execute_update(self, query, *query_args):
+        """Executes a write or update on the attached dispatch DB.
+        
+        If dispatcher is not in context, opens connection to the dispatch DB before making the
+        query; if only executing one DB operation, this can save writing, but will
+        be substantially slower for multiple operations than opening a context."""
+        
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
@@ -658,11 +745,29 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def register_taxi(self, my_taxi, my_pool):
+        """Registers the taxi my_taxi with this dispatcher: tells my_taxi that
+        this dispatch is its associated dispatcher by providing the dispatch db_path,
+        and tells my_pool to update the stored representation of my_taxi accordingly.
+        """
         my_taxi.dispatch_path = self.db_path
         my_pool.update_taxi_dispatch(my_taxi, self.db_path)
 
 
     def rebuild_json_task(self, r):
+        """SQLite doesn't support lists or dictionaries, so much of task information
+        is stored in JSON format. This method reconstructs task objects from the
+        stored JSON-format tasks.
+        
+        Args:
+            r - The row from the tasks table in the dispatch DB, in dict format.
+        Returns:
+            The appropriate Task subclass, with all (non-private, i.e., don't 
+            start with "_") attributes restored to their values from the time
+            the task was last written to the dispatch_db.
+            
+        Raises an error if the appropriate Task subclass cannot be found in the 
+        global scope.
+        """
         # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
         if r.get('depends_on', None) is not None:
             r['depends_on'] = json.loads(r['depends_on'])
@@ -763,7 +868,8 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def claim_task(self, my_taxi, task):
-        """Attempt to claim task for a given taxi.  Fails if the status has been changed from pending."""
+        """Attempt to claim task for a given taxi.  Fails if the status of task
+        has been changed from pending."""
 
         # If task has no id, either it's not in the DB or we couldn't claim it anyways
         if getattr(task, 'id', None) is not None:
@@ -788,6 +894,15 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def write_tasks(self, tasks):
+        """Stores (i.e., adds or updates) the Task instances specified in tasks
+        to the tasks table of the dispatch DB specified in self.db_path. Calls
+        task.compiled() to obtain a JSON-serializable version of the task that
+        will fit in to the dispatch DB (i.e., non-common attributes stored in a
+        'payload' dict attribute).
+        
+        Args:
+            tasks - A list of Task subclasses to be written to the DB.
+        """
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
