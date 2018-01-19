@@ -94,6 +94,11 @@ setuptools.setup(
     # Find package in src/taxi
     package_dir={'':'src'},
     packages=setuptools.find_packages('src'),
+
+    # Dependencies
+    install_requires=[
+        'argparse', 'parse'
+    ],
     
     # Make taxi.sh and run_taxi.py available to run everywhere
     scripts=['bin/taxi.sh', 'bin/run_taxi.py', 'src/taxi/tools/taxi-summary', 'src/taxi/tools/taxi-edit', 'src/taxi/tools/taxi-unabandon']
