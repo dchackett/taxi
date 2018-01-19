@@ -16,7 +16,6 @@ spectro.SpectroTask.loadg.conventions = "{fout_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k
 flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
-
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")
 pool_db_path = base_path + "/test-pool.sqlite"
@@ -67,7 +66,7 @@ if __name__ == '__main__':
         start_at_traj=4
     )
     
-    ## Add F and A2 (quenched) spectroscopy tasks for both streams
+    ## Add F and A2 spectroscopy tasks for both streams
     spec4_pool = mcmc.measure_on_config_generators(
         config_measurement_class=spectro.SpectroTask,
         measure_on=hmc_pool,

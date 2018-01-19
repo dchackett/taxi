@@ -21,6 +21,7 @@ base_path = os.path.abspath("./taxi-test")
 pool_db_path = base_path + "/test-pool.sqlite"
 dispatch_db_path = base_path + "/test-disp.sqlite"
 
+
 # Taxis will import this file, so everything except for imports and
 # relevant declarations need to go in to a __main__ block so the job isn't
 # repeatedly respecified
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         start_at_traj=4
     )
     
-    ## Add F and A2 (quenched) spectroscopy tasks for both streams
+    ## Add F and A2 spectroscopy tasks for both streams
     spec4_pool = mcmc.measure_on_config_generators(
         config_measurement_class=spectro.SpectroTask,
         measure_on=hmc_pool,
@@ -119,4 +120,3 @@ if __name__ == '__main__':
     
         my_pool.spawn_idle_taxis(dispatcher=my_disp)
     
-
