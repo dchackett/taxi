@@ -43,6 +43,10 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         for i in range(len(self.src_files)):
             with open(self.src_files[i], 'w') as test_file:
                 test_file.write(self.src_files[i])
+                
+        for dst_fn in self.dst_files:
+            if os.path.exists(dst_fn):
+                os.remove(dst_fn)
 
         ## Set up queue system
         self.my_queue = local_queue.LocalQueue()
@@ -259,8 +263,6 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
     ## Test re-launch detection for idle taxis
     def test_taxi_relaunch(self):
-        print map(dict, self.my_queue.execute_select("SELECT * FROM queue"))
-        print map(dict, self.my_disp.execute_select("SELECT * FROM tasks"))
         
         # Set up single copy task pool, registered to test1
         test_task = taxi.tasks.Copy(self.src_files[0], self.dst_files[0], for_taxi=self.my_taxi.name)
@@ -277,19 +279,13 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
-            
-        with self.my_pool:
-            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
-        
+                    
         # Run queue with the second, taskless taxi
         # During this step: taxi_two should detect that there is a task it cannot
         # run, and launch my_taxi to run it.
         with self.squeue:
             self.squeue.run_next_job()
             
-        with self.my_pool:
-            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
-    
         # After one step, the second taxi should be held, the first still idle
         with self.my_pool:
             pool_stat = self.my_pool.get_all_taxis_in_pool()
@@ -316,9 +312,6 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(pool_stat[0].status, 'H')
             self.assertEqual(pool_stat[1].status, 'H')
             
-        with self.my_pool:
-            print map(dict, self.my_pool.execute_select("SELECT * FROM taxis"))
-
         # The task should be finished
         with self.my_disp:
             task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
