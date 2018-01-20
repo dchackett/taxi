@@ -66,7 +66,7 @@ if __name__ == '__main__':
         start_at_traj=4
     )
     
-    ## Add F and A2 (quenched) spectroscopy tasks for both streams
+    ## Add F and A2 spectroscopy tasks for both streams
     spec4_pool = mcmc.measure_on_config_generators(
         config_measurement_class=spectro.SpectroTask,
         measure_on=hmc_pool,
