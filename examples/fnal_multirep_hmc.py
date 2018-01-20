@@ -12,11 +12,16 @@ import taxi.apps.mrep_milc.spectro as spectro
 # Plug in binary locations
 hmc.MultirepHMCTask.binary = '/lqcdproj/multirep/dhackett/bin/sun_mrep_hmc'
 flow.FlowTask.binary = '/lqcdproj/multirep/dhackett/bin/su4_wf'
+spectro.MultirepSpectroTask.multirep_spectro_binaries = {
+    # Key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
+    (4, 'f', False, False, False) : '/lqcdproj/multirep/dhackett/bin/su4_f_clov_cg',
+    (4, 'a2', False, False, False) : '/lqcdproj/multirep/dhackett/bin/su4_as2_clov_cg',
+}
 
 # Plug in desired file-naming conventions
 flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.SpectroTask.loadg.conventions = "{fout_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.SpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
 # Specify paths to Dispatch and Pools DBS

@@ -12,6 +12,11 @@ import taxi.apps.mrep_milc.mrep_fncs as mrep_fncs
 # Plug in desired file-naming conventions
 spectro.SpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.MultirepSpectroTask.multirep_spectro_binaries = {
+    # Key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
+    (4, 'f', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',
+    (4, 'a2', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg',
+}
 
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")
@@ -29,7 +34,7 @@ if __name__ == '__main__':
     
     ## Add F and A2 (quenched) spectroscopy tasks for both streams
     spec4_pool = mcmc.measure_on_files(
-        config_measurement_class=spectro.SpectroTask,
+        config_measurement_class=spectro.MultirepSpectroTask,
         filenames=gauge_files,
         req_time=600,
         start_at_traj=10,
@@ -37,7 +42,7 @@ if __name__ == '__main__':
     )
     
     spec6_pool = mcmc.measure_on_files(
-        config_measurement_class=spectro.SpectroTask,
+        config_measurement_class=spectro.MultirepSpectroTask,
         filenames=gauge_files,
         req_time=600,
         start_at_traj=10,

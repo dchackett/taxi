@@ -36,91 +36,69 @@ EOF
 SU4_F_irrep_names = [4, '4', 'f', 'F']
 SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
 
-## Binaries
-# Spectroscopy binaries are special, because there are so many of them in MILC
-# Multirep dictionary key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
-multirep_spectro_binaries = {
-    (4, 'f', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',
-    (4, 'f', False, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_pa',
-    (4, 'f', True, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_s_pa',
-    (4, 'a2', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg',
-    (4, 'a2', False, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_pa',
-    (4, 'a2', True, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_s_pa',
-    # Baryon binaries 
-    (4, 'a2', False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_as2_clov_cg_bar',
-    (4, 'f',  False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_f_clov_cg_bar',
-}
-
-
 
 class SpectroTask(ConfigMeasurement):
     ## File naming conventions
     loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadp = InputFile('{loadp_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     savep = File('{savep_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg = None
     
-    # Dynamical behavior for e.g. "tspec" vs "xspecpa" vs ...
-    def _get_fout_prefix(self):
-        return ('x' if self.screening else 't') + 'spec' + ('pa' if self.p_plus_a else '')
-    def _get_savep_prefix(self):
-        return ('x' if self.screening else 't') + 'prop' + ('pa' if self.p_plus_a else '')
-    fout_prefix = fixable_dynamic_attribute('_fout_prefix', _get_fout_prefix)
-    savep_prefix = fixable_dynamic_attribute('_savep_prefix', _get_savep_prefix)
-    
-    
     def __init__(self,
                  # Application-specific required arguments
-                 r0, irrep,
+                 kappa, r0, binary, fout_prefix,
                  # Override ConfigMeasurement defaults
                  req_time=600, 
                  # Application-specific defaults
                  source_type='gaussian', cgtol=1e-9, maxcgiter=500, loadp=None,
-                 save_propagator=False,
-                 p_plus_a=False, screening=False, compute_baryons=False,
-                 Nc=4,
+                 save_propagator=False, savep_prefix=None,
                  # Overrides
                  Ns=None, Nt=None,
-                 kappa=None,
                  # Arguments to pass along to superclass
                  **kwargs):
-        """Measure spectroscopy on a correlation function.
+        """Measure correlation functions on a stored gauge configuration.
         
         If starter is a filename, attempts to read parameters from filename. If
         starter is a ConfigGenerator, steals parameters from the GaugeGenerator.
         
         Args:
             starter: A filename or a ConfigGenerator.
+            kappa: Either a numerical value to use for kappa, or the name of an attribute
+                of this class to find kappa in (after it has been stolen from either
+                a filename or a ConfigGenerator, e.g., "k4", "k6").
+            binary: Spectroscopy binary. Force specification because physical flags
+                (e.g., irrep, screening mass?, use p+a trick?, compute baryons?)
+                are handled by having many different binaries, versus passing flags
+                to one binary.
+            fout_prefix: Prefix to spectroscopy filename, like "tspec" or "xspecpa".
+                Force specification for same reason as binary.
             Ns: Number of lattice points in spatial direction. If provided, overrides
                 whatever was found in the ConfigGenerator or filename.
             Nt: Number of lattice points in temporal direction. If provided, overrides
                 whatever was found in the ConfigGenerator or filename.
-            irrep: Irrep of fermion to compute correlators for
-            p_plus_a: Apply Periodic+Antiperiodic boundary conditions trick? (Requires binary specified)
-            screening: Compute screening mass (spatial-direction) correlation functions? (Requires binary specified)
-            compute_baryons: Compute baryon correlators? (Requires binary specified)
-            Nc: Number of colors (Default 4 for TACO multirep study) (Requires binary specified)
         """
         
         super(SpectroTask, self).__init__(req_time=req_time, **kwargs)
 
         # Physical parameters
         self.r0 = r0
-        self.irrep = irrep
         self.source_type = source_type
         self.cgtol = cgtol
         self.maxcgiter = maxcgiter
+        
+        self.binary = binary
         
         # Propagator saving/loading
         self.loadp = loadp
         self.savep.save = save_propagator
         
-        
-        # Physical Flags (used to determine binary)
-        self.p_plus_a = p_plus_a
-        self.screening = screening
-        self.compute_baryons = compute_baryons
-        self.Nc = Nc
+        # Filenames
+        if save_propagator:
+            assert savep_prefix is not None, "Must specify savep_prefix to save propagator"
+            self.savep_prefix = savep_prefix
+        assert fout_prefix is not None, "Must specify fout_prefix for file names, e.g. tspec"
+        self.fout_prefix = fout_prefix
         
         # Override parameters read out from a filename or stolen from a ConfigGenerator
         if Ns is not None:
@@ -128,15 +106,18 @@ class SpectroTask(ConfigMeasurement):
         if Nt is not None:
             self.Nt = Nt
             
-        # Plug in appropriate kappa from filename or ConfigGenerator, or override if provided
-        if kappa is None:
-            # Not overridden, figure out what kappa to use
-            if self.irrep in SU4_F_irrep_names:
-                kappa = self.k4
-            elif self.irrep in SU4_A2_irrep_names:
-                kappa = self.k6
-        assert kappa is not None, "Kappa not found or specified for multirep spectroscopy task"
-        self.kappa = kappa 
+        # Semi-smart, semi-hackish kappa loading
+        if isinstance(kappa, basestring):
+            # Assume kappa is a parameter to be stolen
+            try:
+                self.kappa = getattr(self, kappa)
+            except AttributeError:
+                raise AttributeError("Specified kappa='{0}', but no attribute with that name is present in {1}".format(kappa, self))
+        else:
+            # Just take whatever value is provided
+            self.kappa = kappa
+            
+        assert self.kappa > 0
         
     
     def build_input_string(self):
@@ -182,6 +163,17 @@ class SpectroTask(ConfigMeasurement):
                 raise RuntimeError("Spectro ok check fails: running did not complete in " + self.fout)
 
 
+
+class MultirepSpectroTask(SpectroTask):
+    # Dynamical behavior for filenames e.g. "tspec" vs "xspecpa" vs ...
+    def _get_fout_prefix(self):
+        return ('x' if self.screening else 't') + 'spec' + ('pa' if self.p_plus_a else '')
+    def _get_savep_prefix(self):
+        return ('x' if self.screening else 't') + 'prop' + ('pa' if self.p_plus_a else '')
+    fout_prefix = fixable_dynamic_attribute('_fout_prefix', _get_fout_prefix)
+    savep_prefix = fixable_dynamic_attribute('_savep_prefix', _get_savep_prefix)
+        
+    
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.
     def _dynamic_get_binary(self):
         if self.irrep in SU4_F_irrep_names:
@@ -189,13 +181,94 @@ class SpectroTask(ConfigMeasurement):
         elif self.irrep in SU4_A2_irrep_names:
             irrep = 'a2'
         else:
-            raise NotImplementedError("SpectroTask only knows about F, A2 irreps, not {r}".format(r=self.irrep))
+            raise NotImplementedError("MultirepSpectroTask only knows about F, A2 irreps, not {r}".format(r=self.irrep))
             
         key_tuple = (self.Nc, irrep, self.screening, self.p_plus_a, self.compute_baryons)
         
         try:
-            return multirep_spectro_binaries[key_tuple]
+            return self.multirep_spectro_binaries[key_tuple]
         except KeyError:
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
+    
+    multirep_spectro_binaries = {} # Specify in run-spec script
+    
+    def __init__(self,
+                 # Application-specific required arguments
+                 r0, irrep,
+                 # Override ConfigMeasurement defaults
+                 req_time=600, 
+                 # Application-specific defaults
+                 source_type='gaussian', cgtol=1e-9, maxcgiter=500, loadp=None,
+                 save_propagator=False,
+                 p_plus_a=False, screening=False, compute_baryons=False,
+                 Nc=4,
+                 # Overrides
+                 Ns=None, Nt=None,
+                 kappa=None,
+                 # Arguments to pass along to superclass
+                 **kwargs):
+        """Measure correlation functions on a stored gauge configuration.
+        
+        If starter is a filename, attempts to read parameters from filename. If
+        starter is a ConfigGenerator, steals parameters from the GaugeGenerator.
+        
+        Instead of having to specify the binary and output file prefixes, these
+        are dynamically determined from physical flags. Must have binaries specified
+        in self.multirep_spectro_binaries in a dictionary of the format
+        {(Nc, irrep, screening, p_plus_a, compute_baryons) : "/path/to/appropriate_binary"}
+        
+        Args:
+            starter: A filename or a ConfigGenerator.
+            Ns: Number of lattice points in spatial direction. If provided, overrides
+                whatever was found in the ConfigGenerator or filename.
+            Nt: Number of lattice points in temporal direction. If provided, overrides
+                whatever was found in the ConfigGenerator or filename.
+            irrep: Irrep of fermion to compute correlators for
+            p_plus_a: Apply Periodic+Antiperiodic boundary conditions trick? (Requires binary specified)
+            screening: Compute screening mass (spatial-direction) correlation functions? (Requires binary specified)
+            compute_baryons: Compute baryon correlators? (Requires binary specified)
+            Nc: Number of colors (Default 4 for TACO multirep study) (Requires binary specified)
+        """
+        
+        # HACK: We don't want to call the SpectroTask constructor, we just want
+        # the other function overrides. So, skip that constructor by just calling
+        # SpectroTask's superconstructor
+        super(SpectroTask, self).__init__(req_time=req_time, **kwargs)
+        
+        # Physical parameters
+        self.r0 = r0
+        self.source_type = source_type
+        self.cgtol = cgtol
+        self.maxcgiter = maxcgiter
+        
+        # Physical Flags (used to determine binary)
+        self.p_plus_a = p_plus_a
+        self.screening = screening
+        self.compute_baryons = compute_baryons
+        self.Nc = Nc
+        
+        # Propagator saving/loading
+        self.loadp = loadp
+        self.savep.save = save_propagator
+                
+        # Override parameters read out from a filename or stolen from a ConfigGenerator
+        if Ns is not None:
+            self.Ns = Ns
+        if Nt is not None:
+            self.Nt = Nt
+        
+        self.irrep = irrep
+        
+        # Plug in appropriate kappa from filename or ConfigGenerator, or override if provided
+        if kappa is None:
+            # Not overridden, figure out what kappa to use
+            if self.irrep in SU4_F_irrep_names:
+                kappa = self.k4
+            elif self.irrep in SU4_A2_irrep_names:
+                kappa = self.k6
+        assert kappa is not None, "Kappa not found or specified for multirep spectroscopy task"
+        self.kappa = kappa 
+        
+        assert self.kappa > 0
 
