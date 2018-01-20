@@ -49,14 +49,14 @@ def copy_tasks_for_multirep_outputs(task_pool, out_dir, gauge_dir):
         param_subpath = "{b}/{k4}_{k6}/".format(b=task.beta, k4=task.k4, k6=task.k6)
         if isinstance(task, taxi.mcmc.ConfigGenerator):
             if getattr(task, 'saveg', None) is not None:
-                saveg_dest = os.path.join(gauge_dir, volume_subpath, param_subpath, task.saveg)
+                saveg_dest = os.path.join(gauge_dir, volume_subpath, param_subpath, str(task.saveg))
                 
-                new_copy_task = Copy(src=task.saveg, dest=saveg_dest)
+                new_copy_task = Copy(src=str(task.saveg), dest=saveg_dest)
                 new_copy_task.depends_on = [task]
                 copy_tasks.append(new_copy_task)
         
         if getattr(task, 'fout', None) is not None:
-            words = os.path.basename(task.fout).split('_')
+            words = os.path.basename(str(task.fout)).split('_')
             
             type_subpath = ''
             if words[0] == 'hmc':
@@ -74,8 +74,8 @@ def copy_tasks_for_multirep_outputs(task_pool, out_dir, gauge_dir):
             elif 'flow' in words[0]:
                 type_subpath = 'flow'
             
-            fout_dest = os.path.join(out_dir, volume_subpath, type_subpath, param_subpath, os.path.basename(task.fout))
-            new_copy_task = Copy(src=task.fout, dest=fout_dest)
+            fout_dest = os.path.join(out_dir, volume_subpath, type_subpath, param_subpath, os.path.basename(str(task.fout)))
+            new_copy_task = Copy(src=str(task.fout), dest=fout_dest)
             new_copy_task.depends_on = [task]
             copy_tasks.append(new_copy_task)
     
@@ -90,52 +90,3 @@ def _wijay_volume_postprocessor(parsed):
     parsed['Ns'] = int(vol_str[:2])
     parsed['Nt'] = int(vol_str[2:])
     return parsed
-
-        
-mrep_wijay_gauge_fmt = 'cfg_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{label}}_{{traj:d}}'
-mrep_wijay_gauge = _convention_metafactory(mrep_wijay_gauge_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_spectro_fmt = 'outCt_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}gf_{{traj:d}}'
-mrep_wijay_spectro = _convention_metafactory(mrep_wijay_spectro_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_prop_fmt = 'prop_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}gf_{{traj:d}}'
-mrep_wijay_prop = _convention_metafactory(mrep_wijay_prop_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_modes_overlap_output_fmt = 'outOverlapModes_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
-mrep_wijay_modes_overlap_output = _convention_metafactory(mrep_wijay_modes_overlap_output_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_gauge_landau_fmt = 'cfgLandau_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
-mrep_wijay_gauge_landau = _convention_metafactory(mrep_wijay_gauge_landau_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_h0_fmt = 'h0_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
-mrep_wijay_h0 = _convention_metafactory(mrep_wijay_h0_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_hov_fmt = 'hov_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{traj:d}}'
-mrep_wijay_hov = _convention_metafactory(mrep_wijay_hov_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_prop_overlap_fmt = 'propOverlap_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}_{{traj:d}}'
-mrep_wijay_prop_overlap = _convention_metafactory(mrep_wijay_prop_overlap_fmt, postprocessor=_wijay_volume_postprocessor)
-
-mrep_wijay_prop_overlap_output_fmt = 'outPropOverlap_{{Ns:d}}{{Nt:d}}_b{{beta:g}}_kf{{k4:g}}_kas{{k6:g}}_{{irrep}}_{{r0:g}}_{{traj:d}}'
-mrep_wijay_prop_overlap_output = _convention_metafactory(mrep_wijay_prop_overlap_output_fmt, postprocessor=_wijay_volume_postprocessor)
-
-
-
-
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
