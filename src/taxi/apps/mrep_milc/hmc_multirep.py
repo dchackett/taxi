@@ -1,14 +1,7 @@
 #!/usr/bin/env python
-
-from taxi import fixable_dynamic_attribute, should_save_file, should_load_file
+from taxi import fixable_dynamic_attribute
 from taxi.mcmc import ConfigGenerator
-import taxi.local.local_taxi as local_taxi
-
-from taxi.file import File, InputFile
-
-
-## local_taxi should specify:
-# - "pure_gauge_ora_binary"
+from taxi.file import File, InputFile, should_save_file, should_load_file
 
 # Structure of input file - see build_input_string() below
 hmc_input_template = """
@@ -124,7 +117,7 @@ class MultirepHMCTask(ConfigGenerator):
     fout = File('hmc_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg = File('cfg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     
-    binary = local_taxi.multirep_hmc_binary
+    binary = None # Specify this in run-specification scripts
     
     def __init__(self,
                  # Application-specific required arguments

@@ -55,7 +55,7 @@ if __name__ == '__main__':
     my_pool = taxi.pool.SQLitePool(
         db_path=pool_db_path, 
         pool_name=pool_name, 
-        work_dir=(base_path + "/pool/"),
+        work_dir=(base_path + "/work/"),
         log_dir=(base_path + "/log/")
     )
     

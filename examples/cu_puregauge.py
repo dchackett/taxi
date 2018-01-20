@@ -5,14 +5,16 @@ import taxi
 import taxi.pool
 import taxi.dispatcher
 import taxi.mcmc as mcmc
-import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.pure_gauge_ora as pg_ora
+import taxi.apps.mrep_milc.flow as flow
 
+# Plug in binary locations
+pg_ora.PureGaugeORATask.binary = '/nfs/beowulf03/dchackett/su4_pure_gauge/bin/su4_ora'
+flow.FlowTask.binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_wf_mpi'
 
 # Plug in desired file-naming conventions
 flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-
 
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")
@@ -69,7 +71,7 @@ if __name__ == '__main__':
     my_pool = taxi.pool.SQLitePool(
         db_path=pool_db_path, 
         pool_name=pool_name, 
-        work_dir=(base_path + "/pool/"),
+        work_dir=(base_path + "/work/"),
         log_dir=(base_path + "/log/")
     )
     

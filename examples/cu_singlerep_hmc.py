@@ -5,10 +5,13 @@ import taxi
 import taxi.pool
 import taxi.dispatcher
 import taxi.mcmc as mcmc
-import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.hmc_singlerep as hmc
+import taxi.apps.mrep_milc.flow as flow
 import taxi.apps.mrep_milc.spectro as spectro
 
+# Plug in binary locations
+hmc.SingleRepHMCTask.binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_mrep_hmc'
+flow.FlowTask.binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_wf_mpi'
 
 # Plug in desired file-naming conventions
 flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
@@ -91,7 +94,7 @@ if __name__ == '__main__':
     my_pool = taxi.pool.SQLitePool(
         db_path=pool_db_path, 
         pool_name=pool_name, 
-        work_dir=(base_path + "/pool/"),
+        work_dir=(base_path + "/work/"),
         log_dir=(base_path + "/log/")
     )
     

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-
 from taxi.mcmc import ConfigMeasurement
-import taxi.local.local_taxi as local_taxi
 from taxi.file import File, InputFile
 
 ## local_taxi should specify:
@@ -35,7 +33,7 @@ class FlowTask(ConfigMeasurement):
     fout = File('flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg = None
     
-    binary = local_taxi.flow_binary
+    binary = None # Specify this in run-specification scripts
     
     def __init__(self,
                  # Application-specific required arguments

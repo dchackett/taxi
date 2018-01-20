@@ -1,17 +1,7 @@
 #!/usr/bin/env python
-
-import os
-
-from taxi import expand_path
-from taxi import fixable_dynamic_attribute, should_save_file, should_load_file
+from taxi import fixable_dynamic_attribute
 from taxi.mcmc import ConfigMeasurement
-import taxi.local.local_taxi as local_taxi
-
-from taxi.file import File, InputFile
-
-## local_taxi should specify:
-# - "spectro_binary"
-
+from taxi.file import File, InputFile, should_save_file, should_load_file
 
 spectro_input_template = """
 prompt 0
@@ -45,6 +35,22 @@ EOF
 # Synonyms for relevant irreps in SU4
 SU4_F_irrep_names = [4, '4', 'f', 'F']
 SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
+
+## Binaries
+# Spectroscopy binaries are special, because there are so many of them in MILC
+# Multirep dictionary key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
+multirep_spectro_binaries = {
+    (4, 'f', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',
+    (4, 'f', False, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_pa',
+    (4, 'f', True, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg_s_pa',
+    (4, 'a2', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg',
+    (4, 'a2', False, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_pa',
+    (4, 'a2', True, True, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg_s_pa',
+    # Baryon binaries 
+    (4, 'a2', False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_as2_clov_cg_bar',
+    (4, 'f',  False, False, True) : '/nfs/beowulf03/wijay/mrep/bin/su4_f_clov_cg_bar',
+}
+
 
 
 class SpectroTask(ConfigMeasurement):
@@ -188,7 +194,7 @@ class SpectroTask(ConfigMeasurement):
         key_tuple = (self.Nc, irrep, self.screening, self.p_plus_a, self.compute_baryons)
         
         try:
-            return local_taxi.multirep_spectro_binaries[key_tuple]
+            return multirep_spectro_binaries[key_tuple]
         except KeyError:
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
