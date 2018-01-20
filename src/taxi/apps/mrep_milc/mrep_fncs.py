@@ -3,39 +3,9 @@
 """
 
 import os
-
 import taxi.mcmc
 from taxi.tasks import Copy
 
-from taxi.file import File, InputFile
-
-
-def _convention_metafactory(fmt, postprocessor=None):
-    if not hasattr(fmt, '__iter__'):
-        fmt = [fmt]
-            
-    def _factory(prefix=None, input_file=False):        
-        conventions = [ff.format(prefix=prefix) for ff in fmt]        
-        file_kwargs = dict(conventions=conventions, postprocessor=postprocessor)        
-        return InputFile(**file_kwargs) if input_file else File(**file_kwargs)
-    
-    return _factory
-
-pure_gauge_fmt = '{prefix}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{label}}_{{traj:d}}'
-pure_gauge = _convention_metafactory(pure_gauge_fmt)
-
-pure_gauge_spectro_fmt = '{prefix}_{{irrep}}_r{{r0:g}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{kappa:g}}_{{label}}_{{traj:d}}'
-pure_gauge_spectro = _convention_metafactory(pure_gauge_spectro_fmt)
-
-mrep_dh_fmt = '{prefix}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}'
-mrep_dh = _convention_metafactory(mrep_dh_fmt)
-
-mrep_dh_spectro_fmt = [
-        '{prefix}_{{irrep}}_r{{r0:g}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}',
-        '{prefix}_{{irrep}}_{{Ns:d}}_{{Nt:d}}_{{beta:g}}_{{k4:g}}_{{k6:g}}_{{label}}_{{traj:d}}',
-    ]
-mrep_dh_spectro = _convention_metafactory(mrep_dh_spectro_fmt)
-        
 
 def copy_tasks_for_multirep_outputs(task_pool, out_dir, gauge_dir):
     out_dir = taxi.expand_path(out_dir)
