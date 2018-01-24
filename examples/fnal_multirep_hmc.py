@@ -21,8 +21,8 @@ spectro.MultirepSpectroTask.multirep_spectro_binaries = {
 # Plug in desired file-naming conventions
 flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.SpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.MultirepSpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.MultirepSpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     
     ## Add F and A2 spectroscopy tasks for both streams
     spec4_pool = mcmc.measure_on_config_generators(
-        config_measurement_class=spectro.SpectroTask,
+        config_measurement_class=spectro.MultirepSpectroTask,
         measure_on=hmc_pool,
         req_time=60,
         start_at_traj=4,
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     )
     
     spec6_pool = mcmc.measure_on_config_generators(
-        config_measurement_class=spectro.SpectroTask,
+        config_measurement_class=spectro.MultirepSpectroTask,
         measure_on=hmc_pool,
         req_time=60,
         start_at_traj=4,
