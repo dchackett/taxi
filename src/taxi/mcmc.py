@@ -25,7 +25,7 @@ class MCMC(tasks.Runner):
     # Output files
     saveg_filename_prefix = 'cfg'
     saveg = File(conventions="{saveg_filename_prefix}_{traj:d}", save=True)
-    saveg_filename_prefix = 'fout'
+    fout_filename_prefix = 'fout'
     fout = File(conventions="{fout_filename_prefix}_{traj:d}", save=True)
     # Input files -- Won't be tracked by rollbacker, automatically parse and load parameters
     loadg = InputFile(conventions="{loadg_filename_prefix}_{traj:d}", save=False)
