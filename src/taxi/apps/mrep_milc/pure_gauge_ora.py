@@ -31,9 +31,11 @@ EOF
 
 class PureGaugeORATask(ConfigGenerator):
     
-    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    fout = File('ora_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    saveg = File('cfgPg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadg = InputFile('{loadg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('{fout_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout_filename_prefix = 'ora'
+    saveg = File('{saveg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg_filename_prefix = 'cfgPg'
     
     binary = None # Specify this in run-specification scripts
     

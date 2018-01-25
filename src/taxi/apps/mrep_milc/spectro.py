@@ -39,10 +39,10 @@ SU4_A2_irrep_names = [6, '6', 'a2', 'A2', 'as2', 'AS2', 'as', 'AS']
 
 class SpectroTask(ConfigMeasurement):
     ## File naming conventions
-    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    fout = File('{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    loadp = InputFile('{loadp_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    savep = File('{savep_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadg = InputFile('{loadg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('{fout_filename_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadp = InputFile('{loadp_filename_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    savep = File('{savep_filename_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg = None
     
     def __init__(self,
@@ -96,9 +96,9 @@ class SpectroTask(ConfigMeasurement):
         # Filenames
         if save_propagator:
             assert savep_prefix is not None, "Must specify savep_prefix to save propagator"
-            self.savep_prefix = savep_prefix
+            self.savep_filename_prefix = savep_prefix
         assert fout_prefix is not None, "Must specify fout_prefix for file names, e.g. tspec"
-        self.fout_prefix = fout_prefix
+        self.fout_filename_prefix = fout_prefix
         
         # Override parameters read out from a filename or stolen from a ConfigGenerator
         if Ns is not None:
@@ -166,12 +166,12 @@ class SpectroTask(ConfigMeasurement):
 
 class MultirepSpectroTask(SpectroTask):
     # Dynamical behavior for filenames e.g. "tspec" vs "xspecpa" vs ...
-    def _get_fout_prefix(self):
+    def _get_fout_filename_prefix(self):
         return ('x' if self.screening else 't') + 'spec' + ('pa' if self.p_plus_a else '')
-    def _get_savep_prefix(self):
+    def _get_savep_filename_prefix(self):
         return ('x' if self.screening else 't') + 'prop' + ('pa' if self.p_plus_a else '')
-    fout_prefix = fixable_dynamic_attribute('_fout_prefix', _get_fout_prefix)
-    savep_prefix = fixable_dynamic_attribute('_savep_prefix', _get_savep_prefix)
+    fout_filename_prefix = fixable_dynamic_attribute('_fout_filename_prefix', _get_fout_filename_prefix)
+    savep_filename_prefix = fixable_dynamic_attribute('_savep_filename_prefix', _get_savep_filename_prefix)
         
     
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.

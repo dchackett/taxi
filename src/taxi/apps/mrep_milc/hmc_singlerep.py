@@ -99,9 +99,11 @@ milc_irrep_names = {'f' : 'fund', 'a2' : 'asym', 's2' : 'symm', 'g' : 'adjt'}
 
 
 class SingleRepHMCTask(ConfigGenerator):
-    loadg = InputFile('{loadg_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    fout = File('hmc_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
-    saveg = File('cfg_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadg = InputFile('{loadg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout = File('{fout_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    fout_filename_prefix = 'hmc'
+    saveg = File('{saveg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg_filename_prefix = 'cfg'
     
     binary = None # Specify this in run-specification scripts
     
