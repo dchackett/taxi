@@ -81,7 +81,7 @@ class MCMC(tasks.Runner):
         self.loadg._value_override = config_generator.saveg
             
             
-    def start_from_config_file(self, loadg, delay_fn_exists_check=False):
+    def start_from_config_file(self, loadg, delay_fn_exists_check=True):
         """Sets up MCMC task to run the specified config file loadg.  Uses file
         naming conventions (see taxi.file) to parse parameters from the filename.
         Specified config file must exist at time of task specification unless
@@ -218,7 +218,7 @@ class ConfigMeasurement(MCMC):
     
     fout_filename_prefix = 'meas'
         
-    def __init__(self, measure_on, save_config=False, delay_fn_exists_check=False, **kwargs):
+    def __init__(self, measure_on, save_config=False, delay_fn_exists_check=True, **kwargs):
         """Specify a task to perform a measurement on a field configuration.
         
         Args:
