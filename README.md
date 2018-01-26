@@ -1,27 +1,27 @@
+# Disclaimer/Advertisement
+
+taxi is presently under very active development. If you would like to use taxi for your work, please contact us if you need any assistance.
+
 # Overview
 
-`taxi` is a minimal scientific workflow manager intended to automate the process of running Markov Chain Monte Carlo (MCMC) simulations (and more specifically, lattice gauge theory (LGT) simulations) on large parallel clusters. For an overview of scientific workflow management, please consult the excellent [Pegasus documentation](https://pegasus.isi.edu/documentation/tutorial_scientific_workflows.php).
+taxi is a minimal scientific workflow manager intended to automate the process of running Markov Chain Monte Carlo (MCMC) simulations (and more specifically, lattice gauge theory (LGT) simulations) on large parallel clusters. For an overview of scientific workflow management, please consult the excellent [Pegasus documentation](https://pegasus.isi.edu/documentation/tutorial_scientific_workflows.php).
 
-Most scientific workflow management systems (WMSs) are difficult to install on remote machines and may have unachievable (or highly nontrivial to work around) requirements (e.g., some WMS might only work with the HTCondor queueing system, but you need to run on a machine that uses Slurm or PBS). Furthermore, many of these systems are designed to accomodate much more general workflows than necessary for MCMC/LGT studies. This excess generality can make it difficult/time-prohibitive to learn how to use a WMS. Finally, most systems require some active central monitor program to be kept running; this program must retain access to remote resources, which can be difficult to manage.  `taxi` was made to address all of these issues: `taxi` is easy to get running on almost any machine with any queueing system, and designed with running MCMC/LGT simulations in mind.
+Most scientific workflow management systems (WMSs) are difficult to install on remote machines and may have unachievable (or highly nontrivial to work around) requirements (e.g., some WMS might only work with the HTCondor queueing system, but you need to run on a machine that uses Slurm or PBS). Furthermore, many of these systems are designed to accomodate much more general workflows than necessary for MCMC/LGT studies. This excess generality can make it difficult/time-prohibitive to learn how to use a WMS. Finally, most systems require some active central monitor program to be kept running; this program must retain access to remote resources, which can be difficult to manage.  taxi was made to address all of these issues: taxi is easy to get running on almost any machine with any queueing system, and designed with running MCMC/LGT simulations in mind.
 
-`taxi` is intended to be lightweight, requiring a minimum of installation and setup to run on remote clusters. To this end, `taxi` is written to be compatible with Python 2.6.6, which is the version of Python available on most clusters (including the USQCD machines at Fermilab). The `taxi` package has minimal dependencies on non-standard Python packages, and works gracefully and transparently with `virtualenv` to allow installation on machines where users have limited privileges.
+taxi is intended to be lightweight, requiring a minimum of installation and setup to run on remote clusters. To this end, taxi is written to be compatible with Python 2.6.6, which is the version of Python available on most clusters (including the USQCD machines at Fermilab). The taxi package has minimal dependencies on non-standard Python packages, and works gracefully and transparently with virtualenv to allow installation on machines where users have limited privileges.
 
-Most MCMC workflows share a common structure. `taxi` takes advantage of this structure to make it easy to adapt the software to run different binary suites, and to specify complicated workflows. `taxi` provides a number of abstract superclasses that run common types of MCMC binaries; adapting them to run a specific binary amounts to overriding two or three functions. A set of convenience functions allow users to specify arbitrarily long sequences of configuration-generations (e.g., HMC) and measurements (e.g., spectroscopy).
+Most MCMC workflows share a common structure. taxi takes advantage of this structure to make it easy to adapt the software to run different binary suites, and to specify complicated workflows. taxi provides a number of abstract superclasses that run common types of MCMC binaries; adapting them to run a specific binary amounts to overriding two or three functions. A set of convenience functions allow users to specify arbitrarily long sequences of configuration-generations (e.g., HMC) and measurements (e.g., spectroscopy).
 
-In order to circumvent the need for an active central monitor program, `taxi` uses a passive central control scheme. In this "taxi-dispatcher" model, a set of workers (taxis) are controlled by a central, passive controller (the dispatcher). The taxis iterate the following cycle:
+In order to circumvent the need for an active central monitor program, taxi uses a passive central control scheme. In this "taxi-dispatcher" model, a set of workers (taxis) are controlled by a central, passive controller (the dispatcher). The taxis iterate the following cycle:
 1. Taxi completes its present task
 2. Upon task completion, taxi calls up the dispatcher and informs it that the task is complete/failed/etc
 3. Dispatcher considers the remaining tasks, tells the taxi what to work on next, and updates its records
 4. Taxi hangs up and begins work on its new task.
-The Dispatcher need only be active while a Taxi is communicating with it. This allows all of the processing portions of the Dispatcher to be run by whatever program implements the Taxis. The Dispatcher's records/memory are stored in some way that is accessible to all worker jobs. The present implementation of `taxi` uses SQLite databases stored on shared file systems to implement the Dispatcher.
+The Dispatcher need only be active while a Taxi is communicating with it. This allows all of the processing portions of the Dispatcher to be run by whatever program implements the Taxis. The Dispatcher's records/memory are stored in some way that is accessible to all worker jobs. The present implementation of taxi uses SQLite databases stored on shared file systems to implement the Dispatcher.
 
 In order to run workflows that take longer than the maximum allowable run time for a job (e.g., 24 hours), taxis will resubmit themselves. The taxis will also adaptively manage the number of taxi worker jobs on the queue to match the available workload, without any input required from the user.
 
-# Disclaimer/Advertisement
-
-`taxi` is presently under very active development. If you would like to use `taxi` for your work, please contact us.
-
-# How to use `taxi`
+# How to use taxi
 
 ## Installing on USQCD/Fermilab machines
 
@@ -29,24 +29,24 @@ In order to run workflows that take longer than the maximum allowable run time f
 
 Many computing resources (such as the USQCD cluster at Fermilab) do not have an up-to-date version of Python (most machines only have Python 2.6.6, versus Python 2.7).  The packages standardly included in scientific Python distributions are also rarely available.  And, because users have limited privileges in such environments, it can be difficult to install or update anything.
 
-The solution to this issue is `virtualenv`, which allows you to create an isolated Python environment. In this environment, you may install and update the available software as if you had system-wide privileges. In addition, `virtualenv` may be used without installing anything.
+The solution to this issue is virtualenv, which allows you to create an isolated Python environment. In this environment, you may install and update the available software as if you had system-wide privileges. In addition, virtualenv may be used without installing anything.
 
-1. Download the `tar.gz` of the latest version of [`virtualenv`](https://pypi.python.org/pypi/virtualenv).
+1. Download the `tar.gz` of the latest version of [virtualenv](https://pypi.python.org/pypi/virtualenv).
 2. Copy the archive to the USQCD cluster, e.g.: `scp virtualenv-15.1.0.tar.gz some_user@bc1.FNAL.GOV:~`
 3. Unpack it, e.g.: `tar xvzf virtualenv-15.1.0.tar.gz`.  Note that no installation is necessary.
 4. Create a new virtual environment, e.g.: `virtualenv-15.1.0/virtualenv.py taxi_env`
 5. Activate the virtual environment, e.g.: `source taxi_env/bin/activate`
 
-We can now install `taxi` and the packages it depends on in this `virtualenv`. Whenever you want to use `taxi` (e.g., submit jobs, use tools), you must first enter the `virtualenv` like `source taxi_env/bin/activate`.
+We can now install taxi and the packages it depends on in this virtualenv. Whenever you want to use taxi (e.g., submit jobs, use tools), you must first enter the virtualenv like `source taxi_env/bin/activate`.
 
 
 ### Localizing and installing taxi
 
-Ensure that the `virtualenv` created above is active for this part of the process.
+Ensure that the virtualenv created above is active for this part of the process.
 
-1. Make a clone of the `taxi` repository from GitHub, e.g.: `git clone https://github.com/dchackett/taxi.git` (or download and unpack an archive of the repository)
-2. In the root folder of the repository, call `setup.py` to localize `taxi`: `python setup.py localize --machine=fnal`
-3. Install `taxi`. In a virtualenv, there is no need for a `--user` flag: `python setup.py install`. Note that this step will automatically install `argparse` and `parse` from PyPI, which requires an internet connection.  If no internet connection is available, download and install these packages in the virtual environment beforehand.
+1. Make a clone of the taxi repository from GitHub, e.g.: `git clone https://github.com/dchackett/taxi.git` (or download and unpack an archive of the repository)
+2. In the root folder of the repository, call `setup.py` to localize taxi: `python setup.py localize --machine=fnal`
+3. Install taxi. In a virtualenv, there is no need for a `--user` flag: `python setup.py install`. Note that this step will automatically install `argparse` and `parse` from PyPI, which requires an internet connection.  If no internet connection is available, download and install these packages in the virtual environment beforehand.
 
 
 ## Overview of examples
