@@ -188,7 +188,10 @@ class FileInstanceInterface(FileInterface):
         
         assert isinstance(convention, basestring)
         
-        return convention.format(**self.task_instance.to_dict())
+        try:
+            return convention.format(**self.task_instance.to_dict())
+        except KeyError as e:
+            raise KeyError("Unable to find key '{0}' while rendering convention '{1}'".format(e.args[0], convention))
     
     
     def __json__(self):
@@ -227,7 +230,7 @@ class File(object):
     attribute is set for a subclass, overrides for all further subclasses and instances
     of that class; if an set for an instance, overrides for that instance only.
     """
-    def __init__(self, conventions=None, save=True, postprocessor=None):
+    def __init__(self, conventions, save=True, postprocessor=None):
         self.conventions = conventions
         self.save = save
         self.load = False
@@ -344,9 +347,9 @@ class InputFile(File):
     filename and load them in to the object where the filename was set.
     """
     
-    def __init__(self, auto_parse=True, save=False, **kwargs):
+    def __init__(self, conventions, auto_parse=True, save=False, **kwargs):
         assert save == False, "InputFiles cannot be saved"
-        super(InputFile, self).__init__(save=False, **kwargs)
+        super(InputFile, self).__init__(conventions, save=False, **kwargs)
         self.load = True
         self.auto_parse = auto_parse
         self._string_must_be_override = True
