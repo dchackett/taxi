@@ -12,7 +12,7 @@ import os
 
 import tasks
 from taxi import sanitized_path, expand_path
-from taxi.file import File, InputFile, should_save_file, should_load_file
+from taxi.file import File, InputFile, FileInterface, should_save_file, should_load_file
 
         
 
@@ -249,7 +249,7 @@ class ConfigMeasurement(MCMC):
             self.traj = measure_on.final_traj    
 
 
-### Stream functions
+### Convenience functions to make streams of ConfigGenerators
 def make_config_generator_stream(config_generator_class, N,
                                  starter=None, # default: fresh start
                                  streamseed=None, seeds=None, # One of these must be provided
@@ -272,6 +272,13 @@ def make_config_generator_stream(config_generator_class, N,
             stream.  Must provide at least N seeds.  If more than N are provided,
             ignores the unneeded seeds at the end of the list.  Either streamseed
             or seeds must be provided.  If seeds is provided, overrides streamseed.
+        start_traj: Which trajectory the stream of ConfigGenerators will begin
+            counting at.  The provided trajectory number is the trajectory number
+            of the configuration specified in 'starter', e.g., with the default
+            of 0 and starter=None for a fresh start, the all-identity fresh starting
+            configuration is configuration number 0. If None is provided, will
+            take starting traj from the ConfigGenerator or parse it out of the
+            filename according to provided conventions for loadg.
         **kwargs: Arguments to pass along to each ConfigGenerator in the stream unmodified.
     
     Returns:
@@ -293,7 +300,13 @@ def make_config_generator_stream(config_generator_class, N,
         seeds = [randint(0, 9999) for nn in range(N)]
         
     # For first task in stream, restart trajectory counting (don't just continue from last stream)
-    kwargs['start_traj'] = start_traj
+    # Unless start_traj is None, in which case let the ConfigGenerator figure out start_traj from starter
+    if start_traj is not None:
+        kwargs['start_traj'] = start_traj
+        
+    # If provided a file naming convention handle, render to string
+    if isinstance(starter, File) or isinstance(starter, FileInterface):
+        starter = str(starter)
     
     ## Assemble stream
     stream = []
@@ -314,6 +327,52 @@ def make_config_generator_stream(config_generator_class, N,
     return stream  
 
 
+def extend_ensemble(config_generator_class, N,
+                     starter,
+                     streamseed=None, seeds=None, # One of these must be provided
+                     **kwargs):
+    """Wrapper function for make_config_generator_stream to extend an existing
+    ensemble of gauge configurations. Assembles a stream of sequential ConfigGenerators,
+    each picking up where the last left off.
+    
+    Args:
+        config_generator_class: A subclass of ConfigGenerator.
+        N (int): Number of ConfigGenerators to build the stream out of.
+        starter: Where to start the stream.  Passed to the first ConfigGenerator
+            in the stream, whose default behavior is: if a string, then
+            load the config stored in the file with that filename.  If a ConfigGenerator,
+            then start the stream on the saved output configuration of that ConfigGenerator.
+            Must not be None, doesn't make sense to extend a fresh-start ensemble.
+        streamseed: A metaseed, used to seed an RNG that then produces N many seeds,
+            which are passed to the ConfigGenerators in the stream as seeds. Either
+            streamseed or seeds must be provided.  If seeds is provided, overrides
+            streamseed.
+        seeds: An ordered list of seeds to be fed to each ConfigGenerator in the
+            stream.  Must provide at least N seeds.  If more than N are provided,
+            ignores the unneeded seeds at the end of the list.  Either streamseed
+            or seeds must be provided.  If seeds is provided, overrides streamseed.
+        **kwargs: Arguments to pass along to each ConfigGenerator in the stream unmodified.
+    
+    Returns:
+        List of ConfigGenerator tasks.
+    """
+
+    assert starter is not None, "Cannot extend a fresh ensemble"
+        
+    # TODO: Check **kwargs versus parsed params to make sure physical parameters aren't
+    # being overridden (?)
+    
+    # Passing None to start_traj lets config_generator_class get its start_traj
+    # from starter, instead of resetting it
+    return make_config_generator_stream(
+        config_generator_class=config_generator_class,
+        N=N, starter=starter, start_traj=None,
+        streamseed=streamseed, seed=seed, **kwargs
+    )
+    
+    
+
+### Convenience functions to run "measurement" binaries on gauge configurations
 def measure_on_config_generators(config_measurement_class, measure_on,
                                  start_at_traj=0,
                                  **kwargs):
