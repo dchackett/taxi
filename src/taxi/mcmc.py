@@ -176,13 +176,13 @@ class ConfigGenerator(MCMC):
         elif isinstance(starter, str):
             # Start from a saved file -- try to steal parameters from filename
             self.start_from_config_file(starter)
-            self.start_traj = self.__dict__.pop('traj', None) # traj should have been parsed out
             
             # Figure out starting trajectory -- user provided (overrides), or use file name conventions
             if start_traj is not None:
                 self.start_traj = start_traj
-            else:
-                raise NotImplementedError("Wasn't able to parse 'traj' for 'start_traj' out of config filename '{0}'.".format(starter))
+            
+            assert getattr(self, 'start_traj', None) is not None,\
+                "Wasn't able to parse 'traj' for 'start_traj' out of config filename '{0}'.".format(starter)
                 
         else:
             raise TypeError("Don't know what to do with starter type: {s}".format(s=type(starter)))
@@ -367,7 +367,7 @@ def extend_ensemble(config_generator_class, N,
     return make_config_generator_stream(
         config_generator_class=config_generator_class,
         N=N, starter=starter, start_traj=None,
-        streamseed=streamseed, seed=seed, **kwargs
+        streamseed=streamseed, seeds=seeds, **kwargs
     )
     
     
