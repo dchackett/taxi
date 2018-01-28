@@ -50,36 +50,32 @@ class Task(object):
         if not hasattr(self, '_currently_evaluating_properties'):
             self._currently_evaluating_properties = set([])
         
-        d = copy(self.__dict__)
-        
-        # Evaluate all properties, loading in to dict
+        # Retrieve all attributes and evaluate all properties, loading in to dict
+        # Also retrieves class attributes (defaults) and loads in to dict, which
+        # is in some sense a promotion of a default to an instance-level attr.
         # TODO: Write a unit test for this            
+        d = {}
         for k in dir(self):
             if k.startswith('_'):
                 continue # Enforce privacy
-            if not hasattr(self.__class__, k):
-                continue # Non-property attributes aren't present in both class and instance
             if k in self._currently_evaluating_properties:
                 continue # Don't let evaluating a property depend on evaluating a property
-            try: # Try to evaluate property
-                # TODO: Switch to a working duck-typed check for 'property'
-                # The current problem is that (at least) instance methods also have __get__
-                # if hasattr(getattr(self.__class__, k), '__get__'):
-                # UPDATE: Trying out checks for '__get__' and '__set__', which should exclude
-                # methods
-                class_attr = getattr(self.__class__, k)
-                if isinstance(class_attr, property) or (hasattr(class_attr, '__get__') and hasattr(class_attr, '__set__')):
-                    self._currently_evaluating_properties.add(k)
-                    d[k] = getattr(self, k)
+            self._currently_evaluating_properties.add(k)
+            
+            try:
+                v = getattr(self, k) # Try to retrieve attribute or evaluate property
             except AttributeError:
                 pass # Don't die if getter not implemented
             
+            if not callable(v): # Don't save methods -- NOTE: might cause unpredictable behavior with callable properties
+                d[k] = v 
+                
             try:
                 self._currently_evaluating_properties.remove(k) # Make sure this isn't on the stack anymore once we've evaluated it
             except KeyError:
                 pass
                 
-        # Don't include private variables in dict version of object
+        # Redundancy for safety: don't include private variables in dict version of object
         for k in d.keys():
             if k.startswith('_'):
                 d.pop(k)
