@@ -29,7 +29,7 @@ EOF
 
 class FlowTask(ConfigMeasurement):
     ## File naming conventions
-    loadg = InputFile('{loadg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadg = InputFile('{loadg_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('{fout_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout_filename_prefix = 'flow'
     saveg = None

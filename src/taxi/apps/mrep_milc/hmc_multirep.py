@@ -113,10 +113,10 @@ resid {cgtol}      # CG stopping condition"""
 
 
 class MultirepHMCTask(ConfigGenerator):
-    loadg = InputFile('{loadg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    loadg = InputFile('{loadg_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout = File('{fout_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     fout_filename_prefix = 'hmc'
-    saveg = File('{saveg_filename_prefix}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
+    saveg = File('{saveg_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}')
     saveg_filename_prefix = 'cfg'
     
     binary = None # Specify this in run-specification scripts
