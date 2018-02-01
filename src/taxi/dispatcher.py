@@ -901,8 +901,11 @@ class SQLiteDispatcher(Dispatcher):
         'payload' dict attribute).
         
         Args:
-            tasks - A list of Task subclasses to be written to the DB.
+            tasks - A list of Task subclasses to be written to the DB (or a single task).
         """
+        if isinstance(tasks, tasks.Task):
+            tasks = [tasks]
+        
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
