@@ -294,8 +294,8 @@ class Runner(Task):
             
             if rollback_dir is not None:
                 rollback_dir = expand_path(rollback_dir)
-                assert os.path.exists(rollback_dir), \
-                    "Provided rollback dir (expanded) '{0}' does not exist".format(rollback_dir)
+                if not os.path.exists(rollback_dir):
+                    os.makedirs(rollback_dir) # Dig out the rollback directory
         
             self.output_files = [fn for fn in self.output_files if fn is not None] # Happens when e.g. MCMC passes saveg up, but saveg was None
             
