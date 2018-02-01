@@ -42,7 +42,9 @@ class LocalQueue(BatchQueue):
         }
 
 
-    def launch_taxi(self, taxi):
+    def launch_taxi(self, taxi, respawn=False):
+        super(LocalQueue, self).launch_taxi(taxi, respawn=respawn)
+        
         if taxi.nodes is not None and taxi.nodes > 1:
             raise Exception("Can only run single-node jobs on beowulf")
             

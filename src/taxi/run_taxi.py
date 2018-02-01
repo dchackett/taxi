@@ -144,7 +144,7 @@ if __name__ == '__main__':
                 with my_pool:
                     if tasks_run > 0:
                         # Resubmit self as queued taxi
-                        my_pool.submit_taxi_to_queue(my_taxi=taxi_obj, queue=my_queue)
+                        my_pool.submit_taxi_to_queue(my_taxi=taxi_obj, queue=my_queue, respawn=True)
                     else:
                         # ANTI-THRASHING: This taxi accomplished nothing while it was alive
                         my_pool.update_taxi_status(taxi_obj, 'E')

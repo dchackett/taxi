@@ -32,15 +32,20 @@ class BatchQueue(object):
         raise NotImplementedError
 
     def report_taxi_status(self, taxi):
-        return self.report_taxi_status_by_name(taxi.name)
+        return self.report_taxi_status_by_name(str(taxi))
         
 
-    def launch_taxi(self, taxi):
+    def launch_taxi(self, taxi, respawn=False):
         """
         - Tell the batch system to start a new job associated with the given taxi.
         - No return, but raises exceptions if a failure is detected.
+        - Don't launch a taxi that already exists on the queue unless respawning.
         """
-        raise NotImplementedError
+        
+        queue_status = self.report_taxi_status(taxi)['status']
+        assert queue_status == 'X' or respawn,\
+            "Cannot relaunch taxi {0}: taxi is already on the queue, and this launch is not a respawn."
+        
 
     def cancel_job(self, job_number):
         """

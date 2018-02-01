@@ -96,7 +96,9 @@ class LocalQueue(BatchQueue):
             'running_time': run_time,
         }
 
-    def launch_taxi(self, taxi):
+    def launch_taxi(self, taxi, respawn=False):
+        super(LocalQueue, self).launch_taxi(taxi, respawn=respawn)
+        
         taxi_launch_query = """INSERT INTO queue
             (job_name, status, taxi_args) VALUES (?, ?, ?);"""
 

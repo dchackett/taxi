@@ -99,7 +99,9 @@ class LocalQueue(BatchQueue):
         }
         
 
-    def launch_taxi(self, taxi):
+    def launch_taxi(self, taxi, respawn=False):
+        super(LocalQueue, self).launch_taxi(taxi, respawn=respawn)
+        
         ## Time logistics
         bash_time = taxi.time_limit
         
