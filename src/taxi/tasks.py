@@ -136,6 +136,7 @@ class Task(object):
     
     
     def _rollback(self):
+        print "Rolling back task {0}: {1}".format(getattr(self, 'id', None), self)
         assert self.status != 'active', "Task {0} is active, cannot roll it back. Kill it first.".format(self)
         self.status = 'pending'
 
@@ -326,6 +327,8 @@ class Runner(Task):
                 
             # Output files are cleared, don't need to keep track of them anymore
             self.output_files = []
+        else:
+            print "No output files tracked for task {0} ({1})".format(getattr(self, 'id', None), self)
             
 
 class Copy(Runner):
