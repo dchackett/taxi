@@ -101,5 +101,10 @@ setuptools.setup(
     ],
     
     # Make taxi.sh and run_taxi.py available to run everywhere
-    scripts=['bin/taxi.sh', 'bin/run_taxi.py', 'src/taxi/tools/taxi-summary', 'src/taxi/tools/taxi-edit', 'src/taxi/tools/taxi-unabandon']
+    scripts=['bin/taxi.sh', 'bin/run_taxi.py',
+             'src/taxi/tools/taxi-summary',
+             'src/taxi/tools/taxi-edit',
+             'src/taxi/tools/taxi-unabandon',
+             'src/taxi/tools/taxi-rollback',
+             'src/taxi/tools/taxi-spawn-idle-taxis']
 )

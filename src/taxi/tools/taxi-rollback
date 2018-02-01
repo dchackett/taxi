@@ -1,0 +1,17 @@
+#!/bin/bash
+
+python -c """
+import taxi
+import taxi.tools as tools
+import taxi.mcmc
+
+command_line_args = '$*'.split()
+d,p = tools.load.dispatch_and_pool(*command_line_args[:2])
+
+tasks = d.get_all_tasks(include_complete=True)
+rollback_task = tasks[int(command_line_args[2])]
+
+d.rollback(rollback_task, rollback_dir='./rollback/')
+"""
+
+
