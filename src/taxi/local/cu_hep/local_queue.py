@@ -29,7 +29,7 @@ class LocalQueue(BatchQueue):
         if not qerr:
             taxi_job_number = re.findall("job_number:\W+(\d+)", qout)
 
-            usage_lines = re.findall("usage:", qout)
+            usage_lines = re.findall("usage", qout)
             if len(usage_lines) == 0:
                 taxi_status = 'Q'
             else:
