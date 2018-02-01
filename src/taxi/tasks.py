@@ -269,11 +269,11 @@ class Runner(Task):
         exec_str += self.binary + " "
         exec_str += self.build_input_string().strip() # Remove leading and trailing whitespace from input string
 
-        # Only keep track of files that were actually created
-        self.output_files = [ofn for ofn in self.output_files if os.path.exists(str(ofn))]
-
         #print "exec:", exec_str
         os.system(exec_str)
+
+        # Only keep track of files that were actually created
+        self.output_files = [ofn for ofn in self.output_files if os.path.exists(str(ofn))]
 
         ## Verify output
         self.verify_output()
