@@ -13,7 +13,7 @@ def unabandon(dispatch, pool, rollback_dir=None, delete_files=False):
     
     pool.update_all_taxis_queue_status(dispatcher=dispatch) # Marks tasks as abandoned, updates taxis as missing
     
-    tasks = dispatch.get_task_blob(include_complete=True) # Task blob is an id : task dict
+    tasks = dispatch.get_all_tasks(include_complete=True) # Task blob is an id : task dict
     active_tasks, abandoned_tasks = _utility.classify_abandoned_tasks(tasks=tasks, queue=q)
     
     relevant_taxis = []

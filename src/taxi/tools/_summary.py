@@ -24,7 +24,7 @@ def summary(dispatch):
     ## Connect to queue to check taxi existence
     q = LocalQueue()
     
-    tasks = dispatch.get_task_blob(include_complete=True) # Task blob is an id : task dict
+    tasks = dispatch.get_all_tasks(include_complete=True) # Task blob is an id : task dict
     
     ## Classify tasks
     pending_tasks   = []

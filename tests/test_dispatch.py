@@ -67,7 +67,7 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
         with self.test_dispatch:
             self.test_dispatch.initialize_new_task_pool(test_task_pool)
 
-            task_blob = self.test_dispatch.get_task_blob(None, include_complete=True)
+            task_blob = self.test_dispatch.get_all_tasks(None, include_complete=True)
             read_task = task_blob[1]
             read_task_two = task_blob[2]
 
@@ -75,7 +75,7 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             self.assertEqual(read_task_two.is_recurring, True)
             self.assertEqual(read_task_two.status, test_task_two.status)
 
-            task_blob_no_complete = self.test_dispatch.get_task_blob(None, include_complete=False)
+            task_blob_no_complete = self.test_dispatch.get_all_tasks(None, include_complete=False)
 
             self.assertEqual(task_blob_no_complete.keys(), [2])
 

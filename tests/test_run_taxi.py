@@ -106,12 +106,12 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
     def test_die(self):
         test_task = taxi.tasks.Die(message="Testing", for_taxi=self.my_taxi.name)
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi)
             self.assertEqual(task_blob, None)
 
             self.my_disp.initialize_new_task_pool([test_task])
             
-            task_blob = self.my_disp.get_task_blob(self.my_taxi)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi)
             self.assertEqual(len(task_blob.keys()), 1)
 
         with self.my_pool:
@@ -140,7 +140,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         ## Third, 'die' task should be complete
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi, include_complete=True)
             self.assertEqual(task_blob[1].task_type, 'Die')
             self.assertTrue(task_blob[1], taxi.tasks.Die)
             self.assertEqual(task_blob[1].status, 'complete')
@@ -174,7 +174,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             self.assertEqual(pool_stat[0].time_last_submitted, None)
         
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob()
+            task_blob = self.my_disp.get_all_tasks()
             self.assertEqual(task_blob[1].status, 'pending')
             self.assertEqual(task_blob[1].run_time, -1.0)
 
@@ -210,7 +210,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         ## Check for correct dispatcher status
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi, include_complete=True)
             self.assertEqual(len(task_blob), 1)
             self.assertEqual(task_blob.values()[0].status, 'complete')
             self.assertEqual(task_blob.values()[0].task_type, 'Copy')
@@ -233,7 +233,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         with self.my_disp:
             self.my_disp.initialize_new_task_pool(task_pool)
-            task_blob = self.my_disp.get_task_blob(self.my_taxi)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi)
         
         with self.my_pool:
             self.my_pool.submit_taxi_to_queue(self.my_taxi, self.my_queue)
@@ -249,7 +249,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         ## Check that execution happened in the expected order
         ## TODO: Currently done based on filesystem info; should we store start_time for tasks, as well?
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(include_complete=True)
+            task_blob = self.my_disp.get_all_tasks(include_complete=True)
             for task in task_blob.values():
                 self.assertEqual(task.status, 'complete')
 
@@ -299,7 +299,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
 
         # And the copy task should still be unfinished
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=False)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi, include_complete=False)
             self.assertEqual(len(task_blob), 1)
 
         # Step into the queue one more time
@@ -314,7 +314,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
             
         # The task should be finished
         with self.my_disp:
-            task_blob = self.my_disp.get_task_blob(self.my_taxi, include_complete=True)
+            task_blob = self.my_disp.get_all_tasks(self.my_taxi, include_complete=True)
             self.assertEqual(len(task_blob), 1)
             self.assertEqual(task_blob[1].status, 'complete')
 

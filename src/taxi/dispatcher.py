@@ -75,7 +75,7 @@ class Dispatcher(object):
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.tasks.Task)
         
 
-    def get_task_blob(self, my_taxi=None, include_complete=True):
+    def get_all_tasks(self, my_taxi=None, include_complete=True):
         """Retrieve tasks from dispatch (i.e., stored task information). If my_taxi
         is specified, retrieves tasks that my_taxi can run; otherwise, retrieves all tasks.
         If include_complete=False, retrieves only incomplete tasks.
@@ -106,7 +106,7 @@ class Dispatcher(object):
         for_taxi are available to run given infinite time, but there are incomplete
         tasks remaining, tells the taxi to Sleep."""
         
-        task_blob = self.get_task_blob(for_taxi, include_complete=False)
+        task_blob = self.get_all_tasks(for_taxi, include_complete=False)
 
         # Order tasks in blob by priority
         if (task_blob is None) or (len(task_blob) == 0):
@@ -211,7 +211,7 @@ class Dispatcher(object):
         by_taxi = str(by_taxi)
         assert by_taxi is not None # This should never happen, but would be catastrophically inconvenient if it did.
         
-        tasks = self.get_task_blob()
+        tasks = self.get_all_tasks()
         abandoned_tasks = []
         for task_id, task in tasks.items():
             if task.status == 'active' and task.by_taxi == by_taxi:
@@ -293,7 +293,7 @@ class Dispatcher(object):
             Dictionary like {(taxi object) : (should taxi be running?)}
         """
         
-        task_blob = self.get_task_blob(None, include_complete=False) # dict(id:task)
+        task_blob = self.get_all_tasks(None, include_complete=False) # dict(id:task)
     
         # There's nothing we can do with errored E or held H taxis
         taxi_list = [t for t in taxi_list if t.status in ['Q', 'R', 'I']] # Only want queued, running, or idle taxis
@@ -521,7 +521,7 @@ class Dispatcher(object):
         assert not (rollback_dir is None and delete_files == False),\
             "Must either provide a rollback_dir to copy files to or give permission to delete_files"
         
-        task_blob = self.get_task_blob(include_complete=True)
+        task_blob = self.get_all_tasks(include_complete=True)
         
         affected_tasks = []
         
@@ -803,7 +803,7 @@ class SQLiteDispatcher(Dispatcher):
         return rebuilt
             
 
-    def get_task_blob(self, my_taxi=None, include_complete=True):
+    def get_all_tasks(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks runnable by specified taxi (my_taxi), or all
         tasks (if my_taxi is not provided)."""
 
@@ -893,7 +893,7 @@ class SQLiteDispatcher(Dispatcher):
         task.by_taxi = my_taxi.name
 
 
-    def write_tasks(self, tasks):
+    def write_tasks(self, tasks_to_write):
         """Stores (i.e., adds or updates) the Task instances specified in tasks
         to the tasks table of the dispatch DB specified in self.db_path. Calls
         task.compiled() to obtain a JSON-serializable version of the task that
@@ -903,15 +903,15 @@ class SQLiteDispatcher(Dispatcher):
         Args:
             tasks - A list of Task subclasses to be written to the DB (or a single task).
         """
-        if isinstance(tasks, tasks.Task):
-            tasks = [tasks]
+        if isinstance(tasks_to_write, tasks.Task):
+            tasks_to_write = [tasks_to_write]
         
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         # JSON serialize all tasks
-        compiled_tasks = [task.compiled() for task in tasks]
+        compiled_tasks = [task.compiled() for task in tasks_to_write]
         
         # Build list to insert
         upsert_data = []
