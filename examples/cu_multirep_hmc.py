@@ -12,17 +12,17 @@ import taxi.apps.mrep_milc.spectro as spectro
 # Plug in binary locations
 hmc.MultirepHMCTask.binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_mrep_hmc'
 flow.FlowTask.binary = '/nfs/beowulf03/dchackett/mrep/bin/su4_wf_mpi'
-spectro.MultirepSpectroTask.multirep_spectro_binaries = {
+spectro.MultirepSpectroTask._multirep_spectro_binaries = {
     # Key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
     (4, 'f', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',
     (4, 'a2', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg',
 }
 
 # Plug in desired file-naming conventions
-flow.FlowTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+flow.FlowTask.loadg.conventions = "{loadg_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 flow.FlowTask.fout.conventions = "flow_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.MultirepSpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.MultirepSpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.MultirepSpectroTask.loadg.conventions = "{loadg_filename_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
+spectro.MultirepSpectroTask.fout.conventions = "{fout_filename_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 
 # Specify paths to Dispatch and Pools DBS
 base_path = os.path.abspath("./taxi-test")

@@ -12,7 +12,7 @@ import taxi.apps.mrep_milc.spectro as spectro
 # Plug in binary locations
 hmc.MultirepHMCTask.binary = '/lqcdproj/multirep/dhackett/bin/sun_mrep_hmc'
 flow.FlowTask.binary = '/lqcdproj/multirep/dhackett/bin/su4_wf'
-spectro.MultirepSpectroTask.multirep_spectro_binaries = {
+spectro.MultirepSpectroTask._multirep_spectro_binaries = {
     # Key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
     (4, 'f', False, False, False) : '/lqcdproj/multirep/dhackett/bin/su4_f_clov_cg',
     (4, 'a2', False, False, False) : '/lqcdproj/multirep/dhackett/bin/su4_as2_clov_cg',

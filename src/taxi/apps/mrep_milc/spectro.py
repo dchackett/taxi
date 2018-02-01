@@ -186,12 +186,12 @@ class MultirepSpectroTask(SpectroTask):
         key_tuple = (self.Nc, irrep, self.screening, self.p_plus_a, self.compute_baryons)
         
         try:
-            return self.multirep_spectro_binaries[key_tuple]
+            return self._multirep_spectro_binaries[key_tuple]
         except KeyError:
             raise NotImplementedError("Missing binary for (Nc, irrep, screening?, p+a?, compute_baryons?)="+str(key_tuple))
     binary = fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
     
-    multirep_spectro_binaries = {} # Specify in run-spec script
+    _multirep_spectro_binaries = {} # Specify in run-spec script
     
     def __init__(self,
                  # Application-specific required arguments
@@ -215,7 +215,7 @@ class MultirepSpectroTask(SpectroTask):
         
         Instead of having to specify the binary and output file prefixes, these
         are dynamically determined from physical flags. Must have binaries specified
-        in self.multirep_spectro_binaries in a dictionary of the format
+        in self._multirep_spectro_binaries in a dictionary of the format
         {(Nc, irrep, screening, p_plus_a, compute_baryons) : "/path/to/appropriate_binary"}
         
         Args:

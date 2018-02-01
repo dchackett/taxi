@@ -12,7 +12,7 @@ import taxi.apps.mrep_milc.mrep_fncs as mrep_fncs
 # Plug in desired file-naming conventions
 spectro.SpectroTask.loadg.conventions = "{loadg_prefix}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
 spectro.SpectroTask.fout.conventions = "{fout_prefix}_{irrep}_r{r0:g}_{Ns:d}_{Nt:d}_{beta:g}_{k4:g}_{k6:g}_{label}_{traj:d}"
-spectro.MultirepSpectroTask.multirep_spectro_binaries = {
+spectro.MultirepSpectroTask._multirep_spectro_binaries = {
     # Key format: (Nc, irrep, screening, p_plus_a, compute_baryons)
     (4, 'f', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_f_clov_cg',
     (4, 'a2', False, False, False) : '/nfs/beowulf03/dchackett/mrep/bin/su4_as2_clov_cg',
