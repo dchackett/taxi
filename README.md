@@ -68,3 +68,56 @@ In a common use case, you have some pool of stored gauge configurations generate
 
 In the folder `taxi/examples`, there is a file `measure_mrep_spectro_on_files.py`.  This script reads a list of gauge file locations from a text file sitting in the same folder. It then specifies a workflow which will run spectroscopy for two different representations of fermion on each gauge file.  The script finally launches 20 taxis to work simultaneously on the workflow, which has a trivial dependency structure and so may have an arbitrary number of simultaneous workers (up to the number of tasks).
 
+## Testing taxi
+
+taxi comes with a suite of unit tests (still under development). The test suite takes advantage of (tox)[https://tox.readthedocs.io/] to automate testing as well as to test the software in a particular environment. To test taxi,
+1. (Optional) activate the virtualenv you'd like to install the version to be tested in.
+2. Run `python setup.py localize --machine=scalar` to plug in the scalar queue, a simplified local queue used for testing. 
+3. Run `python setup.py install --user` to install the version of taxi to be tested.
+4. Run `tox` to run the test suite.
+
+## Command-line tools
+
+taxi comes with a set of simple command-line tools to check on the progress of jobs, make minor adjustments to jobs in progress, and to recover from common failures.  setup.py will include these tools in the PATH (inside whatever virtualenv is active when installing python), so they are easily accessible from the command line (so long as the correct virtualenv is active). DISCLAIMER: the current toolset is largely ad-hoc and made by the authors as needed.
+
+### taxi-summary
+
+Usage: `taxi-summary {dispatch_db_filename}`
+
+Prints out a digest of the state of the specified dispatch: number of tasks active, pending, completed, failed, abandoned, etc.  Prints out which taxis are running currently-active tasks.
+
+### taxi-unabandon
+
+Usage: `taxi-unabandon {dispatch_db_filename}`
+
+Detects any abandoned tasks in the dispatch.  For each abandoned task, rolls the task back (i.e., deletes their outputs and sets their status to 'pending') and then relaunches the missing-in-action taxi that crashed and abandoned the task.
+
+Useful in cases where taxis crash, or when taxi jobs are killed by hand (e.g. using qdel).
+
+### taxi-spawn-idle-taxis
+
+Usage: `taxi-spawn-idle-taxis {dispatch_db_filename} {pool_db_filename}`
+
+Launches idle taxis for a given job.  This is only useful to restart work on a job where all taxis have crashed or been killed.  If any taxis survive, they will spawn all idle taxis between each task. Note both the dispatch and pool DBs must be specified.
+
+### taxi-rollback
+
+Usage: `taxi-rollback {dispatch_db_filename} {pool_db_filename} {task_id}`
+
+Roll back the specified task, i.e., move all of its output files to `./rollback/` (instead of deleting them) and set the job for pending; repeat recursively for any completed or failed jobs that depend on the specified job.
+
+### taxi-edit
+
+Usage: `taxi-edit {dispatch_db_filename} [{pool_db_filename}]`
+
+Hacky power tool. Loads an interactive Python environment with the following in scope:
+- `d`, an instance of SQLiteDispatcher connected to the provided dispatch DB.
+- `p`, an instance of SQLitePool connected to the provided pool DB (if provided).
+- `q`, an instance of the LocalQueue for whatever localization taxi was installed with.
+- `tb`, a dictionary like { (task id) : (reconstructed Task instance) }.  Note that changing the tasks in this dictionary will not change the tasks in the dispatch DB.  In order to do so, call `d.write_tasks(tb.values())`, or to be more cautious `d.write_tasks([list of affected tasks])`.
+- `tbf`, a list of reconstructed Task objects for all failed tasks in the dispatch. (Same warning as for `tb`).
+- `tba`, a list of reconstructed Task objects for all activate tasks in the dispatch. (Same warning as for `tb`).
+- `tbcg`, a list of reconstructed Task objects for all ConfigGenerators in the dispatch. (Same warning as for `tb`).
+- `cgtrees`, list of lists, with each sublist containing separate ConfigGenerator streams (e.g., each sublist contains all the ConfigGenerator tasks for a given ensemble).
+- `trees`, list of lists, with each sublist containing a ConfigGenerator stream and all of its dependent tasks (e.g., each sublist contains all ConfigGenerator tasks for a given ensemble, measurements to be performed on the resulting saved configurations, Copy jobs to file outputs, etc.)
+- `tl`, a list of reconstructed Taxi objects (if a path to the pool DB is provided). As with the Tasks in `tb*`, these objects are not synchronized with the pool DB file, which can be updated by calls to e.g., `p.update_taxi_status(...)`.
