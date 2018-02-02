@@ -72,9 +72,11 @@ In the folder `taxi/examples`, there is a file `measure_mrep_spectro_on_files.py
 
 taxi comes with a suite of unit tests (still under development). The test suite takes advantage of (tox)[https://tox.readthedocs.io/] to automate testing as well as to test the software in a particular environment. To test taxi,
 1. (Optional) activate the virtualenv you'd like to install the version to be tested in.
-2. Run `python setup.py localize --machine=scalar` to plug in the scalar queue, a simplified local queue used for testing. 
-3. Run `python setup.py install --user` to install the version of taxi to be tested.
-4. Run `tox` to run the test suite.
+2. (Optional) delete the folders `taxi/bin`, `taxi/build`, `taxi/dist`, and `taxi/test_run` to ensure a clean install and testing environment (only called for in case of nonsensical errors, but does not hurt to do).
+3. Run `python setup.py localize --machine=scalar` to plug in the scalar queue, a simplified local queue used for testing. 
+4. Run `python setup.py install --user` to install the version of taxi to be tested.
+5. Run `tox` to run the test suite.
+For convenience, the included script `run_tests.sh` will install tox if it's not present and perform these actions.
 
 ## Command-line tools
 
