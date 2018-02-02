@@ -546,7 +546,7 @@ class Dispatcher(object):
                 cascade_tasks = cascade_tasks[1:]
                 
                 if rt.status == 'active':
-                    print "Can't rollback active task w/ id={0}. Kill it first.".format(task.id)
+                    print "Can't rollback active task w/ id={0}. Kill it first.".format(rt.id)
                     # Cancel rollbacking
                     tasks_to_roll_back = [] 
                     break
