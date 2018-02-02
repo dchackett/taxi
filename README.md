@@ -114,9 +114,21 @@ Launches idle taxis for a given job.  This is only useful to restart work on a j
 
 ### taxi-rollback
 
-Usage: `taxi-rollback {dispatch_db_filename} {pool_db_filename} {task_id}`
+Usage: `taxi-rollback {dispatch_db_filename} {task_id}`
 
 Roll back the specified task, i.e., move all of its output files to `./rollback/` (instead of deleting them) and set the job for pending; repeat recursively for any completed or failed jobs that depend on the specified job.
+
+### taxi-edit-task
+
+Usage: `taxi-edit-task {dispatch_db_filename} {task_id} {param_name} {new_value}`
+
+Sets the parameter named `param_name` to the specified value in specified task.  Attemps to guess the datatype of `new_value` by looking at the previous value (if set), or trying to cast the value to an integer or float before leaving it as a string.
+
+### taxi-edit-stream
+
+Usage: `taxi-edit-stream {dispatch_db_filename} {task_id} {param_name} {new_value}`
+
+Like `taxi-edit-task`, but applies the change to not only to the specified task, but to all tasks of the same type downstream. Used for editing parameters in a sequence of ConfigGenerators, e.g., integrator step size like `taxi-edit-stream disp.sqlite 1 nsteps1 12`. Will not cascade through a Task marked as a `branch_root`, so changes will not be applied to a stream forked off to generate a new ensemble.
 
 ### taxi-edit
 

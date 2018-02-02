@@ -1,0 +1,43 @@
+#!/bin/bash
+
+python -c """
+import taxi
+import taxi.tools as tools
+import taxi.mcmc
+
+command_line_args = '$*'.split()
+d = tools.load.dispatch(command_line_args[0])
+
+task_id = int(command_line_args[1])
+param_name = command_line_args[2]
+param_value = command_line_args[3]
+
+tasks = d.get_all_tasks(include_complete=True)
+task_to_edit = tasks[task_id]
+current_value = getattr(task_to_edit, param_name, None)
+
+# Try to get datatype right
+type_was_determined = False
+if current_value is not None:
+    try:
+        param_value = type(current_value)(param_value)
+        type_was_determined = True
+    except ValueError:
+        pass
+
+if not type_was_determined:
+    try:
+        int_value = int(param_value)
+        if int_value == param_value:
+            param_value = int_value
+        else:
+            param_value = float(param_value)
+    except ValueError:
+        pass
+
+setattr(task_to_edit, param_name, param_value)
+
+d.write_tasks(task_to_edit)
+"""
+
+
