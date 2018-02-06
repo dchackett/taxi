@@ -7,9 +7,11 @@ import taxi.mcmc
 
 command_line_args = '$*'.split()
 d,p = tools.load.dispatch_and_pool(*command_line_args)
-
 assert d is not None, "Must specify a dispatch DB to spawn idle taxis"
 assert p is not None, "Must specify a pool DB to spawn idle taxis"
 
+q = taxi.local.local_queue.LocalQueue()
+
+p.update_all_taxis_queue_status(queue=q, dispatcher=d)
 p.spawn_idle_taxis(d)
 """

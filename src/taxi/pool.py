@@ -522,7 +522,6 @@ class SQLitePool(Pool):
         update_query = """UPDATE taxis SET status = ? WHERE name = ?"""
         self.execute_update(update_query, status, taxi_name)
 
-        return
 
 
     def update_taxi_last_submitted(self, my_taxi, last_submit_time):
@@ -532,8 +531,6 @@ class SQLitePool(Pool):
         
         update_query = """UPDATE taxis SET time_last_submitted = ? WHERE name = ?"""
         self.execute_update(update_query, last_submit_time, taxi_name)
-
-        return
 
 
     def update_taxi_dispatch(self, my_taxi, dispatch_path):
@@ -604,8 +601,6 @@ class SQLitePool(Pool):
         self.execute_update(insert_taxi_query, my_taxi.name, my_taxi.pool_name, my_taxi.time_limit, 
             my_taxi.cores, my_taxi.nodes, my_taxi.time_last_submitted, my_taxi.status)
 
-        return
-
 
     def delete_taxi_from_pool(self, my_taxi):
         """Delete a particular taxi from the pool.
@@ -615,5 +610,3 @@ class SQLitePool(Pool):
         remove_query = """DELETE FROM taxis WHERE name = ?"""
 
         self.execute_update(remove_query, taxi_name)
-
-        return
