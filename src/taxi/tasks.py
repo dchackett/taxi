@@ -134,11 +134,19 @@ class Task(object):
                 N_failed += 1
         return N_unresolved, N_failed
     
+    def is_ready(self):
+        """Is the task ready to run?"""
+        return self.status == 'pending' and self.count_unresolved_dependencies==(0,0)
+    
     
     def _rollback(self):
         print "Rolling back task {0}: {1}".format(getattr(self, 'id', None), self)
         assert self.status != 'active', "Task {0} is active, cannot roll it back. Kill it first.".format(self)
         self.status = 'pending'
+        
+    def __repr__(self):
+        """For easier diagnostics, render Tasks like <{Task class name}({task id})>"""
+        return "<{class_name}({task_id})>".format(class_name=self.__class__.__name__, task_id=self.id)
 
         
 ### Special tasks
@@ -148,6 +156,9 @@ class Die(Task):
     def __init__(self, message, req_time=0, **kwargs):        
         super(Die, self).__init__(req_time=req_time, **kwargs)        
         self.message = message
+        
+    def __repr__(self):
+        return "<Die:{msg}>".format(msg=self.message)
     
     
 class Sleep(Task):
@@ -157,12 +168,18 @@ class Sleep(Task):
         super(Sleep, self).__init__(req_time=req_time, **kwargs)        
         self.message = message
         
+    def __repr__(self):
+        return "<Sleep:{msg}>".format(msg=self.message)
+        
 
 class Respawn(Task):
     """Special task tells taxi to respawn itself."""
     
     def __init__(self, req_time=0, **kwargs):
         super(Respawn, self).__init__(req_time=req_time, **kwargs)
+        
+    def __repr__(self):
+        return "<Respawn>"
         
         
 class Runner(Task):
@@ -330,6 +347,7 @@ class Runner(Task):
         else:
             print "No output files tracked for task {0} ({1})".format(getattr(self, 'id', None), self)
             
+            
 
 class Copy(Runner):
     """Copy a file from src to dest. Does not overwrite anything unless told to.
@@ -392,3 +410,8 @@ class Copy(Runner):
         print "{0} -> {1}".format(self.src, self.dest)
         shutil.copy2(self.src, self.dest) 
     
+    
+    def __repr__(self):
+        """Render Copy objects to strings like <Copy(id):{filename}>"""
+        filename = os.path.basename(self.src)
+        return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__, task_id=self.id, filename=filename)
