@@ -41,7 +41,10 @@ if __name__ == '__main__':
 
 
     ## Connect with Dispatcher, Pool, Queue
+    print "Connecting with dispatch: {0}".format(parg.dispatch_path)
     my_dispatch = taxi.dispatcher.SQLiteDispatcher(parg.dispatch_path)
+    
+    print "Connecting with pool: {0}({1})".format(parg.pool_path, parg.pool_name)
     my_pool = taxi.pool.SQLitePool(
         db_path=parg.pool_path,
         pool_name=parg.pool_name,
