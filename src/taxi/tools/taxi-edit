@@ -11,6 +11,7 @@ q = taxi.local.local_queue.LocalQueue()
 
 if d is not None:
     tb = d.get_all_tasks(d)
+    tbr = [t for t in tb.values() if t.is_ready()]
     tbf = [t for t in tb.values() if t.status == 'failed']
     tba = [t for t in tb.values() if t.status == 'active']
     tbcg = [t for t in tb.values() if isinstance(t, taxi.mcmc.ConfigGenerator)]

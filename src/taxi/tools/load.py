@@ -36,7 +36,7 @@ def dispatch_and_pool(*db_paths):
         except:
             d = None
     
-    elif len(db_paths) > 1:
+    elif len(db_paths) == 2:
         # Try first two
         try:
             d = dispatch(db_paths[0])
@@ -44,6 +44,14 @@ def dispatch_and_pool(*db_paths):
         except:
             d = dispatch(db_paths[1])
             p = pool(db_paths[0])
-        
+    
+    elif len(db_paths) == 3:
+        # Assume we're getting (dispatch_path) and (pool_path pool_name) in some order
+        try:
+            d = dispatch(db_paths[0])
+            p = pool(db_paths[1], pool_name=db_paths[2])
+        except:
+            d = dispatch(db_paths[2])
+            p = pool(db_paths[0], pool_name=db_paths[1])
         
     return d,p
