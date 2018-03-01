@@ -130,7 +130,8 @@ class MCMC(tasks.Runner):
         """MCMC tasks all have a file named fout, which is typically named in such
         a way to define what the task is doing. Renders MCMC objects to strings like
         <{MCMC class}({task id}):{fout}>"""
-        return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__, task_id=self.id, filename=self.fout)
+        return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__,
+                 task_id=getattr(self, 'id', None), filename=self.fout)
     
     
 

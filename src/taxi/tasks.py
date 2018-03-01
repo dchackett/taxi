@@ -146,7 +146,7 @@ class Task(object):
         
     def __repr__(self):
         """For easier diagnostics, render Tasks like <{Task class name}({task id})>"""
-        return "<{class_name}({task_id})>".format(class_name=self.__class__.__name__, task_id=self.id)
+        return "<{class_name}({task_id})>".format(class_name=self.__class__.__name__, task_id=getattr(self, 'id', None))
 
         
 ### Special tasks
@@ -414,4 +414,4 @@ class Copy(Runner):
     def __repr__(self):
         """Render Copy objects to strings like <Copy(id):{filename}>"""
         filename = os.path.basename(self.src)
-        return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__, task_id=self.id, filename=filename)
+        return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__, task_id=getattr(self, 'id', None), filename=filename)
