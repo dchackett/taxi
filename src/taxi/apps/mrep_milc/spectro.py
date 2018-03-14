@@ -59,11 +59,11 @@ class SpectroTask(ConfigMeasurement):
                  **kwargs):
         """Measure correlation functions on a stored gauge configuration.
         
-        If starter is a filename, attempts to read parameters from filename. If
-        starter is a ConfigGenerator, steals parameters from the GaugeGenerator.
+        If measure_on is a filename, attempts to read parameters from filename. If
+        measure_on is a ConfigGenerator, steals parameters from the GaugeGenerator.
         
         Args:
-            starter: A filename or a ConfigGenerator.
+            measure_on: A filename or a ConfigGenerator.
             kappa: Either a numerical value to use for kappa, or the name of an attribute
                 of this class to find kappa in (after it has been stolen from either
                 a filename or a ConfigGenerator, e.g., "k4", "k6").
@@ -210,8 +210,8 @@ class MultirepSpectroTask(SpectroTask):
                  **kwargs):
         """Measure correlation functions on a stored gauge configuration.
         
-        If starter is a filename, attempts to read parameters from filename. If
-        starter is a ConfigGenerator, steals parameters from the GaugeGenerator.
+        If measure_on is a filename, attempts to read parameters from filename. If
+        measure_on is a ConfigGenerator, steals parameters from the GaugeGenerator.
         
         Instead of having to specify the binary and output file prefixes, these
         are dynamically determined from physical flags. Must have binaries specified
@@ -219,7 +219,7 @@ class MultirepSpectroTask(SpectroTask):
         {(Nc, irrep, screening, p_plus_a, compute_baryons) : "/path/to/appropriate_binary"}
         
         Args:
-            starter: A filename or a ConfigGenerator.
+            measure_on: A filename or a ConfigGenerator.
             Ns: Number of lattice points in spatial direction. If provided, overrides
                 whatever was found in the ConfigGenerator or filename.
             Nt: Number of lattice points in temporal direction. If provided, overrides
