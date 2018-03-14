@@ -179,7 +179,7 @@ class ConfigGenerator(MCMC):
             self.start_from_config_generator(starter) # Steals parameters, adds to dependencies, etc
             self.start_traj = (starter.final_traj if start_traj is None else start_traj)
         
-        elif isinstance(starter, str):
+        elif isinstance(starter, basestring):
             # Start from a saved file -- try to steal parameters from filename
             self.start_from_config_file(starter)
             
@@ -191,7 +191,7 @@ class ConfigGenerator(MCMC):
                 "Wasn't able to parse 'traj' for 'start_traj' out of config filename '{0}'.".format(starter)
                 
         else:
-            raise TypeError("Don't know what to do with starter type: {s}".format(s=type(starter)))
+            raise TypeError("Don't know what to do with starter of type {0}: {1}".format(type(starter), starter))
 
     @property
     def final_traj(self):
@@ -244,7 +244,7 @@ class ConfigMeasurement(MCMC):
         super(ConfigMeasurement, self).__init__(save_config=save_config, **kwargs)
         
         ## Flexible behavior for finding config to measure on
-        if isinstance(measure_on, str):
+        if isinstance(measure_on, basestring):
             # Measure on some existing configuration file
             self.start_from_config_file(measure_on,
                                         delay_fn_exists_check=delay_fn_exists_check)
@@ -253,6 +253,8 @@ class ConfigMeasurement(MCMC):
             # Measure on the config file saved by a ConfigGenerator task
             self.start_from_config_generator(measure_on) # Steal parameters from the ConfigGenerator
             self.traj = measure_on.final_traj    
+        else:
+            raise TypeError("Don't know how to measure_on of type {0}: {1}".format(type(measure_on), measure_on))
 
 
 ### Convenience functions to make streams of ConfigGenerators
