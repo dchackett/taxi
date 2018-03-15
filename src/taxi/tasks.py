@@ -33,6 +33,9 @@ class Task(object):
         self.branch_root = False
         self.priority = -1
         
+        # Load any unconsumed kwargs in to the object
+        for k, v in kwargs.items():
+            setattr(self, k, v)
         
     def to_dict(self):
         """Returns a dictionaryized version of the object, for use in compilation
