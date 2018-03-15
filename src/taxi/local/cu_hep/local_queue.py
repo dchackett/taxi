@@ -2,13 +2,11 @@
 
 ## Local queue implementation for "cu_hep" machine
 
-import os
 import subprocess
 import re
 import time
 
-from taxi.batch_queue import *
-from taxi._utility import ensure_path_exists
+from taxi.batch_queue import BatchQueue
 
 class LocalQueue(BatchQueue):
 

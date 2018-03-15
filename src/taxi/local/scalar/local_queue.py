@@ -6,7 +6,7 @@
 import sqlite3
 import os
 
-from taxi.batch_queue import *
+from taxi.batch_queue import BatchQueue
 from taxi._utility import ensure_path_exists
 
 import time
