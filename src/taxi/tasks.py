@@ -4,11 +4,9 @@ import os
 import shutil
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list, ensure_path_exists
+from taxi import sanitized_path, expand_path, copy_nested_list, ensure_path_exists
 
 from taxi.file import File, should_save_file, output_file_attributes_for_task
-
-from copy import copy, deepcopy
 
 import hashlib # For checksum comparisons by Copy
 
@@ -36,6 +34,7 @@ class Task(object):
         # Load any unconsumed kwargs in to the object
         for k, v in kwargs.items():
             setattr(self, k, v)
+        
         
     def to_dict(self):
         """Returns a dictionaryized version of the object, for use in compilation

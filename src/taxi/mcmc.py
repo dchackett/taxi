@@ -11,7 +11,7 @@ from random import seed, randint
 import os
 
 import tasks
-from taxi import sanitized_path, expand_path
+from taxi import sanitized_path
 from taxi.file import File, InputFile, FileInterface, should_save_file, should_load_file
 
         
