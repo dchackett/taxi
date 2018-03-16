@@ -38,10 +38,10 @@ EOF
 class SpectroTask(ConfigMeasurement, conventions.LargeN):
     ## File naming conventions
     loadg = InputFile(conventions.loadg_convention)
-    saveg = None
+    saveg = None # Never want to save spectroscopy outputs
     fout = File(conventions.spectro_fout_convention) # fout_filename_prefix provided (or dynamically generated in sublcass)
     loadp = InputFile(conventions.loadp_convention)
-    savep = File(conventions.savep_convention) # savep_filename_prefix provided (or dynamically generated in sublcass)
+    savep = File(conventions.savep_convention) # savep_filename_prefix provided (or dynamically generated in subclass)
     
     # Required params, checked to be present and not None at dispatch compile time
     _required_params = ['binary', 'Ns', 'Nt', 'kappa', 'r0', 'fout_prefix'] + ['Nc', 'beta', 'Nf', 'irrep_fnc', 'label']
@@ -162,13 +162,14 @@ class SpectroTask(ConfigMeasurement, conventions.LargeN):
 
 
 
-class MultirepSpectroTask(SpectroTask):
+class PhysicalSpectroTask(SpectroTask):
     # Dynamical behavior for filenames e.g. "tspec" vs "xspecpa" vs ...
     def _get_fout_filename_prefix(self):
         return ('x' if self.screening else 't') + 'spec' + ('pa' if self.p_plus_a else '')
+    fout_filename_prefix = fixable_dynamic_attribute('_fout_filename_prefix', _get_fout_filename_prefix)
+    
     def _get_savep_filename_prefix(self):
         return ('x' if self.screening else 't') + 'prop' + ('pa' if self.p_plus_a else '')
-    fout_filename_prefix = fixable_dynamic_attribute('_fout_filename_prefix', _get_fout_filename_prefix)
     savep_filename_prefix = fixable_dynamic_attribute('_savep_filename_prefix', _get_savep_filename_prefix)
         
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.

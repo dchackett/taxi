@@ -30,8 +30,10 @@ EOF
 class FlowTask(ConfigMeasurement, conventions.LargeN):
     ## File naming conventions
     loadg = InputFile(conventions.loadg_convention)
+    
     fout = File(conventions.fout_convention)
     fout_filename_prefix = conventions.flow_fout_filename_prefix
+    
     saveg = None
     
     binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
