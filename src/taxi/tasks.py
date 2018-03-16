@@ -15,6 +15,8 @@ special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'is_recur
 class Task(object):
     """Abstract task superclass"""
     
+    _required_params = []
+    
     def __init__(self, req_time=0, for_taxi=None, **kwargs):
         # Provided arguments
         self.req_time = req_time
@@ -94,6 +96,11 @@ class Task(object):
         from pointers to other Task instances to the ids of those tasks. This format
         is necessary for storage in SQL DBs.
         """
+        # Check that all required params are present, not None
+        missing = [rp for rp in self._required_params if getattr(self, rp, None) is None]
+        if len(missing) > 0:
+            raise Exception("Task {0} is missing required parameters: {1}".format(str(self), missing))
+        
         # Break apart task metainfo and task payload, loading payload in to task dict
         payload = self.to_dict()
         compiled = {}
@@ -357,6 +364,7 @@ class Copy(Runner):
     Unlike the usual runner, doesn't call a binary."""
     
     binary = None
+    _required_params = ['src', 'dest']
     
     ## Modularized file naming conventions
     # src = InputFile(...) # Unnecessary to track src, don't ever parse the fn
