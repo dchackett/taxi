@@ -87,9 +87,12 @@ resid {cgtol}          # CG stopping condition"""
 
 class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     loadg = InputFile(conventions.loadg_convention)
+    
     fout = File(conventions.fout_convention)
     fout_filename_prefix = conventions.hmc_fout_filename_prefix
+    
     saveg = File(conventions.saveg_convention)
+    saveg_meta = File(conventions.saveg_convention+'.info') # Gauge metainfo file -- want to copy this along with gauge files
     saveg_filename_prefix = conventions.saveg_filename_prefix
     
     binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
