@@ -48,9 +48,14 @@ class BinaryMenu(object):
             # Check if dicts match
             found_mismatch = False
             for k in requested_keys:
-                if item_dict[k] != kwargs[k]:
-                    found_mismatch = True
-                    break
+                if hasattr(item_dict[k], '__iter__'): # Multiple options provided (i.e., a list like Nc=[2,3,4])
+                    if kwargs[k] not in item_dict[k]:
+                        found_mismatch = True
+                        break
+                else: # One item provided, just compare
+                    if kwargs[k] != item_dict[k]:
+                        found_mismatch = True
+                        break
             if not found_mismatch:
                 return binary
         
