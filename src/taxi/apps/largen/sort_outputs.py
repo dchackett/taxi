@@ -27,17 +27,25 @@ def largen_output_type_subpath(task, ofa):
     return None
         
 
-def largen_ensemble_subpath(task):
+def largen_ensemble_subpath_for_params(params):
     # This is unnecessarily complicated, but the second line should be gracefully expandable to deal with multirep theories
-    theory_subpath = ["SU{Nc}".format(Nc=task.Nc)]
-    theory_subpath += ["N{irrep_fnc}{Nf}".format(irrep_fnc=task.irrep_fnc, Nf=task.Nf)]
+    theory_subpath = ["SU{Nc}".format(**params)]
+    theory_subpath += ["N{irrep_fnc}{Nf}".format(**params)]
     theory_subpath = '_'.join(theory_subpath)
     
-    volume_subpath = "{Ns}x{Nt}".format(Ns=task.Ns, Nt=task.Nt)
-    params_subpath = "{beta}_{kappa}".format(beta=task.beta, kappa=task.kappa)
+    volume_subpath = "{Ns}x{Nt}".format(**params)
+    params_subpath = "{beta}_{kappa}".format(**params)
     
     return os.path.join(theory_subpath, volume_subpath, params_subpath)
 
+def largen_ensemble_subpath(task):
+    params = {
+            'Nc' : task.Nc, 
+            'irrep_fnc' : task.irrep_fnc, 'Nf' : task.Nf,
+            'Ns' : task.Ns, 'Nt' : task.Nt,
+            'beta' : task.beta, 'kappa' : task.kappa
+        }
+    return largen_ensemble_subpath_for_params(params)
 
 def sort_largen_outputs(task_pool, dest_root):
     return sort_outputs(task_pool, dest_root=dest_root,
