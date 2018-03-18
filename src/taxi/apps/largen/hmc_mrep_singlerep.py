@@ -96,7 +96,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     saveg_filename_prefix = conventions.saveg_filename_prefix
     
     binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
-    binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc'])
+    binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc', 'Nf', 'enable_metropolis'])
     
     # Required params, checked to be present and not None at dispatch compile time
     _required_params = ['binary', 'Nc', 'Ns', 'Nt', 'beta', 'kappa', 'irrep', 'label', 'nsteps1']
@@ -109,7 +109,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
                  trajL=1.0,
                  warms=0, nsteps_gauge=6, n_safe=5, safe_factor=4, tpm=1,
                  nsteps2=None, shift=0.2, # Hasenbuch preconditioning
-                 minAR=4,
+                 enable_metropolis=True, minAR=4,
                  maxcgobs=500, maxcgpf=500, cgtol=1e-6,
                  # Override ConfigGenerator defaults (Must pass to superconstructor manually)
                  req_time=600, n_traj=10,
@@ -185,6 +185,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         self.tpm = tpm
         self.warms = warms
         self.minAR = minAR
+        self.enable_metropolis = enable_metropolis
         
         self.maxcgobs = maxcgobs
         self.maxcgpf = maxcgpf
@@ -264,13 +265,18 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
                 elif line.startswith("REJECT") or line.startswith("SAFE_REJECT"):
                     count_traj += 1
                     
-        if (count_traj < self.n_traj) and (count_gmes < self.n_traj):
-            raise RuntimeError("HMC ok check fails: Not enough GMES or ACCEPT/REJECT in " + self.fout +\
+        if count_gmes < self.n_traj:
+            raise RuntimeError("HMC ok check fails: Not enough GMES in " + self.fout +\
                                " %d/%d, %d/%d"%(self.n_traj,count_traj,self.n_traj,count_gmes))
-            
+        
         if count_exit < 1:
             raise RuntimeError("HMC ok check fails: No exit in " + self.fout)
     
-        if count_accept < self.minAR:
+        # If metropolis not enabled, then no accepts/rejects to count
+        if self.enable_metropolis and count_traj < self.n_traj:
+            raise RuntimeError("HMC ok check fails: Not enough ACCEPT/REJECT in " + self.fout +\
+                               " %d/%d, %d/%d"%(self.n_traj,count_traj,self.n_traj,count_gmes))
+
+        if self.enable_metropolis and count_accept < self.minAR:
             raise RuntimeError("HMC ok check fails: %d acceptances < specified minimum %d"%(count_accept, self.minAR))
             
