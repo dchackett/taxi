@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from taxi import fixable_dynamic_attribute
-from taxi import BinaryMenu, binary_from_binary_menu
+from taxi.binary_menu import BinaryMenu, binary_from_binary_menu
 from taxi.mcmc import ConfigMeasurement
 from taxi.file import File, InputFile, should_save_file, should_load_file
 
