@@ -40,7 +40,7 @@ milc_irrep_names = {'f' : 'fund', 'a2' : 'asym', 's2' : 'symm', 'g' : 'adjt'}
 
 # Irrep names for filenames
 fnc_irrep_names = {'f' : 'f', 'a2' : 'as', 's2' : 's', 'g' : 'g'}
-invert_fnc_irrep_names = {v:k for (k,v) in fnc_irrep_names.items()}
+#invert_fnc_irrep_names = {v:k for (k,v) in fnc_irrep_names.items()}
 
 # Irreps from dimensions
 def dim_F(Nc):
@@ -86,8 +86,9 @@ class LargeN(object):
     @property
     def irrep(self):
         if getattr(self, 'Nc', None) is None:
-            raise Exception("Must set Nc before possible to render a conventionalized irrep!")
-        return conventionalized_irrep(self._irrep, Nc=self.Nc)
+            return self._irrep # Can't render a conventionalized irrep yet
+        else:
+            return conventionalized_irrep(self._irrep, Nc=self.Nc)
     @irrep.setter
     def irrep(self, new_irrep):
         self._irrep = new_irrep
