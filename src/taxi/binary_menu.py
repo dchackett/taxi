@@ -40,7 +40,7 @@ class BinaryMenu(object):
             
             # Load defaults in to item without destroying dict in menu
             full_item_key = {}
-            for k, v in item_keys.items():
+            for k, v in item_dict.items():
                 full_item_key[k] = v
             for k, v in self.default_dict.items():
                 full_item_key[k] = v
@@ -76,5 +76,6 @@ def binary_from_binary_menu(binary_menu, key_attr_names, default_dict=None):
         binary = binary_menu.binary_for(**key_dict)
         if binary is None:
             raise NotImplementedError("Missing binary for "+str(key_dict))
+        return binary
     # Allow this behavior to be disable by making binary a fixable dynamic attribute
     return fixable_dynamic_attribute(private_name='_binary', dynamical_getter=_dynamic_get_binary)
