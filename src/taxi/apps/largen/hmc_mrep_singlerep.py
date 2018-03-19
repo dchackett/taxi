@@ -95,7 +95,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     saveg_meta = File(conventions.saveg_convention+'.info') # Gauge metainfo file -- want to copy this along with gauge files
     saveg_filename_prefix = conventions.saveg_filename_prefix
     
-    binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
+    binary_menu = BinaryMenu(default_dict={'enable_metropolis' : True}) # Load with binaries in run-spec scripts
     binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc', 'Nf', 'enable_metropolis'])
     
     # Required params, checked to be present and not None at dispatch compile time
@@ -167,7 +167,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         
         # Kappa and irrep logic
         self.kappa = kappa
-        if Nf%2 == 0:
+        if Nf%2 != 0:
             raise NotImplementedError("Need to use RHMC to do odd numbers of flavors")
         self.Nf = Nf
         self.irrep = irrep
