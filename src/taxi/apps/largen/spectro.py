@@ -173,11 +173,11 @@ class PhysicalSpectroTask(SpectroTask):
     savep_filename_prefix = fixable_dynamic_attribute('_savep_filename_prefix', _get_savep_filename_prefix)
         
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.
-    binary_menu = BinaryMenu() # Load with binaries in run-spec script
+    binary_menu = BinaryMenu(default_dict={'irrep' : 'f', 'compute_baryons' : False}) # Load with binaries in run-spec script
     binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc', 'irrep', 'screening', 'p_plus_a', 'compute_baryons'])
     
     # Required params, checked to be present and not None at dispatch compile time
-    _required_params = ['binary', 'Ns', 'Nt', 'irrep', 'kappa', 'r0', 'fout_prefix'] + ['Nc', 'beta', 'Nf', 'label']
+    _required_params = ['binary', 'Ns', 'Nt', 'irrep', 'kappa', 'r0', 'screening', 'p_plus_a', 'compute_baryons'] + ['Nc', 'beta', 'Nf', 'label']
     
     def __init__(self,
                  # Application-specific required arguments
