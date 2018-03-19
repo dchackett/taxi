@@ -3,6 +3,7 @@
 # Definition of "Dispatcher" class - manages task forest and assigns tasks to Taxis.
 
 import os
+import types # to determine if something is a module for import
 import json
 from taxi._utility import LocalEncoder
 
@@ -69,7 +70,32 @@ class Dispatcher(object):
         """
         # Just need to get these in to the global namespace somewhere so the
         # task subclasses can be found
-        self._imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(self.imports)]
+        self._imported = []
+        for ii, (import_type, to_import) in enumerate(self.imports):
+            if import_type == 'path':
+                self._imported.append(imp.load_source('mod%d'%ii, to_import))
+            elif import_type == 'module':
+                self._imported.append(__import__(to_import))
+            elif import_type == 'unknown':
+                new_import = None
+                # Try importing as a module first
+                try:
+                    new_import = __import__(to_import)
+                except ImportError:
+                    pass
+                
+                # If that doesn't work, try importing as a file
+                if new_import is None:
+                    try:
+                        new_import = imp.load_source('mod%d'%ii, to_import)
+                    except IOError:
+                        pass
+                
+                # Throw an error if importing didn't work, user specified something incorrectly
+                if new_import is None:
+                    raise ImportError("Couldn't find import {0}".format(to_import))
+                self._imported.append(new_import)
+                    
         
         # Print valid task classes that have been loaded
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.tasks.Task)
@@ -482,20 +508,46 @@ class Dispatcher(object):
     def _store_imports(self):
         raise NotImplementedError
 
-
+    def _process_imports_argument(self, imports):
+        processed_imports = []
+        for ii in self.imports:
+            if isinstance(ii, dict):
+                assert ii.has_key('import_type'), "import_type not specified in provided import: {0}".format(ii)
+                assert ii.has_key('import'), "import not specified in provided import: {0}".format(ii)
+                processed_imports.append(ii)
+            elif isinstance(ii, str):
+                if '/' in ii or '-' in ii: # if so, the import must be a path; don't check for file existence in case of relative paths/different machines
+                    processed_imports.append({'import_type' : 'path'})
+                else: # Ambiguous: could be a filename or a module name; will try both
+                    processed_imports.append({'import_type' : 'unknown', 'import' : ii})
+            elif isinstance(ii, types.ModuleType):
+                processed_imports.append({'import_type' : 'module', 'import' : ii.__name__}) # module __name__s like taxi.apps.mrep_milc.hmc_singlerep
+            elif isinstance(ii, (type, types.ClassType)):
+                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # class __module__ like taxi.apps.mrep_milc.hmc_singlerep
+            elif issubclass(ii, taxi.tasks.Task):
+                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # Copy(...).__module__ like taxi.tasks
+        return processed_imports
+    
     def initialize_new_task_pool(self, task_pool, priority_method='canvas', imports=None):
         """Loads the tasks from task_pool in to an empty dispatcher by compiling
         the specified tasks (i.e., assigning IDs and priorities, rendering them in
         to storable format (e.g., JSON)) and storing them in the dispatch (usually a DB).
+        
+        imports: A list of dicts like {import_type : (path or module), import : (path to file to import, or name of module to import)}
         
         See Dispatcher._assign_priorities for priority_method options.
         """
         ## imports: Dispatcher needs to be able to import relevant runners.
         ## Convenient default behavior: import the calling script (presumably, the run-spec script)
         if imports is None:
-            self.imports = [taxi.expand_path(__main__.__file__)] # Import the file that called this pool (presumably, run-spec script)
+            # Import the file that called this pool (presumably, run-spec script)
+            self.imports = [{'import_type' : 'path', 'import' : taxi.expand_path(__main__.__file__)}]
         else:
             self.imports = imports
+            
+        ## Process imports
+        self.imports = self._process_imports_argument(self.imports)
+        
         ## Store imports in the dispatch metadata
         self._store_imports()
             
@@ -611,7 +663,7 @@ class SQLiteDispatcher(Dispatcher):
         then calls superclass to import Task subclasses and get them in the global scope."""
         ## Get imports
         imports_query = """SELECT * FROM imports"""
-        self.imports = [ii['import'] for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
+        self.imports = [(ii['import_type'], ii['import']) for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
         
         ## Call super to do dynamical imports
         super(SQLiteDispatcher, self)._load_existing_dispatch()
@@ -680,6 +732,7 @@ class SQLiteDispatcher(Dispatcher):
         create_imports_str = """
             CREATE TABLE IF NOT EXISTS imports (
                 id integer PRIMARY KEY,
+                import_type text,
                 import text
             )"""
 
@@ -943,7 +996,7 @@ class SQLiteDispatcher(Dispatcher):
         
         
     def _store_imports(self):
-        import_query = """INSERT OR REPLACE INTO imports (import) VALUES (?)"""
-        upsert_data = [(ii,) for ii in self.imports]
+        import_query = """INSERT OR REPLACE INTO imports (import_type, import) VALUES (?, ?)"""
+        upsert_data = [(ii['import_type'], ii['import']) for ii in self.imports]
         self.execute_update(import_query, *upsert_data)
 
