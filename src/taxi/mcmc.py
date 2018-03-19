@@ -71,7 +71,10 @@ class MCMC(tasks.Runner):
         # Load parameters from CG in to this object
         for k, v in cg_dict.items():
             if getattr(self, k, None) is None: # Don't override anything already present
-                setattr(self, k, v)
+                try:
+                    setattr(self, k, v)
+                except AttributeError:
+                    pass # Probably just tried to set some property with no setter
         
         # Need the config generator to run first
         self.depends_on.append(config_generator)
@@ -497,3 +500,50 @@ def sort_outputs(task_pool, dest_root,
             
     
     return copy_tasks
+
+
+### Forking stream task specification convenience function
+def make_forking_streams(make_mcmc_stream, starter, param_tree, serial=True):
+    """Convenience function to specify multiple ensembles, with MCMC streams for
+    later ensembles forking off from earlier ones.
+    Args:
+        make_mcmc_stream: A function (probably a call to make_config_generator_stream)
+            that creates and returns the tasks to generate an ensemble. Passed starter
+            as the keyword arg 'starter', and all params in param_tree leaves as **kwargs.
+        at: A nested list comprising a tree, whose leaves are dicts of parameters
+            that will be fed to make_ensemble (along with starter, which is plugged
+            in from parent streams). Even list depths mean "run steams in serial,
+            starting each from the last", odd list depths mean "run streams in parallel,
+            starting all simultaneously from the same seed". The dicts must specify
+            "fork_after_Nth", i.e., which Task (1-indexed) in the MCMC stream that
+            later streams should start from.
+        starter: Starter for root of the tree.
+    """
+    
+    task_pool = []
+    def _recursive_make_forking_streams(starter, param_tree, serial):
+        if isinstance(param_tree, dict):
+            new_stream = make_mcmc_stream(starter=starter, **param_tree)
+            starter = new_stream[param_tree['fork_after_Nth']-1]
+            task_pool.append(new_stream)
+            return starter
+        elif isinstance(param_tree, list):
+            if serial:
+                # Jobs in a stream, each starting from partway through the last
+                # This list is a serial list, so next list is parallel
+                for subtree in param_tree:
+                    starter = _recursive_make_forking_streams(starter=starter, param_tree=subtree, serial=False)
+                    if starter is None:
+                        break
+            elif not serial: # parallel
+                # Forking streams -- jobs all start from same starter
+                for subtree in param_tree:
+                    _recursive_make_forking_streams(starter=starter, param_tree=subtree, serial=True)
+    
+    # Call function in closure to recursively populate task_pool
+    _recursive_make_forking_streams(starter, param_tree, serial=serial)
+    
+    # Flatten task pool and return
+    if len(task_pool) > 0:
+        task_pool = reduce(lambda x,y: x+y, task_pool)
+    return task_pool
