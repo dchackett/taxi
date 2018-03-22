@@ -88,6 +88,7 @@ class TestSQLiteDispatchDelete(TestSQLiteBase):
 
     def tearDown(self):
         super(TestSQLiteDispatchDelete, self).tearDown()
+        os.unlink(self.test_dump_filename)
 
     def test_delete(self):
         test_task = Task()
