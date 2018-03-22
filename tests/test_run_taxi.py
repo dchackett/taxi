@@ -107,7 +107,7 @@ class TestScalarRunTaxiIntegration(unittest.TestCase):
         test_task = taxi.tasks.Die(message="Testing", for_taxi=self.my_taxi.name)
         with self.my_disp:
             task_blob = self.my_disp.get_all_tasks(self.my_taxi)
-            self.assertEqual(task_blob, None)
+            self.assertEqual(len(task_blob), 0)
 
             self.my_disp.initialize_new_task_pool([test_task])
             

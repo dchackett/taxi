@@ -80,6 +80,95 @@ class TestSQLiteEmptyDispatch(TestSQLiteBase):
             self.assertEqual(task_blob_no_complete.keys(), [2])
 
 
+class TestSQLiteDispatchDelete(TestSQLiteBase):
+
+    def setUp(self):
+        super(TestSQLiteDispatchDelete, self).setUp()
+        self.test_dump_filename = './tests/db_dump_dispatch.sqlite'
+
+    def tearDown(self):
+        super(TestSQLiteDispatchDelete, self).tearDown()
+
+    def test_delete(self):
+        test_task = Task()
+        with self.test_dispatch:
+            # Write test task to dispatch
+            self.test_dispatch.initialize_new_task_pool([test_task])
+            
+            # Find list of tasks in dispatch, delete all of them
+            task_blob = self.test_dispatch.get_all_tasks()
+            self.assertEqual(len(task_blob), 1)
+            self.test_dispatch.delete_tasks(task_blob)
+            
+            # Make sure deletion has occurred
+            task_blob = self.test_dispatch.get_all_tasks()
+            self.assertEqual(len(task_blob), 0)
+
+    def test_trim(self):
+        # Make a test stream of Tasks
+        test_pool1 = [Task() for t in range(5)]
+        for tt in range(1, len(test_pool1)):
+            test_pool1[tt].depends_on = [test_pool1[tt-1]]
+            
+        # Branch a second test stream off the first
+        test_pool2 = [Task() for t in range(5)]
+        for tt in range(1, len(test_pool2)):
+            test_pool2[tt].depends_on = [test_pool2[tt-1]]
+        test_pool2[0].depends_on = [test_pool1[2]] # branch off from third task
+        
+        # Put in correct structure for branch finder; assign ids so we know what to look for
+        test_pool1[0].branch_root = True
+        test_pool2[0].branch_root = True
+        for tt, t in enumerate(test_pool1 + test_pool2):
+            t.id = tt
+            t.trunk = True
+            
+        # Mark branch in test_pool1 as complete
+        for t in test_pool1:
+            t.status = 'complete'
+            
+        with self.test_dispatch:
+            # Write test pool to dispatch
+            self.test_dispatch.initialize_new_task_pool(test_pool1 + test_pool2)
+            
+            # Make sure all desired tasks are present initially
+            tb = self.test_dispatch.get_all_tasks()
+            self.assertEqual(sorted([t.id for t in test_pool1 + test_pool2]), sorted(tb.keys()))
+            
+            # Call trimmer - should remove test_pool2, dumping tasks to provided dump DB path
+            self.test_dispatch.trim_completed_branches(dump_dispatch=self.test_dump_filename)
+            
+            # Check that only test_pool1 tasks are still present
+            tb = self.test_dispatch.get_all_tasks()
+            self.assertEqual(sorted([t.id for t in test_pool2]), sorted(tb.keys()))
+            
+        # Check that tasks in test_pool2 were moved to dump dispatch
+        dump_dispatch = SQLiteDispatcher(self.test_dump_filename)
+        with dump_dispatch:
+            tb = dump_dispatch.get_all_tasks()
+            self.assertEqual(sorted([t.id for t in test_pool1]), sorted(tb.keys()))
+            
+        # Now, mark test_pool2 complete and trim
+        for t in test_pool2:
+            t.status = 'complete'
+            
+        with self.test_dispatch:
+            # Mark tasks in test_pool1 as completed
+            self.test_dispatch.write_tasks(test_pool2)
+            
+            tb = self.test_dispatch.get_all_tasks()
+            for t in tb.values():
+                print t, t.status, t.depends_on
+            
+            # Call trimmer - should remove test_pool1, deleting tasks (because no dump DB provided)
+            self.test_dispatch.trim_completed_branches()
+            
+            # Check that no tasks are left
+            tb = self.test_dispatch.get_all_tasks()
+            self.assertEqual(len(tb), 0)
+            
+            
+
 if __name__ == '__main__':
     suite1 = unittest.TestLoader().loadTestsFromTestCase(TestSQLiteEmptyDispatch)
 

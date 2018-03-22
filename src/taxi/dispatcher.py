@@ -39,7 +39,7 @@ class TaskClaimException(Exception):
 
 class Dispatcher(object):
 
-    def __init__(self):
+    def __init__(self, db_path):
         pass
 
     def __enter__(self):
@@ -194,9 +194,15 @@ class Dispatcher(object):
         return task
         
 
-    def write_tasks(self, tasks):
+    def write_tasks(self, tasks_to_write):
         """Stores (i.e., adds or updates) the Task instances specified in tasks
         to the dispatch (i.e., repository of stored task information, usually a DB)."""
+        raise NotImplementedError
+
+        
+    def delete_tasks(self, tasks_to_delete):
+        """Removes the tasks specified in 'tasks' (as either Task objects or task
+        ids in the dispatch DB) from the dispatch."""
         raise NotImplementedError
 
 
@@ -371,14 +377,18 @@ class Dispatcher(object):
     def _invert_dependency_graph(self, task_pool):
         # Give each task an identifier, reset dependents
         for jj, task in enumerate(task_pool):
-            task._dependents = []
+            # Don't add dependents to tasks rendered as ids (in case of deletion or include_completes=False)
+            if isinstance(task, tasks.Task):
+                task._dependents = []
 
         # Let dependencies know they have a dependent
         for task in task_pool:
             if task.depends_on is None:
                 continue
             for dependency in task.depends_on:
-                dependency._dependents.append(task)
+                # Don't add dependents to tasks rendered as ids (in case of deletion or include_completes=False)
+                if isinstance(dependency, tasks.Task):
+                    dependency._dependents.append(task)
                 
 
     ## Initialization
@@ -396,19 +406,20 @@ class Dispatcher(object):
         # First, find all roots
         trees = []
         for task in task_pool:
-            if task.depends_on is None or len(task.depends_on) == 0:
+            if task.depends_on is None or len(task.depends_on) == 0 or task.branch_root:
                 trees.append([task])
 
         ## Build out from roots
         # TODO:
         # - If dependent has different number of nodes, make it a new tree
-        # - If task is a trunk task and two dependents are trunk tasks, make one of them a new tree
         for tree in trees:
             for tree_task in tree:
                 if not tree_task.trunk:
                     continue
                 n_trunks_found = 0
                 for d in tree_task._dependents:
+                    if d.branch_root:
+                        continue # Already seeded branches with these above
                     # Count number of trunk tasks encountered in dependents, fork if this isn't the first
                     if d.trunk:
                         n_trunks_found += 1
@@ -620,8 +631,29 @@ class Dispatcher(object):
         self.write_tasks(affected_tasks)
             
     
+    ### Dispatch trimming (for scalability)
+    def trim_completed_branches(self, dump_dispatch=None):
+        # Find branches made  entirely of complete tasks
+        task_blob = self.get_all_tasks(include_complete=True)
+        branches = self.find_branches(task_blob.values())
+        branch_is_complete = [all([t.status == 'complete' for t in branch]) for branch in branches]
+        completed_branches = [branch for (is_complete, branch) in zip(branch_is_complete, branches) if is_complete]
+        
+        print branches
+        
+        if len(completed_branches) == 0:
+            return
+        
+        # Delete tasks associated with completed branches
+        delete_tasks = reduce(lambda x,y: x+y, completed_branches) # flatten
+        
+        # If provided, connect to dump dispatch and back up tasks to delete there
+        if dump_dispatch is not None:
+            dump_dispatch = type(self)(dump_dispatch)
+            dump_dispatch.write_tasks(delete_tasks)
 
-    
+        self.delete_tasks(delete_tasks)
+            
     
 import sqlite3
 
@@ -780,7 +812,8 @@ class SQLiteDispatcher(Dispatcher):
         # Semi-intelligent behavior for whether to execute or executemany
         # If query_args is nothing but tuples (from unpacking [(1,...), (2,...), ...]), then many
         # Otherwise, execute one
-        use_execute_many = all([isinstance(qa, tuple) for qa in query_args])
+        # Explicit length check necessary, executemany doesn't work for delete queries where no query_args are provided
+        use_execute_many = (len(query_args) > 0) and all([isinstance(qa, tuple) for qa in query_args])
         
         try:
             with self.conn:
@@ -880,7 +913,7 @@ class SQLiteDispatcher(Dispatcher):
         
 
         if len(task_res) == 0:
-            return None
+            return []
 
         # Dictionaryize everything
         task_res = map(dict, task_res)
@@ -958,6 +991,9 @@ class SQLiteDispatcher(Dispatcher):
         """
         if isinstance(tasks_to_write, tasks.Task):
             tasks_to_write = [tasks_to_write]
+            
+        if isinstance(tasks_to_write, dict): # if passed a task blob like returned by get_all_tasks
+            tasks_to_write = tasks_to_write.values()
         
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
@@ -983,7 +1019,27 @@ class SQLiteDispatcher(Dispatcher):
             upsert_data.append(task_values)
         
         self.execute_update(task_query, *upsert_data)
-            
+    
+    
+    def delete_tasks(self, tasks_to_delete):
+        """Removes the tasks specified in 'tasks' (as either Task objects or task
+        ids in the dispatch DB) from the dispatch."""
+        
+        # Gracefully accept single task_ids/Tasks
+        if not hasattr(tasks_to_delete, '__iter__'):
+            tasks_to_delete = [tasks_to_delete]
+        
+        # Get task ids
+        task_ids = []
+        for t in tasks_to_delete:
+            if isinstance(t, tasks.Task):
+                task_ids.append(t.id)
+            else:
+                task_ids.append(t) # assume t is a task_id
+                
+        delete_query = "DELETE FROM tasks WHERE id IN ({})".format(','.join(map(str, task_ids)))
+        self.execute_update(delete_query)
+    
         
     def _get_max_task_id(self):
         task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""
