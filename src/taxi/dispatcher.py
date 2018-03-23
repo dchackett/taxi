@@ -4,6 +4,8 @@
 
 import os
 import types # to determine if something is a module for import
+import time # for sleep in retries
+
 import json
 from taxi._utility import LocalEncoder
 
@@ -519,6 +521,7 @@ class Dispatcher(object):
     def _store_imports(self):
         raise NotImplementedError
 
+
     def _process_imports_argument(self, imports):
         processed_imports = []
         for ii in self.imports:
@@ -535,9 +538,10 @@ class Dispatcher(object):
                 processed_imports.append({'import_type' : 'module', 'import' : ii.__name__}) # module __name__s like taxi.apps.mrep_milc.hmc_singlerep
             elif isinstance(ii, (type, types.ClassType)):
                 processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # class __module__ like taxi.apps.mrep_milc.hmc_singlerep
-            elif issubclass(ii, taxi.tasks.Task):
-                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # Copy(...).__module__ like taxi.tasks
+#            elif issubclass(ii, taxi.tasks.Task):
+#                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # Copy(...).__module__ like taxi.tasks
         return processed_imports
+    
     
     def initialize_new_task_pool(self, task_pool, priority_method='canvas', imports=None):
         """Loads the tasks from task_pool in to an empty dispatcher by compiling
@@ -564,6 +568,34 @@ class Dispatcher(object):
             
         ## Build dispatch
         self.trees = self.find_branches(task_pool)
+        self._assign_priorities(task_pool, priority_method=priority_method)
+        self._assign_task_ids(task_pool)
+        self._populate_task_table(task_pool)
+        
+        
+    def add_new_tasks(self, task_pool, priority_method='canvas', imports=None):
+        """Loads the tasks from task_pool in to an existing dispatcher by compiling
+        the specified tasks (i.e., assigning IDs and priorities, rendering them in
+        to storable format (e.g., JSON)) and storing them in the dispatch (usually a DB).
+        
+        imports: A list of dicts like {import_type : (path or module), import : (path to file to import, or name of module to import)}
+        
+        See Dispatcher._assign_priorities for priority_method options.
+        """
+        ## imports: Dispatcher needs to be able to import relevant runners.
+        ## Convenient default behavior: import the calling script (presumably, the run-spec script)
+        if imports is not None:
+            ## Process imports
+            imports = self._process_imports_argument(imports)        
+            self.imports += imports
+            ## Store imports in the dispatch metadata
+            self._store_imports()
+        
+        ## Get old tasks and integrate with new tasks
+        old_tasks = self.get_all_tasks()
+        total_pool = task_pool + old_tasks.values()
+        
+        self.trees = self.find_branches(total_pool)
         self._assign_priorities(task_pool, priority_method=priority_method)
         self._assign_task_ids(task_pool)
         self._populate_task_table(task_pool)
@@ -671,11 +703,14 @@ class SQLiteDispatcher(Dispatcher):
     ## weird in Python2 and earlier.  We can look into it.
 
 
-    def __init__(self, db_path):
+    def __init__(self, db_path, max_connection_attempts=3, retry_sleep_time=10):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
         
         self._in_context = False
+        
+        self.max_connection_attempts = max_connection_attempts
+        self.retry_sleep_time = retry_sleep_time
         
         with self:
             pass # Semi-kludgey creation/retrieval of dispatch DB
@@ -713,7 +748,17 @@ class SQLiteDispatcher(Dispatcher):
         
         dispatch_db_exists = os.path.exists(self.db_path)
             
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+        # Try to connect N times to avoid database locking
+        for ii in range(self.max_connection_attempts)[::-1]:
+            try:
+                self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+                continue
+            except sqlite3.OperationalError as err:
+                if ii > 0:
+                    print "Connection failed. Sleeping {0} seconds and trying again ({1} retries remaining)".format(self.retry_sleep_time, ii)
+                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
+                else:
+                    raise err
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         # Only run initializers once
@@ -765,7 +810,8 @@ class SQLiteDispatcher(Dispatcher):
             CREATE TABLE IF NOT EXISTS imports (
                 id integer PRIMARY KEY,
                 import_type text,
-                import text
+                import text,
+                CONSTRAINT unique_imports UNIQUE (import_type, import)
             )"""
 
         with self.conn:

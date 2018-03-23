@@ -281,7 +281,8 @@ class SQLitePool(Pool):
     def __init__(self, db_path, pool_name=None,
                  work_dir=None, log_dir=None,
                  allocation=None, queue=None,
-                 thrash_delay=300):
+                 thrash_delay=300,
+                 max_connection_attempts=3, retry_sleep_time=10):
         """
         Argument options: either [db_path(, pool_name, thrash_delay)] are specified,
         which specifies the location of an existing pool; or,
@@ -314,6 +315,8 @@ class SQLitePool(Pool):
             self.pool_name = pool_name
 
         self.conn = None
+        self.max_connection_attempts = max_connection_attempts
+        self.retry_sleep_time = retry_sleep_time
         
         self._in_context = False
         
@@ -399,13 +402,24 @@ class SQLitePool(Pool):
             return
         self._in_context = True
         
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0)
+        # Try to connect N times to avoid database locking
+        for ii in range(self.max_connection_attempts)[::-1]:
+            try:
+                self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+                continue
+            except sqlite3.OperationalError as err:
+                if ii > 0:
+                    print "Connection failed. Sleeping {0} seconds and trying again ({1} retries remaining)".format(self.retry_sleep_time, ii)
+                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
+                else:
+                    raise err
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
         
         self._get_or_create_pool() # Also retrieves info about pool from DB, including working dir, so must occur here
         
         taxi.ensure_path_exists(taxi.expand_path(self.work_dir)) # Dig out working directory if it doesn't exist
         taxi.ensure_path_exists(taxi.expand_path(self.log_dir)) # Dig out log directory if it doesn;t exist
+
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
         """Context interface: connect to SQLite Pool DB.  If performing multiple operations,
