@@ -671,8 +671,6 @@ class Dispatcher(object):
         branch_is_complete = [all([t.status == 'complete' for t in branch]) for branch in branches]
         completed_branches = [branch for (is_complete, branch) in zip(branch_is_complete, branches) if is_complete]
         
-        print branches
-        
         if len(completed_branches) == 0:
             return
         
