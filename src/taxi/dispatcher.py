@@ -175,7 +175,7 @@ class Dispatcher(object):
         if N_pending_tasks == 0:
             ## TODO: I think this will break both the with: and the outer while True:,
             ## but add a test case!
-            return tasks.Die(message="WORK COMPLETE: no tasks pending")
+            return tasks.Sleep(message="WORK COMPLETE: no tasks pending")
             
         if not found_ready_task:
             ## TODO: we could add another status code that puts the taxi to sleep,
