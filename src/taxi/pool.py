@@ -199,8 +199,12 @@ class Pool(object):
         pool_status = self.get_taxi(my_taxi).status
 
         if queue_status in ('Q', 'R'): # Taxi is present on queue
-            if pool_status in ('E', 'H', 'M'):
+            if pool_status in ('E', 'H'):
                 # Hold and error statuses must be changed explicitly
+                return
+            elif pool_status == 'M':
+                # taxi is either no longer missing, or was marked incorrectly
+                self.update_taxi_status(my_taxi, queue_status)
                 return
             else:
                 self.update_taxi_status(my_taxi, queue_status)
@@ -336,6 +340,16 @@ class SQLitePool(Pool):
                 status text,
                 dispatch text
             )"""
+            
+        create_no_idle_to_missing_str = """
+            CREATE TRIGGER IF NOT EXISTS no_idle_to_missing
+            AFTER UPDATE OF status ON taxis
+            WHEN (NEW.status = 'M' AND OLD.status IN ('I', 'Q'))
+            BEGIN
+                UPDATE taxis SET status=OLD.status WHERE name=OLD.name;
+            END;
+            """
+            
         create_pool_str = """
             CREATE TABLE IF NOT EXISTS pools (
                 name text PRIMARY KEY,
@@ -347,6 +361,7 @@ class SQLitePool(Pool):
 
         with self.conn:
             self.conn.execute(create_taxi_str)
+            self.conn.execute(create_no_idle_to_missing_str)
             self.conn.execute(create_pool_str)
     
     
