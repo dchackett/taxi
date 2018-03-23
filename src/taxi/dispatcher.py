@@ -1041,6 +1041,9 @@ class SQLiteDispatcher(Dispatcher):
         if isinstance(tasks_to_write, dict): # if passed a task blob like returned by get_all_tasks
             tasks_to_write = tasks_to_write.values()
         
+        if tasks_to_write is None or len(tasks_to_write) == 0:
+            return
+        
         task_query = """INSERT OR REPLACE INTO tasks
         (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
