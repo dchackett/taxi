@@ -3,6 +3,9 @@
 # Interface for system queues.  Used by the Pool class to interact with the batch system.
 # This is an abstract class; implementations to be provided for specific machines in "local" subdir.
 
+class RespawnError(Exception):
+    pass
+
 class BatchQueue(object):
 
     # Enumeration of taxi status codes
@@ -43,8 +46,8 @@ class BatchQueue(object):
         """
         
         queue_status = self.report_taxi_status(taxi)['status']
-        assert queue_status == 'X' or respawn,\
-            "Cannot relaunch taxi {0}: taxi is already on the queue, and this launch is not a respawn."
+        if not (queue_status == 'X' or respawn):
+            raise RespawnError("Cannot relaunch taxi {0}: taxi is already on the queue, and this launch is not a respawn.")
         
 
     def cancel_job(self, job_number):

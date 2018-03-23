@@ -8,6 +8,7 @@ import os
 
 import traceback
 
+from taxi.batch_queue import RespawnError
 import taxi.local.local_queue
 
 class Pool(object):
@@ -138,6 +139,8 @@ class Pool(object):
 
         try:
             queue.launch_taxi(my_taxi, **kwargs)
+        except RespawnError:
+            print RespawnError.message # Don't mark taxis as E if we tried to submit them twice
         except:
             self.update_taxi_status(my_taxi, 'E')
             print "Failed to submit taxi {t}".format(t=str(my_taxi))
