@@ -145,7 +145,7 @@ class Task(object):
     
     def is_ready(self):
         """Is the task ready to run?"""
-        return self.status == 'pending' and self.count_unresolved_dependencies==(0,0)
+        return self.status == 'pending' and self.count_unresolved_dependencies()==(0,0)
     
     
     def _rollback(self):
