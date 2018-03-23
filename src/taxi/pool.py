@@ -206,7 +206,7 @@ class Pool(object):
                 self.update_taxi_status(my_taxi, queue_status)
                 return
         elif queue_status == 'X': # Taxi is not present on queue
-            if pool_status in ('E', 'H', 'M'):
+            if pool_status in ('E', 'H', 'M', 'I'):
                 # Taxi shouldn't be on queue: all is well
                 return
             elif pool_status in ('Q', 'R'):
@@ -223,9 +223,6 @@ class Pool(object):
                 if dispatcher is not None:
                     dispatcher.mark_abandoned_task(my_taxi)
                     
-                return
-            else:
-                # Taxi is marked (I)dle, and not present on queue: all is well
                 return
         else:
             print "Invalid queue status code - '{0}'".format(queue_status)
