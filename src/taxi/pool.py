@@ -344,7 +344,7 @@ class SQLitePool(Pool):
         create_no_idle_to_missing_str = """
             CREATE TRIGGER IF NOT EXISTS no_idle_to_missing
             AFTER UPDATE OF status ON taxis
-            WHEN (NEW.status = 'M' AND OLD.status IN ('I', 'Q'))
+            WHEN (NEW.status = 'M' AND OLD.status IN ('I', 'H'))
             BEGIN
                 UPDATE taxis SET status=OLD.status WHERE name=OLD.name;
             END;
