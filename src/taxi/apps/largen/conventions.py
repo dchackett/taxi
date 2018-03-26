@@ -37,10 +37,11 @@ irrep_names = {'f' : F_irrep_names, 'a2' : A2_irrep_names, 'g' : G_irrep_names, 
 
 # MILC conventions for each irrep
 milc_irrep_names = {'f' : 'fund', 'a2' : 'asym', 's2' : 'symm', 'g' : 'adjt'}
+invert_milc_irrep_names = {'fund' : 'f', 'asym' : 'a2', 'symm' : 's2', 'adjt' : 'g'}
 
 # Irrep names for filenames
 fnc_irrep_names = {'f' : 'f', 'a2' : 'as', 's2' : 's', 'g' : 'g'}
-#invert_fnc_irrep_names = {v:k for (k,v) in fnc_irrep_names.items()}
+invert_fnc_irrep_names = {'f' : 'f', 'as' : 'a2', 's' : 's2', 'g' : 'g'}
 
 # Irreps from dimensions
 def dim_F(Nc):
@@ -78,9 +79,16 @@ class LargeN(object):
     @property
     def irrep_milc(self):
         return milc_irrep_names[self.irrep]
+    @irrep_milc.setter
+    def irrep_milc(self, new_irrep_milc):
+        self._irrep = invert_milc_irrep_names[new_irrep_milc]
+    
     @property
     def irrep_fnc(self):
         return fnc_irrep_names[self.irrep]
+    @irrep_fnc.setter
+    def irrep_fnc(self, new_irrep_fnc):
+        self._irrep = invert_fnc_irrep_names[new_irrep_fnc]
     
     # Transparent conventionalized irrep names
     @property
