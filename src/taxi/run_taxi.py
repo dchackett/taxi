@@ -182,4 +182,5 @@ if __name__ == '__main__':
             loops_without_executing_task = 0 # ANTI-THRASH: Not thrashing if we've made it this far
 
 ## Exit
+print "EXITING"
 os.system('date')
