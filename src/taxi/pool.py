@@ -133,14 +133,13 @@ class Pool(object):
 
         if self.check_for_thrashing(my_taxi):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {0}; set to hold.".format(my_taxi)
-            self.update_taxi_status(my_taxi, 'H')
+            print "Thrashing detected for taxi {0}; aborting submission.".format(my_taxi)
             return
 
         try:
             queue.launch_taxi(my_taxi, **kwargs)
         except RespawnError:
-            print RespawnError.message # Don't mark taxis as E if we tried to submit them twice
+            print RespawnError # Don't mark taxis as E if we tried to submit them twice
         except:
             self.update_taxi_status(my_taxi, 'E')
             print "Failed to submit taxi {t}".format(t=str(my_taxi))
