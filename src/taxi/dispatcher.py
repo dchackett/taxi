@@ -1051,8 +1051,8 @@ class SQLiteDispatcher(Dispatcher):
             return
         
         task_query = """INSERT OR REPLACE INTO tasks
-        (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+        (id, task_type, depends_on, status, for_taxi, by_taxi, is_recurring, req_time, start_time, run_time, priority, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         # JSON serialize all tasks
         compiled_tasks = [task.compiled() for task in tasks_to_write]
@@ -1066,8 +1066,11 @@ class SQLiteDispatcher(Dispatcher):
                 json.dumps(compiled_task['depends_on'], cls=LocalEncoder),
                 compiled_task['status'], 
                 compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
+                compiled_task['by_taxi'] if compiled_task.has_key('by_taxi') else None, 
                 compiled_task['is_recurring'],
                 compiled_task['req_time'], 
+                compiled_task['start_time'], 
+                compiled_task['run_time'], 
                 compiled_task['priority'],
                 json.dumps(compiled_task['payload'], cls=LocalEncoder) if compiled_task.has_key('payload') else None,
             )
