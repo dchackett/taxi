@@ -10,7 +10,7 @@ from taxi.file import File, should_save_file, output_file_attributes_for_task
 
 import hashlib # For checksum comparisons by Copy
 
-special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'is_recurring', 'req_time', 'priority']
+special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'by_taxi', 'is_recurring', 'req_time', 'start_time', 'run_time', 'priority']
 
 class Task(object):
     """Abstract task superclass"""
@@ -21,13 +21,18 @@ class Task(object):
         # Provided arguments
         self.req_time = req_time
         self.for_taxi = for_taxi
-                
+        self.by_taxi = None
+        
         # Defaults
         self.status = 'pending'
         self.is_recurring = False
         if not hasattr(self, 'depends_on'): # Don't clobber anything set by a subclass
             self.depends_on = [] 
-
+        
+        # Timing -- set when running
+        self.start_time = None
+        self.run_time = None
+        
         # Tree properties
         self.trunk = False
         self.branch_root = False
