@@ -15,6 +15,8 @@ import __main__ # To get filename of calling script
 import taxi
 import taxi.tasks as tasks
 
+import random
+
 ## Need to be able to make blank objects to reconstruct Tasks from JSON payloads
 class BlankObject(object):
     def __init__(self):
@@ -41,7 +43,7 @@ class TaskClaimException(Exception):
 
 class Dispatcher(object):
 
-    def __init__(self, db_path):
+    def __init__(self, db_path, shuffle_tasks=False):
         pass
 
     def __enter__(self):
@@ -140,7 +142,13 @@ class Dispatcher(object):
         if (task_blob is None) or (len(task_blob) == 0):
             task_priority_ids = []
         else:
-            task_priority_ids = [ t.id for t in sorted(task_blob.values(), key=task_priority_sort_key) ]
+            task_list = task_blob.values()
+            # Scalability: to reduce task-claim collisions, shuffle tasks before sorting by
+            # priority, which amounts to randomizing order within equal-priority sets of tasks.
+            if getattr(self, 'shuffle_tasks', False):
+                random.seed(time.time())
+                random.shuffle(task_list)
+            task_priority_ids = [ t.id for t in sorted(task_list, key=task_priority_sort_key) ]
         
         # Find highest-priority task that can be completed
         N_pending_tasks = 0
@@ -701,14 +709,16 @@ class SQLiteDispatcher(Dispatcher):
     ## weird in Python2 and earlier.  We can look into it.
 
 
-    def __init__(self, db_path, max_sqlite_attempts=3, retry_sleep_time=10):
+    def __init__(self, db_path, max_sqlite_attempts=3, retry_sleep_time=10, shuffle_tasks=True):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
         
-        self._in_context = False
-        
         self.max_sqlite_attempts = max_sqlite_attempts
         self.retry_sleep_time = retry_sleep_time
+        
+        self.shuffle_tasks = shuffle_tasks
+        
+        self._in_context = False
         
         with self:
             pass # Semi-kludgey creation/retrieval of dispatch DB
@@ -764,8 +774,9 @@ class SQLiteDispatcher(Dispatcher):
         self._in_context = True
         
         dispatch_db_exists = os.path.exists(self.db_path)
-            
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+        
+        # isolation_level=None: autocommit mode, hopefully helps with concurrent access/scalability issues
+        self.conn = sqlite3.connect(self.db_path, timeout=30.0, isolation_level=None) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         # Only run initializers once
@@ -1023,11 +1034,10 @@ class SQLiteDispatcher(Dispatcher):
             
             # Affected rows == 1 if this worked correctly
             claim_failed = result.rowcount != 1
-                
-            if claim_failed:
-                task_status = self.check_task_status(task)
-                raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
             
+            if claim_failed:
+                raise TaskClaimException("Failed to claim task {0}".format(task.id))
+                            
         # Keep task object up-to-date
         task.status = 'active'
         task.by_taxi = my_taxi.name
