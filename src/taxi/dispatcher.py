@@ -701,13 +701,13 @@ class SQLiteDispatcher(Dispatcher):
     ## weird in Python2 and earlier.  We can look into it.
 
 
-    def __init__(self, db_path, max_connection_attempts=3, retry_sleep_time=10):
+    def __init__(self, db_path, max_sqlite_attempts=3, retry_sleep_time=10):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
         
         self._in_context = False
         
-        self.max_connection_attempts = max_connection_attempts
+        self.max_sqlite_attempts = max_sqlite_attempts
         self.retry_sleep_time = retry_sleep_time
         
         with self:
@@ -734,6 +734,25 @@ class SQLiteDispatcher(Dispatcher):
         super(SQLiteDispatcher, self)._load_existing_dispatch()
 
 
+    def _attempt_sqlite_operation(self, fn_to_call, *args, **kwargs):
+        result = None
+        # Try operation N times to avoid database locking
+        for ii in range(self.max_sqlite_attempts)[::-1]:
+            try:
+                with self.conn:
+                    result = fn_to_call(*args, **kwargs)
+                break
+            except sqlite3.OperationalError as err:
+                if 'database is locked' not in err.message:
+                    raise err # Only want to retry if database is locked
+                if ii > 0:
+                    print "Sqlite operation failed: {0}. Sleeping {1} seconds and trying again ({2} retries remaining)".format(err.message, self.retry_sleep_time, ii)
+                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
+                else:
+                    raise err
+        return result
+
+
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
     def __enter__(self):
         """Context interface: connect to SQLite Dispatch DB.  If performing multiple operations,
@@ -746,17 +765,7 @@ class SQLiteDispatcher(Dispatcher):
         
         dispatch_db_exists = os.path.exists(self.db_path)
             
-        # Try to connect N times to avoid database locking
-        for ii in range(self.max_connection_attempts)[::-1]:
-            try:
-                self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
-                continue
-            except sqlite3.OperationalError as err:
-                if ii > 0:
-                    print "Connection failed. Sleeping {0} seconds and trying again ({1} retries remaining)".format(self.retry_sleep_time, ii)
-                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
-                else:
-                    raise err
+        self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         # Only run initializers once
@@ -817,6 +826,8 @@ class SQLiteDispatcher(Dispatcher):
             self.conn.execute(create_imports_str)
 
 
+    def _execute_and_fetchall(self, *args, **kwargs):
+        return self.conn.execute(*args, **kwargs).fetchall()
     def execute_select(self, query, *query_args):
         """Executes a select query on the attached dispatch DB.
         
@@ -832,8 +843,7 @@ class SQLiteDispatcher(Dispatcher):
             return res
         
         try:
-            with self.conn:
-                res = self.conn.execute(query, query_args).fetchall()
+            res = self._attempt_sqlite_operation(self._execute_and_fetchall, query, query_args)
         except:
             raise
 
@@ -860,12 +870,10 @@ class SQLiteDispatcher(Dispatcher):
         use_execute_many = (len(query_args) > 0) and all([isinstance(qa, tuple) for qa in query_args])
         
         try:
-            with self.conn:
-                if not use_execute_many:
-                    self.conn.execute(query, query_args)
-                else:
-                    self.conn.executemany(query, query_args)
-                self.conn.commit()
+            if not use_execute_many:
+                self._attempt_sqlite_operation(self.conn.execute, query, query_args)
+            else:
+                self._attempt_sqlite_operation(self.conn.executemany, query, query_args)
         except:
             print "Failed to execute query: "
             print query
@@ -1004,19 +1012,19 @@ class SQLiteDispatcher(Dispatcher):
         # If task has no id, either it's not in the DB or we couldn't claim it anyways
         if getattr(task, 'id', None) is not None:
             # Claim in DB -- check for race conditions
-            with self.conn:
-                # Try to change status, but with condition that taxi status is pending
-                claim_query = """UPDATE tasks SET status="active", by_taxi=? WHERE id=? AND status="pending";"""
-                # Affected rows == 1 if this worked correctly
-                result = self.conn.execute(claim_query, (my_taxi.name, task.id))
-                claim_failed = result.rowcount != 1
+            
+            # Try to change status, but with condition that taxi status is pending
+            claim_query = """UPDATE tasks SET status="active", by_taxi=? WHERE id=? AND status="pending";"""
+            
+            # Try N times in case DB is locked
+            result = self._attempt_sqlite_operation(self.conn.execute, claim_query, (my_taxi.name, task.id))
+            
+            # Affected rows == 1 if this worked correctly
+            claim_failed = result.rowcount != 1
                 
-                if claim_failed:
-                    task_status = self.check_task_status(task)
-                    raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
-                    
-                # Claim went through successfully, commit the claim
-                self.conn.commit()
+            if claim_failed:
+                task_status = self.check_task_status(task)
+                raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
             
         # Keep task object up-to-date
         task.status = 'active'
