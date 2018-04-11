@@ -933,6 +933,8 @@ class SQLiteDispatcher(Dispatcher):
                 
         # Deploy payload
         for k, v in rebuilt.__dict__.pop('payload', {}).items():
+            if k in r.keys():
+                continue # Don't overwrite data from real table columns with payload data
             try:
                 setattr(rebuilt, k, v)
             except AttributeError:
