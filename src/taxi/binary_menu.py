@@ -40,9 +40,9 @@ class BinaryMenu(object):
             
             # Load defaults in to item without destroying dict in menu
             full_item_key = {}
-            for k, v in item_dict.items():
-                full_item_key[k] = v
             for k, v in self.default_dict.items():
+                full_item_key[k] = v
+            for k, v in item_dict.items():
                 full_item_key[k] = v
             
             # Check if dicts match
