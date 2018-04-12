@@ -175,9 +175,9 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         self.nsteps1 = nsteps1
         self.nsteps2 = nsteps2
         self.nsteps_gauge = nsteps_gauge
+        self.shift = shift
         if nsteps2 is None:
             shift = 0 # No shift if not using Hasenbuch
-        self.shift = shift
         self.trajL = trajL
         
         self.n_safe = n_safe
