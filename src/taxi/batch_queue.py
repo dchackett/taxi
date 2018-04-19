@@ -45,9 +45,12 @@ class BatchQueue(object):
         - Don't launch a taxi that already exists on the queue unless respawning.
         """
         
-        queue_status = self.report_taxi_status(taxi)['status']
+        queue_info = self.report_taxi_status(taxi)
+        queue_status = queue_info['status']
         if not (queue_status == 'X' or respawn):
             raise RespawnError("Cannot relaunch taxi {0}: taxi is already on the queue, and this launch is not a respawn.")
+        if respawn and len(queue_info['job_number']) > 1:
+            raise RespawnError("Cannot respawn taxi {0}: multiple taxis already on queue.")
         
 
     def cancel_job(self, job_number):
