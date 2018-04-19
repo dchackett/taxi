@@ -788,7 +788,7 @@ class SQLiteDispatcher(Dispatcher):
             
         ## Get/update a dictionary of all Task subclasses in the global scope, to
         ## rebuild objects from JSON payloads
-        self.class_dict = taxi.all_subclasses_of(taxi.tasks.Task)
+        self.known_task_classes = taxi.all_subclasses_of(taxi.tasks.Task)
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
@@ -919,8 +919,8 @@ class SQLiteDispatcher(Dispatcher):
         
         ## Set up a blank object with the correct type
         rebuilt = BlankObject()
-        if self.class_dict.has_key(r['task_type']):
-            task_class = self.class_dict[r['task_type']]
+        if self.known_task_classes.has_key(r['task_type']):
+            task_class = self.known_task_classes[r['task_type']]
         else:
             raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
         rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
