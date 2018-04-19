@@ -143,6 +143,7 @@ class Pool(object):
 
         try:
             job_id = queue.launch_taxi(my_taxi, **kwargs)
+            self.update_taxi_job_id(my_taxi, job_id)
         except RespawnError as e:
             print str(e) # Don't mark taxis as E if we tried to submit them twice
         except:
@@ -152,7 +153,6 @@ class Pool(object):
         
         self.update_taxi_last_submitted(my_taxi, time.time())
         self.update_taxi_queue_status(my_taxi, queue=queue) # 'I' -> 'Q' or 'E', depending on if submission worked
-        self.update_taxi_job_id(my_taxi, job_id)
 
 
     def remove_taxi_from_queue(self, my_taxi, queue=None):
