@@ -191,11 +191,16 @@ class Pool(object):
         batch queue, it is marked missing 'M' in the pool.  If a dispatcher is provided,
         the missing taxi's tasks are marked abandoned.
         """
+        
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
-            
         queue_status = queue.report_taxi_status(my_taxi)['status']
-        pool_status = self.get_taxi(my_taxi).status
+        
+        # Scalability: if my_taxi is a Taxi object, trust the provided status
+        if not isinstance(my_taxi, taxi.Taxi):
+            pool_status = self.get_taxi(my_taxi).status
+        else:
+            pool_status = my_taxi.status
 
         if queue_status in ('Q', 'R'): # Taxi is present on queue
             if pool_status in ('E', 'H'):
