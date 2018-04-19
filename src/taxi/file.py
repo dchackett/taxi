@@ -5,7 +5,7 @@
 
 import os
 import parse
-
+import weakref
 
 def _decompose_path(fn):
     decomposed = []
@@ -167,7 +167,7 @@ class FileInstanceInterface(FileInterface):
         """
         super(FileInstanceInterface, self).__init__(file_in_class=file_in_class,
              conventions=conventions, save=save, postprocessor=postprocessor)
-        self.task_instance = task_instance
+        self.task_instance = weakref.ref(task_instance) # weakref to prevent memory leak when calling dispatcher.get_all_tasks repeatedly
         
     def __str__(self):
         """Generates filename using the task instance and the (first) provided convention"""
@@ -188,8 +188,9 @@ class FileInstanceInterface(FileInterface):
         
         assert isinstance(convention, basestring)
         
+        task_instance = self.task_instance() # dereference weakref
         try:
-            return convention.format(**self.task_instance.to_dict())
+            return convention.format(**task_instance.to_dict())
         except KeyError as e:
             raise KeyError("Unable to find key '{0}' while rendering convention '{1}'".format(e.args[0], convention))
     
@@ -218,6 +219,7 @@ class FileSubclassInterface(FileInterface):
 
     def parse_params(self, fn):
         return parse_filename(fn, conventions=self.conventions, postprocessor=self.postprocessor)
+
 
 
 class File(object):
@@ -260,7 +262,7 @@ class File(object):
     def _getattr_override(self, name, interface):
         
         if isinstance(interface, FileInstanceInterface):
-            relevant_class = interface.task_instance.__class__
+            relevant_class = interface.task_instance().__class__ # call to dereference weakref
         elif isinstance(interface, FileSubclassInterface):
             relevant_class = interface.subclass
             
@@ -289,6 +291,33 @@ class File(object):
         self.known_subclasses = sorted(self.known_subclasses, cmp=_subclass_cmp)
     
     
+    def _make_new_instance_interface(self, inst):
+        # Use weakref to allow FileInstanceInterfaces to be garbage collected
+        # when their associated tasks fall out of scope
+        new_interface = FileInstanceInterface(task_instance=inst, file_in_class=self)
+        self.instance_interfaces[id(inst)] = weakref.ref(new_interface)
+        # Reference interface from task to prevent interface from being garbage
+        # collected until task is garbage collected
+        if not hasattr(inst, '_file_interfaces'):
+            inst._file_interfaces = []
+        inst._file_interfaces.append(new_interface)
+        return new_interface
+    
+    def _get_instance_interface(self, inst):
+        # If no interface exists with the appropriate object id, make a new one
+        if not self.instance_interfaces.has_key(id(inst)):
+            return self._make_new_instance_interface(inst)
+        
+        interface = self.instance_interfaces[id(inst)]() # call dereferences weakref
+        if interface is None:
+            # We're asking for an interface, but the weakref has died -- this occurs
+            # only when a new object is made with the same ID as an old object that
+            # has been garbage collected. Need a new interface.
+            return self._make_new_instance_interface(inst)
+        else:
+            return interface # Found the interface we wanted
+    
+        
     # Use descriptor technology to make a "property factory" -- return the
     # class-level defaults when an instance of that class
     # hasn't had anything (e.g. conventions, save?, value) set (overridden)
@@ -304,9 +333,7 @@ class File(object):
             
         else:        
             # Instances can be overridden
-            if not self.instance_interfaces.has_key(id(inst)):
-                self.instance_interfaces[id(inst)] = FileInstanceInterface(task_instance=inst, file_in_class=self)
-            interface = self.instance_interfaces[id(inst)]
+            interface = self._get_instance_interface(inst)
         
         if hasattr(interface, '_value_override'):
             return interface._value_override
@@ -322,9 +349,8 @@ class File(object):
         if value is not None:
             value = str(value)
             
-        if self.instance_interfaces.get(id(inst), None) is None:
-            self.instance_interfaces[id(inst)] = FileInstanceInterface(task_instance=inst, file_in_class=self)
-        self.instance_interfaces[id(inst)]._value_override = value
+        interface = self._get_instance_interface(inst)
+        interface._value_override = value # call dereferences weakref
         
         
     def __delete__(self, inst):
@@ -333,7 +359,7 @@ class File(object):
         dynamical rendering with file naming conventions.)
         If _value_override not set, then removes the deleted interface, clearing
         all instance-level overrides."""
-        interface = self.instance_interfaces[id(inst)]
+        interface = self.instance_interfaces[id(inst)]() # Call dereferences weakref
         if hasattr(interface, '_value_override'):
             del interface._value_override
         else:
@@ -364,7 +390,7 @@ class InputFile(File):
         if value is None:
             return # Can't parse None
         
-        interface = self.instance_interfaces[id(inst)]
+        interface = self.instance_interfaces[id(inst)]() # Call derefences weakref
         if not self._getattr_override('auto_parse', interface):
             return # automatic parsing and loading can be disabled
         parsed = interface.parse_params()
