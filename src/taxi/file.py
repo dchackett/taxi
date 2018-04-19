@@ -443,7 +443,12 @@ def file_attributes_for_task(task):
 def output_file_attributes_for_task(task):
     """Finds the name of all InputFile attributes in the class of which task is a member.
     Returns a list of attribute names (strings)."""
-    return [k for (k,v) in task.__class__.__dict__.items() if isinstance(v, File) and not isinstance(v, InputFile)]
+    ofas = []
+    for k in dir(task.__class__):
+        v = getattr(task.__class__, k)
+        if isinstance(v, FileInterface) and isinstance(v.file_in_class, File) and not isinstance(v.file_in_class, InputFile):
+            ofas.append(k)
+    return ofas
 
 
 #class A(object):
