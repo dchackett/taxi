@@ -26,6 +26,8 @@ def summary(dispatch):
     
     tasks = dispatch.get_all_tasks(include_complete=True) # Task blob is an id : task dict
     
+    trunk_number = dispatch._trunk_number(tasks)
+    
     ## Classify tasks
     pending_tasks   = []
     ready_tasks     = []
@@ -56,7 +58,7 @@ def summary(dispatch):
     # Print summary info
     print "PENDING %d  READY %d  BLOCKED %d  ACTIVE %d  ABANDONED %d  FAILED %d  COMPLETE %d"%\
         (len(pending_tasks), len(ready_tasks), len(blocked_tasks), len(active_tasks), len(abandoned_tasks), len(failed_tasks), len(completed_tasks))
-
+    print "TRUNK NUMBER: %d"%trunk_number
     # Print diagnostics
     if len(active_tasks) > 0:
         print "ACTIVE TASKS:"
