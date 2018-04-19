@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import datetime
+import resource # For printing memory usage
 
 import taxi
 import taxi.dispatcher
@@ -112,6 +113,7 @@ if __name__ == '__main__':
         while keep_running:
             print 
             print "ITERATION STARTING AT {0}".format(datetime.datetime.now())
+            print "Memory usage: {0} MiB".format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024.) # Note: ouput will be in GiB, mislabeled if you happen to run on OS X
             flush_output()
             
             loops_without_executing_task += 1 # Value is incorrect for a while, but increment here for maximum safety
