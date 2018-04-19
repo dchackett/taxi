@@ -73,7 +73,7 @@ if __name__ == '__main__':
     ## Record starting time
     taxi_obj.start_time = _start_time
     print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
-    
+    print "Must end by:", datetime.datetime.fromtimestamp(_start_time+taxi_obj.time_limit).isoformat(' ')
     
     ## Diagnostic outputs: where are we running?
     print "Running on", taxi_obj.cores, "cores"
@@ -89,6 +89,10 @@ if __name__ == '__main__':
         loops_without_executing_task = 0 # ANTI-THRASH
         
         while keep_running:
+            print 
+            print "ITERATION STARTING AT {0}".format(datetime.datetime.now())
+            flush_output()
+            
             loops_without_executing_task += 1 # Value is incorrect for a while, but increment here for maximum safety
             
             MAX_WASTED_LOOPS = 20
@@ -98,31 +102,37 @@ if __name__ == '__main__':
             
             ### Maintain taxi pool
             with my_pool:
-                my_pool.update_all_taxis_queue_status(queue=my_queue, dispatcher=my_dispatch)
+                print "Managing taxi pool..."
+                t0 = time.time()
                 my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
+                print "Time to manage taxi pool:", time.time() - t0
         
         
             ### Check with dispatch for tasks to execute
             with my_dispatch:
                 # Ask dispatcher for next task
+                print "Querying dispatcher for next task...",
+                t0 = time.time()
                 task = my_dispatch.request_next_task(for_taxi=taxi_obj)
+                print task
+                print "Time to query dispatcher:", time.time() - t0
         
                 # Flag task for execution
                 try:
                     my_dispatch.claim_task(taxi_obj, task)
+                    print "Claimed task {0} successfully".format(getattr(task, 'id', None))
                 except taxi.dispatcher.TaskClaimException, e:
                     ## Race condition safeguard: skips and tries again if the task status has changed
                     print str(e)
                     continue
                 
+            ## Timing
+            task.start_time = time.time()
+            print "Time remaining:", taxi_obj.time_limit - (task.start_time - taxi_obj.start_time)
             
             ### Execute task
             print "EXECUTING TASK {0}".format(getattr(task, 'id', None))
             print task
-            
-            ## Timing
-            task.start_time = time.time()
-            print "Time remaining:", taxi_obj.time_limit - (task.start_time - taxi_obj.start_time)
             
             flush_output()
             
@@ -174,6 +184,7 @@ if __name__ == '__main__':
             
             ### Record exit status, time taken, etc.
             task.run_time = time.time() - task.start_time
+            print "TASK COMPLETED at {0}. Runtime = {1}".format(datetime.datetime.now(), task.run_time)
             with my_dispatch:
                 tasks_run += 1
                 my_dispatch.finalize_task_run(taxi_obj, task)    
@@ -182,5 +193,5 @@ if __name__ == '__main__':
             loops_without_executing_task = 0 # ANTI-THRASH: Not thrashing if we've made it this far
 
 ## Exit
-print "EXITING"
 os.system('date')
+print "EXITING"
