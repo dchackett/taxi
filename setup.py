@@ -104,6 +104,8 @@ setuptools.setup(
     scripts=['bin/taxi.sh', 'bin/run_taxi.py',
              'src/taxi/tools/taxi-summary',
              'src/taxi/tools/taxi-edit',
+             'src/taxi/tools/taxi-edit-stream',
+             'src/taxi/tools/taxi-edit-task',
              'src/taxi/tools/taxi-unabandon',
              'src/taxi/tools/taxi-rollback',
              'src/taxi/tools/taxi-spawn-idle-taxis']
