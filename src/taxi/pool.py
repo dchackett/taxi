@@ -81,6 +81,11 @@ class Pool(object):
         in the pool to the provided time (e.g. time.time())."""
         raise NotImplementedError
 
+    def update_taxi_job_id(self, my_taxi, job_id):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        raise NotImplementedError
+
     def register_taxi(self, my_taxi):
         """Adds the taxi (Taxi object) my_taxi to the pool.  Also, tells my_taxi which pool
         it is associated with."""
@@ -137,7 +142,7 @@ class Pool(object):
             return
 
         try:
-            queue.launch_taxi(my_taxi, **kwargs)
+            job_id = queue.launch_taxi(my_taxi, **kwargs)
         except RespawnError as e:
             print str(e) # Don't mark taxis as E if we tried to submit them twice
         except:
@@ -147,6 +152,7 @@ class Pool(object):
         
         self.update_taxi_last_submitted(my_taxi, time.time())
         self.update_taxi_queue_status(my_taxi, queue=queue) # 'I' -> 'Q' or 'E', depending on if submission worked
+        self.update_taxi_job_id(my_taxi, job_id)
 
 
     def remove_taxi_from_queue(self, my_taxi, queue=None):
@@ -160,6 +166,7 @@ class Pool(object):
 
         for job in taxi_status['job_numbers']:
             queue.cancel_job(job)
+            self.update_taxi_job_id(my_taxi, None)
 
 
     ### Control logic ###
@@ -342,7 +349,8 @@ class SQLitePool(Pool):
                 nodes integer,
                 time_last_submitted real,
                 status text,
-                dispatch text
+                dispatch text,
+                job_id text
             )"""
             
         create_no_idle_to_missing_str = """
@@ -564,6 +572,13 @@ class SQLitePool(Pool):
         
         update_query = """UPDATE taxis SET time_last_submitted = ? WHERE name = ?"""
         self.execute_update(update_query, last_submit_time, taxi_name)
+        
+    def update_taxi_job_id(self, my_taxi, job_id):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        taxi_name = str(my_taxi)
+        update_query = """UPDATE taxis SET job_id = ? WHERE name = ?"""
+        self.execute_update(update_query, job_id, taxi_name)        
 
 
     def update_taxi_dispatch(self, my_taxi, dispatch_path):

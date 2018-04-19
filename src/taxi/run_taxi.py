@@ -75,6 +75,27 @@ if __name__ == '__main__':
     print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
     print "Must end by:", datetime.datetime.fromtimestamp(_start_time+taxi_obj.time_limit).isoformat(' ')
     
+    ## Check that this taxi has the correct job_id to be running, or die to prevent duplicated taxis
+    queue_id = my_queue.get_current_job_id()
+    print "JOB_ID:", queue_id
+    if queue_id is not None: # Don't implement this logic when queue_id cannot be found
+        if taxi_obj.job_id != queue_id:
+            if taxi_obj.job_id is None:
+                # job_id was somehow never set; set it now
+                print "WARNING: job_id for taxi {0} was not set in pool, setting to {1}".format(taxi_obj, queue_id)
+                my_pool.update_taxi_job_id(taxi_obj, queue_id)
+            else:
+                queue_status = my_queue.report_taxi_status(taxi_obj)
+                if taxi_obj.job_id in queue_status['job_number']:
+                    # Job with correct ID exists on the queue; this taxi should die
+                    print "THRASHING DETECTED: taxi {0} has job_id={1} in pool, versus job_id={2} in queue".format(taxi_obj, taxi_obj.job_id, queue_id)
+                    print "EXITING"
+                    sys.exit()
+                else:
+                    # No job with correct ID exists; set job_id
+                    print "WARNING: taxi {0} has job_id={1} in pool, which is absent in queue. Setting to {2}".format(taxi_obj, taxi_obj.job_id, queue_id)
+                    my_pool.update_taxi_job_id(taxi_obj, queue_id)
+    
     ## Diagnostic outputs: where are we running?
     print "Running on", taxi_obj.cores, "cores"
     print "Working dir:", my_pool.work_dir

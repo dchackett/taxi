@@ -2,6 +2,7 @@
 
 ## Local queue implementation for "cu_hep" machine
 
+import os
 import subprocess
 import re
 import time
@@ -84,7 +85,14 @@ class LocalQueue(BatchQueue):
 
 
     def cancel_job(self, job_number):
+        """
+        Request to cancel the specified job from the queue.
+        """
         subprocess.Popen('qdel {job_number}'.format(job_number=job_number))
 
-
+    def get_current_job_id(self):
+        """Returns job_id on queue of currently running process (to be called by
+        taxis to determine their own job_id).
+        """
+        return os.environ['JOB_ID']
 

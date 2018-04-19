@@ -67,3 +67,9 @@ class BatchQueue(object):
             * 'utilization_pct': % of nodes currently utilized
         """
         raise NotImplementedError
+        
+    def get_current_job_id(self):
+        """Returns job_id on queue of currently running process (to be called by
+        taxis to determine their own job_id).
+        """
+        raise NotImplementedError
