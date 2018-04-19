@@ -160,7 +160,6 @@ class Dispatcher(object):
             # Only try to do pending tasks
             if task.status != 'pending':
                 continue
-            
             N_pending_tasks += 1
                 
             # Check whether task is ready to go, and taxi can run it
@@ -917,34 +916,36 @@ class SQLiteDispatcher(Dispatcher):
         Raises an error if the appropriate Task subclass cannot be found in the 
         global scope.
         """
-        # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
-        if r.get('depends_on', None) is not None:
-            r['depends_on'] = json.loads(r['depends_on'])
         
-        # Big complicated dictionary of task args in JSON format
-        if r.has_key('payload'):
-            r['payload'] = json.loads(r['payload'])
-                
+        ## Set up a blank object with the correct type
+        rebuilt = BlankObject()
         if self.class_dict.has_key(r['task_type']):
             task_class = self.class_dict[r['task_type']]
         else:
             raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
-            
-        rebuilt = BlankObject()
-        #rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
         rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
-        #rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
         
-        # Set attributes appropriately -- set task class first for proper dynamic behavior
+        # Set attributes appropriately -- set task class first, so we'll get proper dynamic behavior
         for k, v in r.items():
             try:
                 setattr(rebuilt, k, v)
             except AttributeError:
                 pass # For non-settable properties
-                
+
+        # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
+        if getattr(rebuilt, 'depends_on', None) is not None:
+            rebuilt.depends_on = json.loads(rebuilt.depends_on)
+
+        # Big complicated dictionary of task args in JSON format
+        if hasattr(rebuilt, 'payload'):
+            payload = json.loads(rebuilt.payload)
+            del rebuilt.payload
+        else:
+            payload = {}
+
         # Deploy payload
-        for k, v in rebuilt.__dict__.pop('payload', {}).items():
-            if k in r.keys():
+        for k, v in payload.items():
+            if k in r.keys() and k != 'payload': # Extra conditional in case you want an attribute named payload
                 continue # Don't overwrite data from real table columns with payload data
             try:
                 setattr(rebuilt, k, v)
