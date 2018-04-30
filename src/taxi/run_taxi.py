@@ -17,6 +17,9 @@ import taxi.local.local_queue as local_queue
 
 from taxi import flush_output, work_in_dir, print_traceback
 
+import taxi.file
+taxi.file._IS_RUNTIME = True # Disable e.g. automatic parsing of parameters out of filenames
+
 
 if __name__ == '__main__':
     
@@ -113,7 +116,10 @@ if __name__ == '__main__':
         while keep_running:
             print 
             print "ITERATION STARTING AT {0}".format(datetime.datetime.now())
+            
+            # DIAGNOSTIC OUTPUTS
             print "Memory usage: {0} MiB".format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024.) # Note: ouput will be in GiB, mislabeled if you happen to run on OS X
+                        
             flush_output()
             
             loops_without_executing_task += 1 # Value is incorrect for a while, but increment here for maximum safety
