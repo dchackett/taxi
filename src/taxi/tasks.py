@@ -423,7 +423,8 @@ class Copy(Runner):
         if len(dest_dirname) > 0:
             ensure_path_exists(os.path.dirname(self.dest))
         print "{0} -> {1}".format(self.src, self.dest)
-        shutil.copy2(self.src, self.dest) 
+        self.output_files = [expand_path(str(self.dest))]
+        shutil.copy2(self.src, self.dest)
     
     
     def __repr__(self):
