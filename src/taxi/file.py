@@ -405,7 +405,8 @@ class InputFile(File):
         
         # Parsing successful, load in to instance
         for k, v in parsed.items():
-            setattr(inst, k, v)
+            if getattr(inst, k, None) is None: # Don't override anything already present
+                setattr(inst, k, v)
         
         
 
