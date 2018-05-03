@@ -187,6 +187,8 @@ class FileInstanceInterface(FileInterface):
         convention = self.conventions
         if hasattr(convention, '__iter__'):
             convention = convention[0]
+        if convention is None:
+            return None
         
         assert isinstance(convention, basestring)
         
