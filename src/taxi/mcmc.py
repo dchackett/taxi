@@ -121,13 +121,11 @@ class MCMC(tasks.Runner):
         
         # If this task should save a gauge file, that gauge file must exist
         if should_save_file(self.saveg) and not os.path.exists(str(self.saveg)):
-            print "MCMC ok check fails: Config file {0} doesn't exist.".format(self.saveg)
-            raise RuntimeError
+            raise RuntimeError("MCMC ok check fails: Config file {0} doesn't exist.".format(self.saveg))
             
         # If this task should save an output file, that output file must exist
         if should_save_file(self.fout) and not os.path.exists(str(self.fout)):
-            print "MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout)
-            raise RuntimeError
+            raise RuntimeError("MCMC ok check fails: Output file {0} doesn't exist.".format(self.fout))
             
 
     def __repr__(self):
