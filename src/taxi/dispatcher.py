@@ -105,6 +105,11 @@ class Dispatcher(object):
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.tasks.Task)
         
 
+    def get_task(self, task_id):
+        """Retrieves task with id task_id from dispatch. Returns reconstructed
+        Task object."""
+        raise NotImplementedError
+
     def get_all_tasks(self, my_taxi=None, include_complete=True):
         """Retrieve tasks from dispatch (i.e., stored task information). If my_taxi
         is specified, retrieves tasks that my_taxi can run; otherwise, retrieves all tasks.
@@ -236,6 +241,17 @@ class Dispatcher(object):
                 task.status = 'pending'
             else:
                 task.status = 'complete'
+        
+        # To block race conditions, Tasks typically fail if they detect that their
+        # output files already exist. This way, if a second taxi starts working on
+        # the same task, that task immediately fails and the taxi moves on. However,
+        # don't want the task to be marked failed in the dispatch while another
+        # taxi is working on it.
+        if task.status == 'failed' and getattr(task, 'id', None) is not None:
+            db_task = self.get_task(task.id)
+            if db_task.by_taxi != str(my_taxi):
+                print "CONFLICT: Task {0} failed, but is checked out to taxi {1}. Leaving DB task as-is.".format(task, db_task.by_taxi)
+                return
 
         # Write local (completed) version of the task to the dispatch DB
         # ...unless we don't have an id for it, in which case it's not in the DB or we can't find it
@@ -955,6 +971,26 @@ class SQLiteDispatcher(Dispatcher):
         return rebuilt
             
 
+    def get_task(self, task_id):
+        """Retrieves task with id task_id from dispatch. Returns reconstructed
+        Task object. Note: task is retrieved in isolation, so depends_on will
+        contain task ids instead of reconstructed task objects."""
+        
+        # Query dispatch DB
+        task_query = "SELECT * FROM tasks WHERE id = ?"
+        task_res = self.execute_select(task_query, task_id)
+        
+        if len(task_res) == 0:
+            return None
+        assert len(task_res) == 1,\
+            "Multiple ({0}) tasks with task_id={1} found in dispatch DB".format(len(task_res), task_id)
+        
+        task_res = dict(task_res[0])
+        task_res = self.rebuild_json_task(task_res)
+        
+        return task_res
+    
+    
     def get_all_tasks(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks runnable by specified taxi (my_taxi), or all
         tasks (if my_taxi is not provided)."""

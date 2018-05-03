@@ -426,6 +426,18 @@ class Copy(Runner):
         self.output_files = [expand_path(str(self.dest))]
         shutil.copy2(self.src, self.dest)
     
+        self.verify_output()
+        
+    
+    def verify_output(self):
+        super(Copy, self).verify_output()
+        
+        # Do the hash. MD5 should be good enough.
+        hash_src = hashlib.md5(open(self.src, 'rb').read()).digest()
+        hash_dest = hashlib.md5(open(self.dest, 'rb').read()).digest()
+        if hash_src != hash_dest:
+            raise RuntimeError("Hash for source {0} ({1}) != hash for dest {2} ({3}))".format(self.src, hash_src, self.dest, hash_dest))
+    
     
     def __repr__(self):
         """Render Copy objects to strings like <Copy(id):{filename}>"""
