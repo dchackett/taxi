@@ -260,7 +260,7 @@ class Pool(object):
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
-        self.update_all_taxis_queue_status(queue=queue)
+        self.update_all_taxis_queue_status(queue=queue, dispatcher=dispatcher)
         
         taxi_list = self.get_all_taxis_in_pool()
         
