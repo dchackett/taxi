@@ -7,6 +7,8 @@ import os
 import parse
 import weakref
 
+_IS_RUNTIME = False # Want to disable some behavior on compute nodes, set this flag to do so
+
 def _decompose_path(fn):
     decomposed = []
     split = (fn, '')
@@ -185,6 +187,8 @@ class FileInstanceInterface(FileInterface):
         convention = self.conventions
         if hasattr(convention, '__iter__'):
             convention = convention[0]
+        if convention is None:
+            return None
         
         assert isinstance(convention, basestring)
         
@@ -317,7 +321,7 @@ class File(object):
         else:
             return interface # Found the interface we wanted
     
-    
+
     # Use descriptor technology to make a "property factory" -- return the
     # class-level defaults when an instance of that class
     # hasn't had anything (e.g. conventions, save?, value) set (overridden)
@@ -390,6 +394,9 @@ class InputFile(File):
         if value is None:
             return # Can't parse None
         
+        if _IS_RUNTIME:
+            return # Never auto-parse at runtime
+        
         interface = self.instance_interfaces[id(inst)]() # Call derefences weakref
         if not self._getattr_override('auto_parse', interface):
             return # automatic parsing and loading can be disabled
@@ -400,7 +407,8 @@ class InputFile(File):
         
         # Parsing successful, load in to instance
         for k, v in parsed.items():
-            setattr(inst, k, v)
+            if getattr(inst, k, None) is None: # Don't override anything already present
+                setattr(inst, k, v)
         
         
 

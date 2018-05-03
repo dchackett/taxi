@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import datetime
+import resource # For printing memory usage
 
 import taxi
 import taxi.dispatcher
@@ -15,6 +16,9 @@ import taxi.tasks
 import taxi.local.local_queue as local_queue
 
 from taxi import flush_output, work_in_dir, print_traceback
+
+import taxi.file
+taxi.file._IS_RUNTIME = True # Disable e.g. automatic parsing of parameters out of filenames
 
 
 if __name__ == '__main__':
@@ -69,11 +73,37 @@ if __name__ == '__main__':
             my_pool.register_taxi(taxi_obj)
             my_dispatch.register_taxi(taxi_obj, my_pool)
             
-
+    
+    ## Check that this taxi has the correct job_id to be running, or die to prevent duplicated taxis
+    queue_id = my_queue.get_current_job_id()
+    print "JOB_ID:", queue_id
+    if queue_id is not None: # Don't implement this logic when queue_id cannot be found
+        if taxi_obj.job_id != queue_id:
+            if taxi_obj.job_id is None:
+                # job_id was somehow never set; set it now
+                print "WARNING: job_id for taxi {0} was not set in pool, setting to {1}".format(taxi_obj, queue_id)
+                my_pool.update_taxi_job_id(taxi_obj, queue_id)
+            else:
+                queue_status = my_queue.report_taxi_status(taxi_obj)
+                if taxi_obj.job_id in queue_status['job_number']:
+                    # Job with correct ID exists on the queue; this taxi should die
+                    print "THRASHING DETECTED: taxi {0} has job_id={1} in pool, versus job_id={2} in queue".format(taxi_obj, taxi_obj.job_id, queue_id)
+                    print "EXITING"
+                    sys.exit()
+                else:
+                    # No job with correct ID exists; set job_id
+                    print "WARNING: taxi {0} has job_id={1} in pool, which is absent in queue. Setting to {2}".format(taxi_obj, taxi_obj.job_id, queue_id)
+                    my_pool.update_taxi_job_id(taxi_obj, queue_id)
+    
+    ## Ensure current_task is Null, in case MIA taxi was relaunched but current_task not fixed
+    if taxi_obj.current_task is not None:
+        taxi_obj.current_task = None
+        my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+        
     ## Record starting time
     taxi_obj.start_time = _start_time
     print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
-    
+    print "Must end by:", datetime.datetime.fromtimestamp(_start_time+taxi_obj.time_limit).isoformat(' ')
     
     ## Diagnostic outputs: where are we running?
     print "Running on", taxi_obj.cores, "cores"
@@ -89,6 +119,14 @@ if __name__ == '__main__':
         loops_without_executing_task = 0 # ANTI-THRASH
         
         while keep_running:
+            print 
+            print "ITERATION STARTING AT {0}".format(datetime.datetime.now())
+            
+            # DIAGNOSTIC OUTPUTS
+            print "Memory usage: {0} MiB".format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024.) # Note: ouput will be in GiB, mislabeled if you happen to run on OS X
+                        
+            flush_output()
+            
             loops_without_executing_task += 1 # Value is incorrect for a while, but increment here for maximum safety
             
             MAX_WASTED_LOOPS = 20
@@ -98,31 +136,56 @@ if __name__ == '__main__':
             
             ### Maintain taxi pool
             with my_pool:
-                my_pool.update_all_taxis_queue_status(queue=my_queue, dispatcher=my_dispatch)
+                print "Managing taxi pool..."
+                t0 = time.time()
+                
+                # Check status in pool
+                pool_taxi = my_pool.get_taxi(taxi_obj)
+                if pool_taxi.status == 'H':
+                    print "TAXI HELD: Status set to 'H' in pool. Killing taxi."
+                    break
+                # Make sure this taxi is listed as running
+                elif pool_taxi.status != 'R':
+                    my_pool.update_taxi_status(taxi_obj, 'R')
+                
+                # Launch more taxis if dispatcher determines more are needed
                 my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
+                
+                print "Time to manage taxi pool:", time.time() - t0
         
         
             ### Check with dispatch for tasks to execute
             with my_dispatch:
                 # Ask dispatcher for next task
+                print "Querying dispatcher for next task...",
+                t0 = time.time()
                 task = my_dispatch.request_next_task(for_taxi=taxi_obj)
+                print task
+                print "Time to query dispatcher:", time.time() - t0
         
                 # Flag task for execution
                 try:
+                    # Claim task in Dispatch
                     my_dispatch.claim_task(taxi_obj, task)
+                    
+                    # Log what this taxi is working on
+                    taxi_obj.current_task = getattr(task, 'id', None)
+                    if taxi_obj.current_task is not None:
+                        my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+                    
+                    print "Claimed task {0} successfully".format(getattr(task, 'id', None))
                 except taxi.dispatcher.TaskClaimException, e:
                     ## Race condition safeguard: skips and tries again if the task status has changed
                     print str(e)
                     continue
                 
+            ## Timing
+            task.start_time = time.time()
+            print "Time remaining:", taxi_obj.time_limit - (task.start_time - taxi_obj.start_time)
             
             ### Execute task
             print "EXECUTING TASK {0}".format(getattr(task, 'id', None))
             print task
-            
-            ## Timing
-            task.start_time = time.time()
-            print "Time remaining:", taxi_obj.time_limit - (task.start_time - taxi_obj.start_time)
             
             flush_output()
             
@@ -174,12 +237,20 @@ if __name__ == '__main__':
             
             ### Record exit status, time taken, etc.
             task.run_time = time.time() - task.start_time
+            print "TASK COMPLETED at {0}. Runtime = {1}".format(datetime.datetime.now(), task.run_time)
             with my_dispatch:
                 tasks_run += 1
-                my_dispatch.finalize_task_run(taxi_obj, task)    
+                try:
+                    my_dispatch.finalize_task_run(taxi_obj, task)    
+                finally:
+                    # Even if dispatch DB is locked, update pool DB to indicate taxi didn't die mid-task
+                    taxi_obj.current_task = None
+                    my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+                    
             flush_output()
             
             loops_without_executing_task = 0 # ANTI-THRASH: Not thrashing if we've made it this far
 
 ## Exit
 os.system('date')
+print "EXITING"

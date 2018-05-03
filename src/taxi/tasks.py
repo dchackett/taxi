@@ -4,34 +4,43 @@ import os
 import shutil
 import taxi.local.local_taxi as local_taxi
 
-from taxi import sanitized_path, expand_path, all_subclasses_of, copy_nested_list, ensure_path_exists
+from taxi import sanitized_path, expand_path, copy_nested_list, ensure_path_exists
 
 from taxi.file import File, should_save_file, output_file_attributes_for_task
 
-from copy import copy, deepcopy
-
 import hashlib # For checksum comparisons by Copy
 
-special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'is_recurring', 'req_time', 'priority']
+special_keys = ['id', 'task_type', 'depends_on', 'status', 'for_taxi', 'by_taxi', 'is_recurring', 'req_time', 'start_time', 'run_time', 'priority']
 
 class Task(object):
     """Abstract task superclass"""
+    
+    _required_params = []
     
     def __init__(self, req_time=0, for_taxi=None, **kwargs):
         # Provided arguments
         self.req_time = req_time
         self.for_taxi = for_taxi
-                
+        self.by_taxi = None
+        
         # Defaults
         self.status = 'pending'
         self.is_recurring = False
         if not hasattr(self, 'depends_on'): # Don't clobber anything set by a subclass
             self.depends_on = [] 
-
+        
+        # Timing -- set when running
+        self.start_time = None
+        self.run_time = None
+        
         # Tree properties
         self.trunk = False
         self.branch_root = False
         self.priority = -1
+        
+        # Load any unconsumed kwargs in to the object
+        for k, v in kwargs.items():
+            setattr(self, k, v)
         
         
     def to_dict(self):
@@ -92,6 +101,11 @@ class Task(object):
         from pointers to other Task instances to the ids of those tasks. This format
         is necessary for storage in SQL DBs.
         """
+        # Check that all required params are present, not None
+        missing = [rp for rp in self._required_params if getattr(self, rp, None) is None]
+        if len(missing) > 0:
+            raise Exception("Task {0} is missing required parameters: {1}".format(str(self), missing))
+        
         # Break apart task metainfo and task payload, loading payload in to task dict
         payload = self.to_dict()
         compiled = {}
@@ -136,7 +150,7 @@ class Task(object):
     
     def is_ready(self):
         """Is the task ready to run?"""
-        return self.status == 'pending' and self.count_unresolved_dependencies==(0,0)
+        return self.status == 'pending' and self.count_unresolved_dependencies()==(0,0)
     
     
     def _rollback(self):
@@ -355,6 +369,7 @@ class Copy(Runner):
     Unlike the usual runner, doesn't call a binary."""
     
     binary = None
+    _required_params = ['src', 'dest']
     
     ## Modularized file naming conventions
     # src = InputFile(...) # Unnecessary to track src, don't ever parse the fn
@@ -408,7 +423,8 @@ class Copy(Runner):
         if len(dest_dirname) > 0:
             ensure_path_exists(os.path.dirname(self.dest))
         print "{0} -> {1}".format(self.src, self.dest)
-        shutil.copy2(self.src, self.dest) 
+        self.output_files = [expand_path(str(self.dest))]
+        shutil.copy2(self.src, self.dest)
     
     
     def __repr__(self):

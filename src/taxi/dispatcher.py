@@ -3,6 +3,9 @@
 # Definition of "Dispatcher" class - manages task forest and assigns tasks to Taxis.
 
 import os
+import types # to determine if something is a module for import
+import time # for sleep in retries
+
 import json
 from taxi._utility import LocalEncoder
 
@@ -11,6 +14,8 @@ import __main__ # To get filename of calling script
 
 import taxi
 import taxi.tasks as tasks
+
+import random
 
 ## Need to be able to make blank objects to reconstruct Tasks from JSON payloads
 class BlankObject(object):
@@ -38,7 +43,7 @@ class TaskClaimException(Exception):
 
 class Dispatcher(object):
 
-    def __init__(self):
+    def __init__(self, db_path, shuffle_tasks=False):
         pass
 
     def __enter__(self):
@@ -69,7 +74,32 @@ class Dispatcher(object):
         """
         # Just need to get these in to the global namespace somewhere so the
         # task subclasses can be found
-        self._imported = [imp.load_source('mod%d'%ii, I) for ii, I in enumerate(self.imports)]
+        self._imported = []
+        for ii, (import_type, to_import) in enumerate(self.imports):
+            if import_type == 'path':
+                self._imported.append(imp.load_source('mod%d'%ii, to_import))
+            elif import_type == 'module':
+                self._imported.append(__import__(to_import))
+            elif import_type == 'unknown':
+                new_import = None
+                # Try importing as a module first
+                try:
+                    new_import = __import__(to_import)
+                except ImportError:
+                    pass
+                
+                # If that doesn't work, try importing as a file
+                if new_import is None:
+                    try:
+                        new_import = imp.load_source('mod%d'%ii, to_import)
+                    except IOError:
+                        pass
+                
+                # Throw an error if importing didn't work, user specified something incorrectly
+                if new_import is None:
+                    raise ImportError("Couldn't find import {0}".format(to_import))
+                self._imported.append(new_import)
+                    
         
         # Print valid task classes that have been loaded
         print "Loaded Task subclasses:", taxi.all_subclasses_of(taxi.tasks.Task)
@@ -112,7 +142,13 @@ class Dispatcher(object):
         if (task_blob is None) or (len(task_blob) == 0):
             task_priority_ids = []
         else:
-            task_priority_ids = [ t.id for t in sorted(task_blob.values(), key=task_priority_sort_key) ]
+            task_list = task_blob.values()
+            # Scalability: to reduce task-claim collisions, shuffle tasks before sorting by
+            # priority, which amounts to randomizing order within equal-priority sets of tasks.
+            if getattr(self, 'shuffle_tasks', False):
+                random.seed(time.time())
+                random.shuffle(task_list)
+            task_priority_ids = [ t.id for t in sorted(task_list, key=task_priority_sort_key) ]
         
         # Find highest-priority task that can be completed
         N_pending_tasks = 0
@@ -124,7 +160,6 @@ class Dispatcher(object):
             # Only try to do pending tasks
             if task.status != 'pending':
                 continue
-            
             N_pending_tasks += 1
                 
             # Check whether task is ready to go, and taxi can run it
@@ -147,7 +182,7 @@ class Dispatcher(object):
         if N_pending_tasks == 0:
             ## TODO: I think this will break both the with: and the outer while True:,
             ## but add a test case!
-            return tasks.Die(message="WORK COMPLETE: no tasks pending")
+            return tasks.Sleep(message="WORK COMPLETE: no tasks pending")
             
         if not found_ready_task:
             ## TODO: we could add another status code that puts the taxi to sleep,
@@ -168,9 +203,15 @@ class Dispatcher(object):
         return task
         
 
-    def write_tasks(self, tasks):
+    def write_tasks(self, tasks_to_write):
         """Stores (i.e., adds or updates) the Task instances specified in tasks
         to the dispatch (i.e., repository of stored task information, usually a DB)."""
+        raise NotImplementedError
+
+        
+    def delete_tasks(self, tasks_to_delete):
+        """Removes the tasks specified in 'tasks' (as either Task objects or task
+        ids in the dispatch DB) from the dispatch."""
         raise NotImplementedError
 
 
@@ -345,14 +386,18 @@ class Dispatcher(object):
     def _invert_dependency_graph(self, task_pool):
         # Give each task an identifier, reset dependents
         for jj, task in enumerate(task_pool):
-            task._dependents = []
+            # Don't add dependents to tasks rendered as ids (in case of deletion or include_completes=False)
+            if isinstance(task, tasks.Task):
+                task._dependents = []
 
         # Let dependencies know they have a dependent
         for task in task_pool:
             if task.depends_on is None:
                 continue
             for dependency in task.depends_on:
-                dependency._dependents.append(task)
+                # Don't add dependents to tasks rendered as ids (in case of deletion or include_completes=False)
+                if isinstance(dependency, tasks.Task):
+                    dependency._dependents.append(task)
                 
 
     ## Initialization
@@ -370,19 +415,20 @@ class Dispatcher(object):
         # First, find all roots
         trees = []
         for task in task_pool:
-            if task.depends_on is None or len(task.depends_on) == 0:
+            if task.depends_on is None or len(task.depends_on) == 0 or task.branch_root:
                 trees.append([task])
 
         ## Build out from roots
         # TODO:
         # - If dependent has different number of nodes, make it a new tree
-        # - If task is a trunk task and two dependents are trunk tasks, make one of them a new tree
         for tree in trees:
             for tree_task in tree:
                 if not tree_task.trunk:
                     continue
                 n_trunks_found = 0
                 for d in tree_task._dependents:
+                    if d.branch_root:
+                        continue # Already seeded branches with these above
                     # Count number of trunk tasks encountered in dependents, fork if this isn't the first
                     if d.trunk:
                         n_trunks_found += 1
@@ -483,24 +529,80 @@ class Dispatcher(object):
         raise NotImplementedError
 
 
+    def _process_imports_argument(self, imports):
+        processed_imports = []
+        for ii in self.imports:
+            if isinstance(ii, dict):
+                assert ii.has_key('import_type'), "import_type not specified in provided import: {0}".format(ii)
+                assert ii.has_key('import'), "import not specified in provided import: {0}".format(ii)
+                processed_imports.append(ii)
+            elif isinstance(ii, str):
+                if '/' in ii or '-' in ii: # if so, the import must be a path; don't check for file existence in case of relative paths/different machines
+                    processed_imports.append({'import_type' : 'path'})
+                else: # Ambiguous: could be a filename or a module name; will try both
+                    processed_imports.append({'import_type' : 'unknown', 'import' : ii})
+            elif isinstance(ii, types.ModuleType):
+                processed_imports.append({'import_type' : 'module', 'import' : ii.__name__}) # module __name__s like taxi.apps.mrep_milc.hmc_singlerep
+            elif isinstance(ii, (type, types.ClassType)):
+                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # class __module__ like taxi.apps.mrep_milc.hmc_singlerep
+#            elif issubclass(ii, taxi.tasks.Task):
+#                processed_imports.append({'import_type' : 'module', 'import' : ii.__module__}) # Copy(...).__module__ like taxi.tasks
+        return processed_imports
+    
+    
     def initialize_new_task_pool(self, task_pool, priority_method='canvas', imports=None):
         """Loads the tasks from task_pool in to an empty dispatcher by compiling
         the specified tasks (i.e., assigning IDs and priorities, rendering them in
         to storable format (e.g., JSON)) and storing them in the dispatch (usually a DB).
+        
+        imports: A list of dicts like {import_type : (path or module), import : (path to file to import, or name of module to import)}
         
         See Dispatcher._assign_priorities for priority_method options.
         """
         ## imports: Dispatcher needs to be able to import relevant runners.
         ## Convenient default behavior: import the calling script (presumably, the run-spec script)
         if imports is None:
-            self.imports = [taxi.expand_path(__main__.__file__)] # Import the file that called this pool (presumably, run-spec script)
+            # Import the file that called this pool (presumably, run-spec script)
+            self.imports = [{'import_type' : 'path', 'import' : taxi.expand_path(__main__.__file__)}]
         else:
             self.imports = imports
+            
+        ## Process imports
+        self.imports = self._process_imports_argument(self.imports)
+        
         ## Store imports in the dispatch metadata
         self._store_imports()
             
         ## Build dispatch
         self.trees = self.find_branches(task_pool)
+        self._assign_priorities(task_pool, priority_method=priority_method)
+        self._assign_task_ids(task_pool)
+        self._populate_task_table(task_pool)
+        
+        
+    def add_new_tasks(self, task_pool, priority_method='canvas', imports=None):
+        """Loads the tasks from task_pool in to an existing dispatcher by compiling
+        the specified tasks (i.e., assigning IDs and priorities, rendering them in
+        to storable format (e.g., JSON)) and storing them in the dispatch (usually a DB).
+        
+        imports: A list of dicts like {import_type : (path or module), import : (path to file to import, or name of module to import)}
+        
+        See Dispatcher._assign_priorities for priority_method options.
+        """
+        ## imports: Dispatcher needs to be able to import relevant runners.
+        ## Convenient default behavior: import the calling script (presumably, the run-spec script)
+        if imports is not None:
+            ## Process imports
+            imports = self._process_imports_argument(imports)        
+            self.imports += imports
+            ## Store imports in the dispatch metadata
+            self._store_imports()
+        
+        ## Get old tasks and integrate with new tasks
+        old_tasks = self.get_all_tasks()
+        total_pool = task_pool + old_tasks.values()
+        
+        self.trees = self.find_branches(total_pool)
         self._assign_priorities(task_pool, priority_method=priority_method)
         self._assign_task_ids(task_pool)
         self._populate_task_table(task_pool)
@@ -568,8 +670,27 @@ class Dispatcher(object):
         self.write_tasks(affected_tasks)
             
     
+    ### Dispatch trimming (for scalability)
+    def trim_completed_branches(self, dump_dispatch=None):
+        # Find branches made  entirely of complete tasks
+        task_blob = self.get_all_tasks(include_complete=True)
+        branches = self.find_branches(task_blob.values())
+        branch_is_complete = [all([t.status == 'complete' for t in branch]) for branch in branches]
+        completed_branches = [branch for (is_complete, branch) in zip(branch_is_complete, branches) if is_complete]
+        
+        if len(completed_branches) == 0:
+            return
+        
+        # Delete tasks associated with completed branches
+        delete_tasks = reduce(lambda x,y: x+y, completed_branches) # flatten
+        
+        # If provided, connect to dump dispatch and back up tasks to delete there
+        if dump_dispatch is not None:
+            dump_dispatch = type(self)(dump_dispatch)
+            dump_dispatch.write_tasks(delete_tasks)
 
-    
+        self.delete_tasks(delete_tasks)
+            
     
 import sqlite3
 
@@ -587,9 +708,14 @@ class SQLiteDispatcher(Dispatcher):
     ## weird in Python2 and earlier.  We can look into it.
 
 
-    def __init__(self, db_path):
+    def __init__(self, db_path, max_sqlite_attempts=3, retry_sleep_time=10, shuffle_tasks=True):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
+        
+        self.max_sqlite_attempts = max_sqlite_attempts
+        self.retry_sleep_time = retry_sleep_time
+        
+        self.shuffle_tasks = shuffle_tasks
         
         self._in_context = False
         
@@ -611,10 +737,29 @@ class SQLiteDispatcher(Dispatcher):
         then calls superclass to import Task subclasses and get them in the global scope."""
         ## Get imports
         imports_query = """SELECT * FROM imports"""
-        self.imports = [ii['import'] for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
+        self.imports = [(ii['import_type'], ii['import']) for ii in self.execute_select(imports_query)] # Extract list of imports from rows (dicts)
         
         ## Call super to do dynamical imports
         super(SQLiteDispatcher, self)._load_existing_dispatch()
+
+
+    def _attempt_sqlite_operation(self, fn_to_call, *args, **kwargs):
+        result = None
+        # Try operation N times to avoid database locking
+        for ii in range(self.max_sqlite_attempts)[::-1]:
+            try:
+                with self.conn:
+                    result = fn_to_call(*args, **kwargs)
+                break
+            except sqlite3.OperationalError as err:
+                if 'database is locked' not in err.message:
+                    raise err # Only want to retry if database is locked
+                if ii > 0:
+                    print "Sqlite operation failed: {0}. Sleeping {1} seconds and trying again ({2} retries remaining)".format(err.message, self.retry_sleep_time, ii)
+                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
+                else:
+                    raise err
+        return result
 
 
     ## NOTE: enter/exit means we can use "with <SQLiteDispatcher>:" syntax
@@ -628,8 +773,9 @@ class SQLiteDispatcher(Dispatcher):
         self._in_context = True
         
         dispatch_db_exists = os.path.exists(self.db_path)
-            
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+        
+        # isolation_level=None: autocommit mode, hopefully helps with concurrent access/scalability issues
+        self.conn = sqlite3.connect(self.db_path, timeout=30.0, isolation_level=None) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         # Only run initializers once
@@ -642,7 +788,7 @@ class SQLiteDispatcher(Dispatcher):
             
         ## Get/update a dictionary of all Task subclasses in the global scope, to
         ## rebuild objects from JSON payloads
-        self.class_dict = taxi.all_subclasses_of(taxi.tasks.Task)
+        self.known_task_classes = taxi.all_subclasses_of(taxi.tasks.Task)
 
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
@@ -680,7 +826,9 @@ class SQLiteDispatcher(Dispatcher):
         create_imports_str = """
             CREATE TABLE IF NOT EXISTS imports (
                 id integer PRIMARY KEY,
-                import text
+                import_type text,
+                import text,
+                CONSTRAINT unique_imports UNIQUE (import_type, import)
             )"""
 
         with self.conn:
@@ -688,6 +836,8 @@ class SQLiteDispatcher(Dispatcher):
             self.conn.execute(create_imports_str)
 
 
+    def _execute_and_fetchall(self, *args, **kwargs):
+        return self.conn.execute(*args, **kwargs).fetchall()
     def execute_select(self, query, *query_args):
         """Executes a select query on the attached dispatch DB.
         
@@ -703,8 +853,7 @@ class SQLiteDispatcher(Dispatcher):
             return res
         
         try:
-            with self.conn:
-                res = self.conn.execute(query, query_args).fetchall()
+            res = self._attempt_sqlite_operation(self._execute_and_fetchall, query, query_args)
         except:
             raise
 
@@ -727,15 +876,14 @@ class SQLiteDispatcher(Dispatcher):
         # Semi-intelligent behavior for whether to execute or executemany
         # If query_args is nothing but tuples (from unpacking [(1,...), (2,...), ...]), then many
         # Otherwise, execute one
-        use_execute_many = all([isinstance(qa, tuple) for qa in query_args])
+        # Explicit length check necessary, executemany doesn't work for delete queries where no query_args are provided
+        use_execute_many = (len(query_args) > 0) and all([isinstance(qa, tuple) for qa in query_args])
         
         try:
-            with self.conn:
-                if not use_execute_many:
-                    self.conn.execute(query, query_args)
-                else:
-                    self.conn.executemany(query, query_args)
-                self.conn.commit()
+            if not use_execute_many:
+                self._attempt_sqlite_operation(self.conn.execute, query, query_args)
+            else:
+                self._attempt_sqlite_operation(self.conn.executemany, query, query_args)
         except:
             print "Failed to execute query: "
             print query
@@ -768,33 +916,37 @@ class SQLiteDispatcher(Dispatcher):
         Raises an error if the appropriate Task subclass cannot be found in the 
         global scope.
         """
-        # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
-        if r.get('depends_on', None) is not None:
-            r['depends_on'] = json.loads(r['depends_on'])
         
-        # Big complicated dictionary of task args in JSON format
-        if r.has_key('payload'):
-            r['payload'] = json.loads(r['payload'])
-                
-        if self.class_dict.has_key(r['task_type']):
-            task_class = self.class_dict[r['task_type']]
+        ## Set up a blank object with the correct type
+        rebuilt = BlankObject()
+        if self.known_task_classes.has_key(r['task_type']):
+            task_class = self.known_task_classes[r['task_type']]
         else:
             raise TypeError("Unknown task_type '%s'; Task subclass probably not imported."%r['task_type'])
-            
-        rebuilt = BlankObject()
-        #rebuilt.__dict__ = r # Python objects are dicts with dressing, pop task dict in to Task object
         rebuilt.__class__ = task_class # Tell the reconstructed object what class it is
-        #rebuilt.__dict__.update(rebuilt.__dict__.pop('payload', {})) # Deploy payload
         
-        # Set attributes appropriately -- set task class first for proper dynamic behavior
+        # Set attributes appropriately -- set task class first, so we'll get proper dynamic behavior
         for k, v in r.items():
             try:
                 setattr(rebuilt, k, v)
             except AttributeError:
                 pass # For non-settable properties
-                
+
+        # SQLite doesn't support arrays -- Parse dependency JSON in to list of integers
+        if getattr(rebuilt, 'depends_on', None) is not None:
+            rebuilt.depends_on = json.loads(rebuilt.depends_on)
+
+        # Big complicated dictionary of task args in JSON format
+        if hasattr(rebuilt, 'payload'):
+            payload = json.loads(rebuilt.payload)
+            del rebuilt.payload
+        else:
+            payload = {}
+
         # Deploy payload
-        for k, v in rebuilt.__dict__.pop('payload', {}).items():
+        for k, v in payload.items():
+            if k in r.keys() and k != 'payload': # Extra conditional in case you want an attribute named payload
+                continue # Don't overwrite data from real table columns with payload data
             try:
                 setattr(rebuilt, k, v)
             except AttributeError:
@@ -827,7 +979,7 @@ class SQLiteDispatcher(Dispatcher):
         
 
         if len(task_res) == 0:
-            return None
+            return []
 
         # Dictionaryize everything
         task_res = map(dict, task_res)
@@ -874,20 +1026,19 @@ class SQLiteDispatcher(Dispatcher):
         # If task has no id, either it's not in the DB or we couldn't claim it anyways
         if getattr(task, 'id', None) is not None:
             # Claim in DB -- check for race conditions
-            with self.conn:
-                # Try to change status, but with condition that taxi status is pending
-                claim_query = """UPDATE tasks SET status="active", by_taxi=? WHERE id=? AND status="pending";"""
-                # Affected rows == 1 if this worked correctly
-                result = self.conn.execute(claim_query, (my_taxi.name, task.id))
-                claim_failed = result.rowcount != 1
-                
-                if claim_failed:
-                    task_status = self.check_task_status(task)
-                    raise TaskClaimException("Failed to claim task {0}: status {1}".format(task.id, task_status))
-                    
-                # Claim went through successfully, commit the claim
-                self.conn.commit()
             
+            # Try to change status, but with condition that taxi status is pending
+            claim_query = """UPDATE tasks SET status="active", by_taxi=? WHERE id=? AND status="pending";"""
+            
+            # Try N times in case DB is locked
+            result = self._attempt_sqlite_operation(self.conn.execute, claim_query, (my_taxi.name, task.id))
+            
+            # Affected rows == 1 if this worked correctly
+            claim_failed = result.rowcount != 1
+            
+            if claim_failed:
+                raise TaskClaimException("Failed to claim task {0}".format(task.id))
+                            
         # Keep task object up-to-date
         task.status = 'active'
         task.by_taxi = my_taxi.name
@@ -905,10 +1056,16 @@ class SQLiteDispatcher(Dispatcher):
         """
         if isinstance(tasks_to_write, tasks.Task):
             tasks_to_write = [tasks_to_write]
+            
+        if isinstance(tasks_to_write, dict): # if passed a task blob like returned by get_all_tasks
+            tasks_to_write = tasks_to_write.values()
+        
+        if tasks_to_write is None or len(tasks_to_write) == 0:
+            return
         
         task_query = """INSERT OR REPLACE INTO tasks
-        (id, task_type, depends_on, status, for_taxi, is_recurring, req_time, priority, payload)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+        (id, task_type, depends_on, status, for_taxi, by_taxi, is_recurring, req_time, start_time, run_time, priority, payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         # JSON serialize all tasks
         compiled_tasks = [task.compiled() for task in tasks_to_write]
@@ -922,15 +1079,38 @@ class SQLiteDispatcher(Dispatcher):
                 json.dumps(compiled_task['depends_on'], cls=LocalEncoder),
                 compiled_task['status'], 
                 compiled_task['for_taxi'] if compiled_task.has_key('for_taxi') else None, 
+                compiled_task['by_taxi'] if compiled_task.has_key('by_taxi') else None, 
                 compiled_task['is_recurring'],
                 compiled_task['req_time'], 
+                compiled_task['start_time'], 
+                compiled_task['run_time'], 
                 compiled_task['priority'],
                 json.dumps(compiled_task['payload'], cls=LocalEncoder) if compiled_task.has_key('payload') else None,
             )
             upsert_data.append(task_values)
         
         self.execute_update(task_query, *upsert_data)
-            
+    
+    
+    def delete_tasks(self, tasks_to_delete):
+        """Removes the tasks specified in 'tasks' (as either Task objects or task
+        ids in the dispatch DB) from the dispatch."""
+        
+        # Gracefully accept single task_ids/Tasks
+        if not hasattr(tasks_to_delete, '__iter__'):
+            tasks_to_delete = [tasks_to_delete]
+        
+        # Get task ids
+        task_ids = []
+        for t in tasks_to_delete:
+            if isinstance(t, tasks.Task):
+                task_ids.append(t.id)
+            else:
+                task_ids.append(t) # assume t is a task_id
+                
+        delete_query = "DELETE FROM tasks WHERE id IN ({})".format(','.join(map(str, task_ids)))
+        self.execute_update(delete_query)
+    
         
     def _get_max_task_id(self):
         task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""
@@ -943,7 +1123,7 @@ class SQLiteDispatcher(Dispatcher):
         
         
     def _store_imports(self):
-        import_query = """INSERT OR REPLACE INTO imports (import) VALUES (?)"""
-        upsert_data = [(ii,) for ii in self.imports]
+        import_query = """INSERT OR REPLACE INTO imports (import_type, import) VALUES (?, ?)"""
+        upsert_data = [(ii['import_type'], ii['import']) for ii in self.imports]
         self.execute_update(import_query, *upsert_data)
 

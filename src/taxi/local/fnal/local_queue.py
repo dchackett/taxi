@@ -7,8 +7,7 @@ import subprocess
 import re
 import time, datetime
 
-from taxi.batch_queue import *
-from taxi._utility import ensure_path_exists
+from taxi.batch_queue import BatchQueue
 
 def _total_seconds(td):
     """datetime.timedelta.total_seconds() is not available in Python 2.7

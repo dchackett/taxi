@@ -8,6 +8,7 @@ import os
 
 import traceback
 
+from taxi.batch_queue import RespawnError
 import taxi.local.local_queue
 
 class Pool(object):
@@ -80,6 +81,16 @@ class Pool(object):
         in the pool to the provided time (e.g. time.time())."""
         raise NotImplementedError
 
+    def update_taxi_job_id(self, my_taxi, job_id):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        raise NotImplementedError
+        
+    def update_taxi_current_task(self, my_taxi, current_task):
+        """Updates the current_task associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        raise NotImplementedError
+
     def register_taxi(self, my_taxi):
         """Adds the taxi (Taxi object) my_taxi to the pool.  Also, tells my_taxi which pool
         it is associated with."""
@@ -132,12 +143,14 @@ class Pool(object):
 
         if self.check_for_thrashing(my_taxi):
             # Put taxi on hold to prevent thrashing
-            print "Thrashing detected for taxi {0}; set to hold.".format(my_taxi)
-            self.update_taxi_status(my_taxi, 'H')
+            print "Thrashing detected for taxi {0}; aborting submission.".format(my_taxi)
             return
 
         try:
-            queue.launch_taxi(my_taxi, **kwargs)
+            job_id = queue.launch_taxi(my_taxi, **kwargs)
+            self.update_taxi_job_id(my_taxi, job_id)
+        except RespawnError as e:
+            print str(e) # Don't mark taxis as E if we tried to submit them twice
         except:
             self.update_taxi_status(my_taxi, 'E')
             print "Failed to submit taxi {t}".format(t=str(my_taxi))
@@ -158,6 +171,7 @@ class Pool(object):
 
         for job in taxi_status['job_numbers']:
             queue.cancel_job(job)
+            self.update_taxi_job_id(my_taxi, None)
 
 
     ### Control logic ###
@@ -189,21 +203,30 @@ class Pool(object):
         batch queue, it is marked missing 'M' in the pool.  If a dispatcher is provided,
         the missing taxi's tasks are marked abandoned.
         """
+        
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
-            
         queue_status = queue.report_taxi_status(my_taxi)['status']
-        pool_status = self.get_taxi(my_taxi).status
+        
+        # Scalability: if my_taxi is a Taxi object, trust the provided status
+        if not isinstance(my_taxi, taxi.Taxi):
+            pool_status = self.get_taxi(my_taxi).status
+        else:
+            pool_status = my_taxi.status
 
         if queue_status in ('Q', 'R'): # Taxi is present on queue
-            if pool_status in ('E', 'H', 'M'):
+            if pool_status in ('E', 'H'):
                 # Hold and error statuses must be changed explicitly
+                return
+            elif pool_status == 'M':
+                # taxi is either no longer missing, or was marked incorrectly
+                self.update_taxi_status(my_taxi, queue_status)
                 return
             else:
                 self.update_taxi_status(my_taxi, queue_status)
                 return
         elif queue_status == 'X': # Taxi is not present on queue
-            if pool_status in ('E', 'H', 'M'):
+            if pool_status in ('E', 'H', 'M', 'I'):
                 # Taxi shouldn't be on queue: all is well
                 return
             elif pool_status in ('Q', 'R'):
@@ -221,9 +244,6 @@ class Pool(object):
                     dispatcher.mark_abandoned_task(my_taxi)
                     
                 return
-            else:
-                # Taxi is marked (I)dle, and not present on queue: all is well
-                return
         else:
             print "Invalid queue status code - '{0}'".format(queue_status)
             raise BaseException
@@ -240,7 +260,7 @@ class Pool(object):
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
-        self.update_all_taxis_queue_status(queue=queue)
+        self.update_all_taxis_queue_status(queue=queue, dispatcher=dispatcher)
         
         taxi_list = self.get_all_taxis_in_pool()
         
@@ -281,7 +301,8 @@ class SQLitePool(Pool):
     def __init__(self, db_path, pool_name=None,
                  work_dir=None, log_dir=None,
                  allocation=None, queue=None,
-                 thrash_delay=300):
+                 thrash_delay=300,
+                 max_connection_attempts=3, retry_sleep_time=10):
         """
         Argument options: either [db_path(, pool_name, thrash_delay)] are specified,
         which specifies the location of an existing pool; or,
@@ -314,6 +335,8 @@ class SQLitePool(Pool):
             self.pool_name = pool_name
 
         self.conn = None
+        self.max_connection_attempts = max_connection_attempts
+        self.retry_sleep_time = retry_sleep_time
         
         self._in_context = False
         
@@ -331,8 +354,20 @@ class SQLitePool(Pool):
                 nodes integer,
                 time_last_submitted real,
                 status text,
-                dispatch text
+                dispatch text,
+                job_id text,
+                current_task integer
             )"""
+            
+        create_no_idle_to_missing_str = """
+            CREATE TRIGGER IF NOT EXISTS no_idle_to_missing
+            AFTER UPDATE OF status ON taxis
+            WHEN (NEW.status = 'M' AND OLD.status IN ('I', 'H'))
+            BEGIN
+                UPDATE taxis SET status=OLD.status WHERE name=OLD.name;
+            END;
+            """
+            
         create_pool_str = """
             CREATE TABLE IF NOT EXISTS pools (
                 name text PRIMARY KEY,
@@ -344,6 +379,7 @@ class SQLitePool(Pool):
 
         with self.conn:
             self.conn.execute(create_taxi_str)
+            self.conn.execute(create_no_idle_to_missing_str)
             self.conn.execute(create_pool_str)
     
     
@@ -399,13 +435,24 @@ class SQLitePool(Pool):
             return
         self._in_context = True
         
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0)
+        # Try to connect N times to avoid database locking
+        for ii in range(self.max_connection_attempts)[::-1]:
+            try:
+                self.conn = sqlite3.connect(self.db_path, timeout=30.0) # Creates file if it doesn't exist
+                continue
+            except sqlite3.OperationalError as err:
+                if ii > 0:
+                    print "Connection failed. Sleeping {0} seconds and trying again ({1} retries remaining)".format(self.retry_sleep_time, ii)
+                    time.sleep(self.retry_sleep_time) # Wait a few seconds f
+                else:
+                    raise err
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
         
         self._get_or_create_pool() # Also retrieves info about pool from DB, including working dir, so must occur here
         
         taxi.ensure_path_exists(taxi.expand_path(self.work_dir)) # Dig out working directory if it doesn't exist
         taxi.ensure_path_exists(taxi.expand_path(self.log_dir)) # Dig out log directory if it doesn;t exist
+
 
     def __exit__(self, exc_type, exc_val, exc_traceback):
         """Context interface: connect to SQLite Pool DB.  If performing multiple operations,
@@ -531,7 +578,20 @@ class SQLitePool(Pool):
         
         update_query = """UPDATE taxis SET time_last_submitted = ? WHERE name = ?"""
         self.execute_update(update_query, last_submit_time, taxi_name)
+        
+    def update_taxi_job_id(self, my_taxi, job_id):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        taxi_name = str(my_taxi)
+        update_query = """UPDATE taxis SET job_id = ? WHERE name = ?"""
+        self.execute_update(update_query, job_id, taxi_name)        
 
+    def update_taxi_current_task(self, my_taxi, current_task):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        taxi_name = str(my_taxi)
+        update_query = """UPDATE taxis SET current_task = ? WHERE name = ?"""
+        self.execute_update(update_query, current_task, taxi_name)  
 
     def update_taxi_dispatch(self, my_taxi, dispatch_path):
         """Update which dispatch (i.e., the path to the dispatch DB) the taxi
