@@ -17,6 +17,8 @@ class Taxi(object):
         self.pool_name = None
         
         self.job_id = None
+        
+        self.current_task = None
 
     def __eq__(self, other):
         eq = (self.name == other.name)
@@ -51,6 +53,7 @@ class Taxi(object):
             self.status = taxi_dict['status']
             self.dispatch_path = taxi_dict['dispatch']
             self.job_id = taxi_dict['job_id']
+            self.current_task = taxi_dict['current_task']
         except KeyError:
             print "Error: attempted to rebuild taxi from malformed dictionary:"
             print taxi_dict
@@ -70,7 +73,8 @@ class Taxi(object):
             'time_last_submitted': self.time_last_submitted,
             'start_time': self.start_time,
             'status': self.status,
-            'job_id' : self.job_id
+            'job_id' : self.job_id,
+            'current_task' : self.current_task,
         }
         if hasattr(self, 'pool_path'):
             self_dict['pool_path'] = self.pool_path

@@ -85,6 +85,11 @@ class Pool(object):
         """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
         in the pool to the provided value."""
         raise NotImplementedError
+        
+    def update_taxi_current_task(self, my_taxi, current_task):
+        """Updates the current_task associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        raise NotImplementedError
 
     def register_taxi(self, my_taxi):
         """Adds the taxi (Taxi object) my_taxi to the pool.  Also, tells my_taxi which pool
@@ -350,7 +355,8 @@ class SQLitePool(Pool):
                 time_last_submitted real,
                 status text,
                 dispatch text,
-                job_id text
+                job_id text,
+                current_task integer
             )"""
             
         create_no_idle_to_missing_str = """
@@ -580,6 +586,12 @@ class SQLitePool(Pool):
         update_query = """UPDATE taxis SET job_id = ? WHERE name = ?"""
         self.execute_update(update_query, job_id, taxi_name)        
 
+    def update_taxi_current_task(self, my_taxi, current_task):
+        """Updates the job_id associated with taxi my_taxi (either name or Taxi object)
+        in the pool to the provided value."""
+        taxi_name = str(my_taxi)
+        update_query = """UPDATE taxis SET current_task = ? WHERE name = ?"""
+        self.execute_update(update_query, current_task, taxi_name)  
 
     def update_taxi_dispatch(self, my_taxi, dispatch_path):
         """Update which dispatch (i.e., the path to the dispatch DB) the taxi

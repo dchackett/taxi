@@ -73,11 +73,6 @@ if __name__ == '__main__':
             my_pool.register_taxi(taxi_obj)
             my_dispatch.register_taxi(taxi_obj, my_pool)
             
-
-    ## Record starting time
-    taxi_obj.start_time = _start_time
-    print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
-    print "Must end by:", datetime.datetime.fromtimestamp(_start_time+taxi_obj.time_limit).isoformat(' ')
     
     ## Check that this taxi has the correct job_id to be running, or die to prevent duplicated taxis
     queue_id = my_queue.get_current_job_id()
@@ -99,6 +94,16 @@ if __name__ == '__main__':
                     # No job with correct ID exists; set job_id
                     print "WARNING: taxi {0} has job_id={1} in pool, which is absent in queue. Setting to {2}".format(taxi_obj, taxi_obj.job_id, queue_id)
                     my_pool.update_taxi_job_id(taxi_obj, queue_id)
+    
+    ## Ensure current_task is Null, in case MIA taxi was relaunched but current_task not fixed
+    if taxi_obj.current_task is not None:
+        taxi_obj.current_task = None
+        my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+        
+    ## Record starting time
+    taxi_obj.start_time = _start_time
+    print "Start time:", datetime.datetime.fromtimestamp(_start_time).isoformat(' ')
+    print "Must end by:", datetime.datetime.fromtimestamp(_start_time+taxi_obj.time_limit).isoformat(' ')
     
     ## Diagnostic outputs: where are we running?
     print "Running on", taxi_obj.cores, "cores"
@@ -160,7 +165,14 @@ if __name__ == '__main__':
         
                 # Flag task for execution
                 try:
+                    # Claim task in Dispatch
                     my_dispatch.claim_task(taxi_obj, task)
+                    
+                    # Log what this taxi is working on
+                    taxi_obj.current_task = getattr(task, 'id', None)
+                    if taxi_obj.current_task is not None:
+                        my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+                    
                     print "Claimed task {0} successfully".format(getattr(task, 'id', None))
                 except taxi.dispatcher.TaskClaimException, e:
                     ## Race condition safeguard: skips and tries again if the task status has changed
@@ -228,7 +240,13 @@ if __name__ == '__main__':
             print "TASK COMPLETED at {0}. Runtime = {1}".format(datetime.datetime.now(), task.run_time)
             with my_dispatch:
                 tasks_run += 1
-                my_dispatch.finalize_task_run(taxi_obj, task)    
+                try:
+                    my_dispatch.finalize_task_run(taxi_obj, task)    
+                finally:
+                    # Even if dispatch DB is locked, update pool DB to indicate taxi didn't die mid-task
+                    taxi_obj.current_task = None
+                    my_pool.update_taxi_current_task(taxi_obj, taxi_obj.current_task)
+                    
             flush_output()
             
             loops_without_executing_task = 0 # ANTI-THRASH: Not thrashing if we've made it this far
