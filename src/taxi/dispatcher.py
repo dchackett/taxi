@@ -724,10 +724,11 @@ class SQLiteDispatcher(Dispatcher):
     ## weird in Python2 and earlier.  We can look into it.
 
 
-    def __init__(self, db_path, max_sqlite_attempts=3, retry_sleep_time=10, shuffle_tasks=True):
+    def __init__(self, db_path, sqlite_timeout=30, max_sqlite_attempts=3, retry_sleep_time=10, shuffle_tasks=True):
         self.db_path = taxi.expand_path(db_path)
         self._setup_complete = False
         
+        self.sqlite_timeout = sqlite_timeout
         self.max_sqlite_attempts = max_sqlite_attempts
         self.retry_sleep_time = retry_sleep_time
         
@@ -791,7 +792,7 @@ class SQLiteDispatcher(Dispatcher):
         dispatch_db_exists = os.path.exists(self.db_path)
         
         # isolation_level=None: autocommit mode, hopefully helps with concurrent access/scalability issues
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0, isolation_level=None) # Creates file if it doesn't exist
+        self.conn = sqlite3.connect(self.db_path, timeout=self.sqlite_timeout, isolation_level=None) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
 
         # Only run initializers once
