@@ -253,6 +253,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         count_traj = 0
         count_exit = 0
         count_accept = 0
+        unitarity_violation = False
         with open(str(self.fout)) as f:
             for line in f:
                 if line.startswith("GMES"):
@@ -264,7 +265,12 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
                     count_accept += 1
                 elif line.startswith("REJECT") or line.startswith("SAFE_REJECT"):
                     count_traj += 1
-                    
+                elif line.startswith("Unitarity problem on node"):
+                    unitarity_violation = True
+    
+        if unitarity_violation:
+            raise RuntimeError("HMC ok check fails: unitarity violation detected")
+            
         if count_gmes < self.n_traj:
             raise RuntimeError("HMC ok check fails: Not enough GMES in " + self.fout +\
                                " %d/%d, %d/%d"%(self.n_traj,count_traj,self.n_traj,count_gmes))
@@ -279,4 +285,3 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
 
         if self.enable_metropolis and count_accept < self.minAR:
             raise RuntimeError("HMC ok check fails: %d acceptances < specified minimum %d"%(count_accept, self.minAR))
-            
