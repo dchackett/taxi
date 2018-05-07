@@ -10,7 +10,7 @@ d,p = tools.load.dispatch_and_pool(*command_line_args)
 q = taxi.local.local_queue.LocalQueue()
 
 if d is not None:
-    tb = d.get_all_tasks(d)
+    tb = d.get_all_tasks()
     tbr = [t for t in tb.values() if t.is_ready()]
     tbf = [t for t in tb.values() if t.status == 'failed']
     tba = [t for t in tb.values() if t.status == 'active']
