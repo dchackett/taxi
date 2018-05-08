@@ -139,17 +139,18 @@ if __name__ == '__main__':
                 print "Managing taxi pool..."
                 t0 = time.time()
                 
-                # Check status in pool
+                ## Check status in pool -- if marked as held since last iteration, exit
                 pool_taxi = my_pool.get_taxi(taxi_obj)
                 if pool_taxi.status == 'H':
                     print "TAXI HELD: Status set to 'H' in pool. Killing taxi."
+                    keep_running = False
                     break
                 # Make sure this taxi is listed as running
                 elif pool_taxi.status != 'R':
                     my_pool.update_taxi_status(taxi_obj, 'R')
                 
-                # Launch more taxis if dispatcher determines more are needed
-                my_pool.spawn_idle_taxis(queue=my_queue, dispatcher=my_dispatch)
+                ## Update statuses to reflect queue, mark tasks abandoned, spawn idle taxis, etc.
+                my_pool.manage_taxi_pool(dispatcher=my_dispatch, queue=my_queue)
                 
                 print "Time to manage taxi pool:", time.time() - t0
         

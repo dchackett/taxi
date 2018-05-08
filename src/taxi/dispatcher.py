@@ -8,6 +8,7 @@ import time # for sleep in retries
 
 import json
 from taxi._utility import LocalEncoder
+from taxi._utility import print_traceback
 
 import imp # For dynamical imports
 import __main__ # To get filename of calling script
@@ -257,27 +258,50 @@ class Dispatcher(object):
         # ...unless we don't have an id for it, in which case it's not in the DB or we can't find it
         if getattr(task, 'id', None) is not None:
             self.write_tasks([task])
-            
-            
-    def mark_abandoned_task(self, by_taxi):
+        
+        
+    def mark_tasks_abandoned(self, by_taxis, task_blob=None):
         """Method to handle the case when a Taxi has died unexpectedly.  When this occurs, it often means
         a task is left marked 'active', but has in fact failed(/been abandoned).  This method marks that task
         abandoned.
         """
         
-        by_taxi = str(by_taxi)
-        assert by_taxi is not None # This should never happen, but would be catastrophically inconvenient if it did.
+        if not hasattr(by_taxis, '__iter__'):
+            by_taxis = [by_taxis] # Gracefully handle by_taxis = single taxi case
+        if len(by_taxis) == 0:
+            return
+        assert not any([bt is None for bt in by_taxis]) # This should never happen, but would be catastrophically inconvenient if it did.
         
-        tasks = self.get_all_tasks()
+        if task_blob is None:
+            task_blob = self.get_all_tasks(include_complete=False)
+            
+        # Identify active tasks associated with the provided taxis
+        by_taxi_names = [str(bt) for bt in by_taxis]
         abandoned_tasks = []
-        for task_id, task in tasks.items():
-            if task.status == 'active' and task.by_taxi == by_taxi:
+        for task_id, task in task_blob.items():
+            if task.status == 'active' and task.by_taxi in by_taxi_names:
                 task.status = 'abandoned'
-                print "WARNING: Task {tid} was abandoned by taxi {tn}.".format(tid=task_id, tn=by_taxi)
+                print "WARNING: Task {tid} was abandoned by taxi {tn}.".format(tid=task_id, tn=task.by_taxi)
                 abandoned_tasks.append(task)
+
+            
+        # Check for case where taxis finished a task but were unable to check it back in
+        # Use verify_output to see if the task was actually completed
+        for by_taxi in by_taxis:
+            if by_taxi.current_task is None:
+                continue
+            task = task_blob[by_taxi.current_task]
+            try:
+                task.verify_output()
+                print "WARNING: verify_output passed for {0}'s abandoned task {1}, marking complete.".format(task.by_taxi, task)
+                task.status = 'complete'
+            except:
+                print "WARNING: verify_output failed for {0}'s abandoned task {1}, marking abandoned.".format(task.by_taxi, task)
+                print_traceback()
+        
         
         # NOTE: At present, a taxi shouldn't be able to run multiple tasks at once
-        # ...but this way, if we allow them to do so, this routine will still work.
+        # but this way, if we allow them to do so, this routine will still work.
         self.write_tasks(abandoned_tasks)
         
         
@@ -337,7 +361,7 @@ class Dispatcher(object):
         return N_ready_tasks
     
     
-    def should_taxis_be_running(self, taxi_list):
+    def should_taxis_be_running(self, taxi_list, task_blob=None):
         """Determines whether tasks are available for each taxi to run.
         
         Taxis should be run if there are trunks available for them.  If there are
@@ -346,16 +370,26 @@ class Dispatcher(object):
         
         Args:
             taxi_list: List of taxi objects; are there tasks available for these taxis to run?
+            task_blob: Optionally, for scalability, an {id:Task} dict return by dispatcher.get_all_tasks().
+            If not provided, will retrieve ourselves.
         Returns:
             Dictionary like {(taxi object) : (should taxi be running?)}
         """
-        
-        task_blob = self.get_all_tasks(None, include_complete=False) # dict(id:task)
+    
+        if task_blob is None:    
+            task_blob = self.get_all_tasks(None, include_complete=False) # dict(id:task)
+        else:
+            # Remove completed tasks from provided task_blob (avoid unexpected behavior: match query in other case)
+            new_task_blob = {}
+            for task_id, task in task_blob.items():
+                if task.status != 'complete':
+                    new_task_blob[task_id] = task
+            task_blob = new_task_blob
     
         # There's nothing we can do with errored E or held H taxis
         taxi_list = [t for t in taxi_list if t.status in ['Q', 'R', 'I']] # Only want queued, running, or idle taxis
         
-        # We only care taxis running on this dispatch
+        # We only care about taxis running on this dispatch
         taxi_list = [t for t in taxi_list if taxi.expand_path(t.dispatch_path) == taxi.expand_path(self.db_path)]
         
         # Convenient dictionary like {(name of taxi) : (taxi object)}
@@ -641,6 +675,12 @@ class Dispatcher(object):
         
         task_blob = self.get_all_tasks(include_complete=True)
         
+        # Find dependents
+        self._invert_dependency_graph(task_blob.values())
+        
+        # Find rollbackable (non-active, non-pending) tasks (also dict->list)
+        already_run = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
+            
         affected_tasks = []
         
         for task in tasks:
@@ -648,12 +688,6 @@ class Dispatcher(object):
             # TODO: Use task equality instead of ids?
             assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
             task = task_blob[task.id]
-            
-            # Find rollbackable (non-active, non-pending) tasks (also dict->list)
-            task_blob = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
-            
-            # Find dependents
-            self._invert_dependency_graph(task_blob)
             
             # Could do this with recursion instead, but recursion is slow in Python
             cascade_tasks = [task]
@@ -673,7 +707,7 @@ class Dispatcher(object):
                 
                 # Must roll back everything downstream, add to list
                 for d in rt._dependents:
-                    if d not in task_blob:
+                    if d not in already_run:
                         continue # Not rollbackable
                     cascade_tasks.append(d)
                     
@@ -794,7 +828,7 @@ class SQLiteDispatcher(Dispatcher):
         # isolation_level=None: autocommit mode, hopefully helps with concurrent access/scalability issues
         self.conn = sqlite3.connect(self.db_path, timeout=self.sqlite_timeout, isolation_level=None) # Creates file if it doesn't exist
         self.conn.row_factory = sqlite3.Row # Row factory for return-as-dict
-
+            
         # Only run initializers once
         if not self._setup_complete:
             self._setup_complete = True

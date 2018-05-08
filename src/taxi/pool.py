@@ -28,7 +28,7 @@ class Pool(object):
         'M',    # Missing: taxi died unexpectedly
     ]
 
-    def __init__(self, work_dir, log_dir, thrash_delay=300, allocation=None, queue=None):
+    def __init__(self, work_dir, log_dir, thrash_delay=300, allocation=None, queue=None, max_simultaneous_launches=3):
         self.work_dir = taxi.expand_path(work_dir)
         self.log_dir = taxi.expand_path(log_dir)
 
@@ -41,6 +41,7 @@ class Pool(object):
         
         # Queue to submit to
         self.queue = queue
+        self.max_simultaneous_launches = max_simultaneous_launches
     
 
     ### Backend interaction ###
@@ -175,7 +176,36 @@ class Pool(object):
 
 
     ### Control logic ###
-
+    def manage_taxi_pool(self, dispatcher, queue=None):
+        """Function called by Taxis each iteration to manage the taxi pool."""
+        if queue is None:
+            queue = taxi.local.local_queue.LocalQueue()
+        
+        # Update taxi statuses to reflect queue statuses
+        status_changes = self.update_all_taxis_queue_status(queue=queue, dispatcher=dispatcher)
+        
+        # Retrieve task_blob from Dispatcher -- need for both abandoned task identification
+        # as well as idle taxi spawning
+        task_blob = dispatcher.get_all_tasks()
+        
+        # If we just marked any taxis as Missing, mark appropriate tasks as abandoned
+        new_mia_taxis = [tn for (tn, status) in status_changes.items() if status == 'M']
+        if len(new_mia_taxis) > 0:
+            # new_mia_taxis: (list of taxi names) -> {(taxi name) : (Taxi object)}
+            taxi_dict = {}
+            for pt in self.get_all_taxis_in_pool():
+                taxi_dict[str(pt)] = pt
+            new_mia_taxis = [taxi_dict[str(mt)] for mt in new_mia_taxis]
+            # Tell dispatcher to mark pertinent tasks as abandoned (or complete, if verify_output checks out)
+            dispatcher.mark_tasks_abandoned(by_taxis=new_mia_taxis, task_blob=task_blob)
+            # Erase current_task status of MIA taxis
+            for taxi_name in new_mia_taxis:
+                self.update_taxi_current_task(taxi_name, None)
+        
+        # Coordinate with dispatcher to spawn any idle taxis that should be running
+        self.spawn_idle_taxis(dispatcher=dispatcher, task_blob=task_blob, queue=queue)
+        
+        
     def update_all_taxis_queue_status(self, queue=None, dispatcher=None):
         """Looks at the queue and updates the status of all of the taxis in the pool,
         depending on whether the taxis are in the queue running or queued, or absent
@@ -184,13 +214,20 @@ class Pool(object):
         If no queue is provided, instantiates local_queue.LocalQueue.  If no dispatcher
         is provided, won't be able to mark tasks as abandoned when missing taxis are
         detected.
+        
+        Returns: Dict of status changes like {(taxi name) : status} for taxis
+        whose statuses were changed.
         """
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
             
         taxi_list = self.get_all_taxis_in_pool()
+        status_changes = {}
         for my_taxi in taxi_list:
-            self.update_taxi_queue_status(my_taxi, queue=queue, dispatcher=dispatcher)
+            new_status = self.update_taxi_queue_status(my_taxi, queue=queue, dispatcher=dispatcher)
+            if new_status is not None: # if status was changed
+                status_changes[str(my_taxi)] = new_status
+        return status_changes
 
 
     def update_taxi_queue_status(self, my_taxi, queue=None, dispatcher=None):
@@ -202,6 +239,8 @@ class Pool(object):
         If a taxi is supposed to be either queued or running, but is absent from the
         batch queue, it is marked missing 'M' in the pool.  If a dispatcher is provided,
         the missing taxi's tasks are marked abandoned.
+        
+        Returns: None if status unchanged, or the new status if status was changed.
         """
         
         if queue is None:
@@ -217,18 +256,18 @@ class Pool(object):
         if queue_status in ('Q', 'R'): # Taxi is present on queue
             if pool_status in ('E', 'H'):
                 # Hold and error statuses must be changed explicitly
-                return
+                return None
             elif pool_status == 'M':
                 # taxi is either no longer missing, or was marked incorrectly
                 self.update_taxi_status(my_taxi, queue_status)
-                return
+                return queue_status
             else:
                 self.update_taxi_status(my_taxi, queue_status)
-                return
+                return queue_status
         elif queue_status == 'X': # Taxi is not present on queue
             if pool_status in ('E', 'H', 'M', 'I'):
                 # Taxi shouldn't be on queue: all is well
-                return
+                return None
             elif pool_status in ('Q', 'R'):
                 # Taxi should be on queue, but is MIA
                 # NOTE: Implicitly, this means that a currently-running taxi is only allowed to respawn itself
@@ -237,19 +276,14 @@ class Pool(object):
                 # Mark the taxi as missing
                 print "WARNING: Taxi {tn} is missing in action".format(tn=my_taxi)
                 self.update_taxi_status(my_taxi, 'M')
-                
-                # If a taxi is missing, it's probably abandoned a task
-                # If provided a dispatcher to talk to, mark that task failed to avoid hanging actives
-                if dispatcher is not None:
-                    dispatcher.mark_abandoned_task(my_taxi)
                     
-                return
+                return 'M'
         else:
             print "Invalid queue status code - '{0}'".format(queue_status)
             raise BaseException
 
 
-    def spawn_idle_taxis(self, dispatcher, queue=None):
+    def spawn_idle_taxis(self, dispatcher, queue=None, task_blob=None):
         """Pool communicates with the provided dispatcher to figure out which taxis
         should be running.  If the dispatcher determines that the workload can support
         additional taxis, it will tell the pool to activate some of its idle taxis.
@@ -259,17 +293,20 @@ class Pool(object):
         
         if queue is None:
             queue = taxi.local.local_queue.LocalQueue()
-            
-        self.update_all_taxis_queue_status(queue=queue, dispatcher=dispatcher)
         
         taxi_list = self.get_all_taxis_in_pool()
         
         # Ask dispatcher which taxis should be running
         with dispatcher:
-            should_be_running = dispatcher.should_taxis_be_running(taxi_list)
+            should_be_running = dispatcher.should_taxis_be_running(taxi_list, task_blob=task_blob)
 
         # Look through the taxis in the pool, put them in active/inactive states as desired
+        N_launched = 0
         for my_taxi in taxi_list:
+            # Optionally limit the number of taxis we launch simultaneously, to reduce the load on e.g. sqlite DBs
+            if self.max_simultaneous_launches is not None and N_launched >= self.max_simultaneous_launches:
+                break
+                
             if not should_be_running.has_key(str(my_taxi)):
                 continue # Dispatcher hasn't given any instructions for this taxi's desired state
                 
@@ -280,10 +317,11 @@ class Pool(object):
             elif my_taxi.status in ['Q', 'R'] and not should_be_running[str(my_taxi)]:
                 raise NotImplementedError("Dispatcher wants taxi {0} to stop, but it is active.".format(my_taxi))
 
-            # Launch taxi if dispatcher says it should be running            
+            # Launch taxi if dispatcher says it should be running        
             if should_be_running[str(my_taxi)]:
                 if my_taxi.status == 'I':
                     self.submit_taxi_to_queue(my_taxi, queue=queue)
+                    N_launched += 1
                 elif my_taxi.status not in ['Q', 'R']:
                     raise NotImplementedError("Dispatcher wants taxi {0} running, but its status is {1}, not 'I'"\
                                               .format(my_taxi, my_taxi.status))
@@ -302,7 +340,7 @@ class SQLitePool(Pool):
                  work_dir=None, log_dir=None,
                  allocation=None, queue=None,
                  thrash_delay=300,
-                 max_connection_attempts=3, retry_sleep_time=10):
+                 max_connection_attempts=3, retry_sleep_time=10, max_simultaneous_launches=3):
         """
         Argument options: either [db_path(, pool_name, thrash_delay)] are specified,
         which specifies the location of an existing pool; or,
@@ -322,7 +360,8 @@ class SQLitePool(Pool):
         (e.g., bc or ds on the USQCD machines).
         """
         super(SQLitePool, self).__init__(work_dir=work_dir, log_dir=log_dir,
-             thrash_delay=thrash_delay, allocation=allocation, queue=queue)
+             thrash_delay=thrash_delay, allocation=allocation, queue=queue,
+             max_simultaneous_launches=max_simultaneous_launches)
 
         self.db_path = taxi.expand_path(db_path)
             
