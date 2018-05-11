@@ -69,6 +69,6 @@ def summary(dispatch):
     if len(failed_tasks) > 0:
         print "FAILED TASKS:"
         for t in [" {0} ({1}) {2}".format(t.id, t.by_taxi, t) for t in failed_tasks]: print t
-    if len(blocked_tasks) > 0:
-        print "BLOCKED TASKS:"
-        for tt in [" {0} ({1}) {2}".format(t.id, ",".join([str(dep.id) for dep in t.depends_on if dep in abandoned_tasks+failed_tasks]), t) for t in blocked_tasks]: print tt
+#    if len(blocked_tasks) > 0:
+#        print "BLOCKED TASKS:"
+#        for tt in [" {0} ({1}) {2}".format(t.id, ",".join([str(dep.id) for dep in t.depends_on if dep in abandoned_tasks+failed_tasks]), t) for t in blocked_tasks]: print tt
