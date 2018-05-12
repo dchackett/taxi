@@ -327,9 +327,26 @@ class Pool(object):
                                               .format(my_taxi, my_taxi.status))
 
 
+    def mark_active_tasks(self, task_blob):
+        """In task_blob, marks tasks as 'active' if a Taxi has the id of that task
+        as its current_task in the pool DB. This allows taxis to work on tasks without
+        successfully claiming them first, so that Taxis do not need to die if the dispatch DB is
+        inaccessible/locked when trying to claim a task.
+        
+        Returns nothing, modifies Tasks in place.
+        """
+        
+        taxi_list = self.get_all_taxis_in_pool()
+        active_taxis = [t for t in taxi_list if t.status == 'active']
+        working_taxis = [t for t in active_taxis if t.current_task is not None]
+        for wt in working_taxis:
+            current_task = task_blob[wt.current_task]
+            current_task.status = 'active'
 
-import sqlite3
-    
+
+
+
+import sqlite3    
     
 class SQLitePool(Pool):
     """
@@ -505,7 +522,6 @@ class SQLitePool(Pool):
     def _create_taxi_object(self, db_taxi):
         """Interface to translate Taxi representation in the DB to a Taxi object.
         """
-        db_taxi = dict(db_taxi)
         
         new_taxi = taxi.Taxi()
         new_taxi.rebuild_from_dict(db_taxi)
@@ -526,7 +542,7 @@ class SQLitePool(Pool):
         query; if only executing one DB operation, this can save writing, but will
         be substantially slower for multiple operations than opening a context.
         
-        Often best to do map(dict, ...) on the results."""
+        Returns results in list-of-dicts format."""
         
         # If we're not in context when this is called, get in context
         if not self._in_context:
@@ -540,6 +556,8 @@ class SQLitePool(Pool):
         except:
             raise
 
+        if res is not None:
+            res = map(dict, res)
         return res
 
 
@@ -593,7 +611,7 @@ class SQLitePool(Pool):
         if len(db_rows) == 0:
             return None
         elif len(db_rows) > 1:
-            print map(dict, db_rows)
+            print db_rows
             raise Exception("Multiple taxis with name=%s found in pool"%taxi_name)
         else:
             this_taxi = self._create_taxi_object(db_rows[0])
@@ -660,7 +678,7 @@ class SQLitePool(Pool):
         else:
             # Name was specified, make sure there's no collision
             taxi_name_query = """SELECT name FROM taxis;"""
-            all_taxi_names = map(lambda t: t['name'], self.execute_select(taxi_name_query))
+            all_taxi_names = [t['name'] for t in self.execute_select(taxi_name_query)]
 
             if my_taxi.name in all_taxi_names:
                 # Already registered in pool DB

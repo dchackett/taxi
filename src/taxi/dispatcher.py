@@ -899,7 +899,7 @@ class SQLiteDispatcher(Dispatcher):
         query; if only executing one DB operation, this can save writing, but will
         be substantially slower for multiple operations than opening a context.
         
-        Often best to do map(dict, ...) on the results."""
+        Returns results in list-of-dicts form."""
         # If we're not in context when this is called, get in context
         if not self._in_context:
             with self:
@@ -911,6 +911,8 @@ class SQLiteDispatcher(Dispatcher):
         except:
             raise
 
+        if res is not None:
+            res = map(dict, res)
         return res
 
 
@@ -1021,9 +1023,9 @@ class SQLiteDispatcher(Dispatcher):
         if len(task_res) == 0:
             return None
         assert len(task_res) == 1,\
-            "Multiple ({0}) tasks with task_id={1} found in dispatch DB".format(len(task_res), task_id)
+            "Multiple ({0}) tasks with task_id={1} found in dispatch DB".format(len(task_res), task_id)        
+        task_res = task_res[0]
         
-        task_res = dict(task_res[0])
         task_res = self.rebuild_json_task(task_res)
         
         return task_res
@@ -1054,9 +1056,6 @@ class SQLiteDispatcher(Dispatcher):
 
         if len(task_res) == 0:
             return []
-
-        # Dictionaryize everything
-        task_res = map(dict, task_res)
         
         # Objectify and package as task_id : task dict
         res_dict = {}
@@ -1090,7 +1089,7 @@ class SQLiteDispatcher(Dispatcher):
         if len(task_res) == 0:
             return None
         
-        return dict(task_res[0])['status']
+        return task_res[0]['status']
 
 
     def claim_task(self, my_taxi, task):
@@ -1188,12 +1187,12 @@ class SQLiteDispatcher(Dispatcher):
         
     def _get_max_task_id(self):
         task_id_query = """SELECT id FROM tasks ORDER BY id DESC LIMIT 1;"""
-        max_id_query = map(dict, self.execute_select(task_id_query))
+        max_id = self.execute_select(task_id_query)
 
-        if len(max_id_query) == 0:
+        if len(max_id) == 0:
             return 0
         else:
-            return max_id_query[0]['id']
+            return max_id[0]['id']
         
         
     def _store_imports(self):
