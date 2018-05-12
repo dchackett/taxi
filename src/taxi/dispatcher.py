@@ -888,7 +888,10 @@ class SQLiteDispatcher(Dispatcher):
 
 
     def _execute_and_fetchall(self, *args, **kwargs):
-        return self.conn.execute(*args, **kwargs).fetchall()
+        res_cursor = self.conn.execute(*args, **kwargs)
+        res = res_cursor.fetchall()
+        res_cursor.close()
+        return res
     def execute_select(self, query, *query_args):
         """Executes a select query on the attached dispatch DB.
         
