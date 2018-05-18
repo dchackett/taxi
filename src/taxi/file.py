@@ -320,7 +320,16 @@ class File(object):
             return self._make_new_instance_interface(inst)
         else:
             return interface # Found the interface we wanted
-    
+        
+    def _cleanup_dead_weakrefs(self):
+        # When Task classes fall out of scope, they leave dead weakrefs behind
+        # in the class-level File.instance_interfaces. These can pile up for large
+        # dispatch DBs reloaded repeatedly; must clean them out.
+        inst_ids = self.instance_interfaces.keys()
+        for inst_id in inst_ids:
+            interface = self.instance_interfaces[inst_id]
+            if interface() is None:
+                self.instance_interfaces.pop(inst_id)
 
     # Use descriptor technology to make a "property factory" -- return the
     # class-level defaults when an instance of that class
@@ -441,6 +450,14 @@ def should_load_file(fn):
         return fn.load
     raise Exception("What type of filename is {0}?".format(fn))
 
+
+def file_attributes_for_class(c):
+    ofas = []
+    for k in dir(c):
+        v = getattr(c, k)
+        if isinstance(v, FileInterface) and isinstance(v.file_in_class, File):
+            ofas.append(k)
+    return ofas
 
 def file_attributes_for_task(task):
     """Finds the name of all File attributes in the class of which task is a member.

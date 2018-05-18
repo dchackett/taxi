@@ -1034,6 +1034,11 @@ class SQLiteDispatcher(Dispatcher):
     def get_all_tasks(self, my_taxi=None, include_complete=True):
         """Get all incomplete tasks runnable by specified taxi (my_taxi), or all
         tasks (if my_taxi is not provided)."""
+        
+        # Clean up dead weakrefs in Files in Task subclasses -- prevent slow memory leak
+        for task_class in self.known_task_classes.values():
+            for file_attr in taxi.file.file_attributes_for_class(task_class):
+                getattr(task_class, file_attr)._cleanup_dead_weakrefs()
 
         if (my_taxi is None):
             task_query = """
