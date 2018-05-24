@@ -592,8 +592,8 @@ class SQLitePool(Pool):
         Returns a list of reconstructed taxi objects.
         """
 
-        query = """SELECT * FROM taxis;"""
-        taxi_raw_info = self.execute_select(query)
+        query = """SELECT * FROM taxis WHERE pool_name=?;"""
+        taxi_raw_info = self.execute_select(query, self.pool_name)
         return [self._create_taxi_object(row) for row in taxi_raw_info]
 
 
