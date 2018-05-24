@@ -683,38 +683,46 @@ class Dispatcher(object):
             
         affected_tasks = []
         
+        ## Determine tasks to start rollbacking from
+        cascade_tasks = []
         for task in tasks:
             # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
             # TODO: Use task equality instead of ids?
-            assert task_blob.has_key(task.id), "Can't find task to roll back in rollbackable tasks"
+            assert task_blob.has_key(task.id), "Can't find task {0} to roll back in rollbackable tasks".format(task.id)
             task = task_blob[task.id]
             
             # Could do this with recursion instead, but recursion is slow in Python
-            cascade_tasks = [task]
-            tasks_to_roll_back = []
-            while len(cascade_tasks) > 0:
-                # Pop task to roll back off front of list
-                rt = cascade_tasks[0]
-                cascade_tasks = cascade_tasks[1:]
-                
-                if rt.status == 'active':
-                    print "Can't rollback active task w/ id={0}. Kill it first.".format(rt.id)
-                    # Cancel rollbacking
-                    tasks_to_roll_back = [] 
-                    break
-                
-                tasks_to_roll_back.append(rt)
-                
-                # Must roll back everything downstream, add to list
-                for d in rt._dependents:
-                    if d not in already_run:
-                        continue # Not rollbackable
-                    cascade_tasks.append(d)
-                    
-            for rt in tasks_to_roll_back:
-                # Perform rollback
-                affected_tasks.append(rt)
-                rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
+            cascade_tasks.append(task)
+        
+        ## Find all rollbackable tasks downstream
+        tasks_to_roll_back = []
+        while len(cascade_tasks) > 0:
+            # Pop task to roll back off front of list
+            rt = cascade_tasks[0]
+            cascade_tasks = cascade_tasks[1:]
+            
+            if rt.status == 'active':
+                print "Can't rollback active task w/ id={0}. Kill it first.".format(rt.id)
+                # Cancel rollbacking
+                tasks_to_roll_back = [] 
+                break
+            
+            tasks_to_roll_back.append(rt)
+            
+            # Must roll back everything downstream, add to list
+            for d in rt._dependents:
+                if d not in already_run:
+                    continue # Not rollbackable
+                cascade_tasks.append(d)
+        
+        ## Perform rollback
+        for rt in tasks_to_roll_back:
+            # Allows for tasks to show up on list more than once
+            if rt.status == 'pending':
+                continue
+            # Perform rollback
+            affected_tasks.append(rt)
+            rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
             
         # Update DB
         self.write_tasks(affected_tasks)
