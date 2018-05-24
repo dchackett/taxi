@@ -8,7 +8,7 @@ import os
 import shutil
 import errno
     
-machine_list = ['scalar', 'cu_hep', 'fnal']
+machine_list = ['scalar', 'cu_hep', 'fnal', 'summit']
 
 def symlink_with_overwrite(src, dst):
     assert os.path.exists(src), src
