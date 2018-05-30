@@ -447,6 +447,8 @@ class Dispatcher(object):
             for dependency in task.depends_on:
                 # Don't add dependents to tasks rendered as ids (in case of deletion or include_completes=False)
                 if isinstance(dependency, tasks.Task):
+                    if not hasattr(dependency, '_dependents'):
+                        dependency._dependents = []
                     dependency._dependents.append(task)
                 
 
