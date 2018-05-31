@@ -661,6 +661,12 @@ class Dispatcher(object):
 
 
     ## Cascading rollback
+    def _all_tasks_downstream_of(task):
+        downstream_tasks = [task]
+        for dst in downstream_tasks:
+            downstream_tasks.append(dst._dependents)
+        return downstream_tasks
+    
     def rollback(self, tasks, delete_files=False, rollback_dir=None):
         """Rolls back a task (or tasks) and any tasks that depend on it, and any tasks that depend on those, etc.
         
@@ -675,59 +681,93 @@ class Dispatcher(object):
         assert not (rollback_dir is None and delete_files == False),\
             "Must either provide a rollback_dir to copy files to or give permission to delete_files"
         
+        ## Get a fresh copy of the task pool from the dispatcher to work with
         task_blob = self.get_all_tasks(include_complete=True)
-        
         # Find dependents
         self._invert_dependency_graph(task_blob.values())
         
-        # Find rollbackable (non-active, non-pending) tasks (also dict->list)
-        already_run = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
-            
-        affected_tasks = []
-        
-        ## Determine tasks to start rollbacking from
-        cascade_tasks = []
+        ## Determine tasks to start rollbacking from in our new task pool
+        rollbackable = []
         for task in tasks:
             # Find the task to roll back in the new task blob (objects won't be identical, but ids will)
             # TODO: Use task equality instead of ids?
-            assert task_blob.has_key(task.id), "Can't find task {0} to roll back in rollbackable tasks".format(task.id)
+            assert task_blob.has_key(task.id), "Can't find task {0} to roll back in dispatch".format(task.id)
             task = task_blob[task.id]
-            
             # Could do this with recursion instead, but recursion is slow in Python
-            cascade_tasks.append(task)
+            rollbackable.append(task)
         
-        ## Find all rollbackable tasks downstream
-        tasks_to_roll_back = []
-        while len(cascade_tasks) > 0:
-            # Pop task to roll back off front of list
-            rt = cascade_tasks[0]
-            cascade_tasks = cascade_tasks[1:]
-            
-            if rt.status == 'active':
-                print "Can't rollback active task w/ id={0}. Kill it first.".format(rt.id)
-                # Cancel rollbacking
-                tasks_to_roll_back = [] 
-                break
-            
-            tasks_to_roll_back.append(rt)
-            
-            # Must roll back everything downstream, add to list
-            for d in rt._dependents:
-                if d not in already_run:
-                    continue # Not rollbackable
-                cascade_tasks.append(d)
         
+        ## Find all tasks downstream of all provided rollbackable tasks
+        cascades = {rt.id : self._all_tasks_downstream_of(rt) for rt in rollbackable}
+        
+        ## Abort rolling back any task that requires rolling back a downstream active task
+        active_cascades = set()
+        for cid, cts in cascades.items():
+            for ct in cts:
+                if ct.status == 'active':
+                    print "Can't rollback active task w/ id={0} (downstream of id={1}). Kill it first.".format(ct.id, cid)
+                    active_cascades.add(cid)
+        # Filter out cascades with active tasks
+        cascades = {cid : cts for (cid, cts) in cascades.items() if cid not in active_cascades}
+        if len(cascades) == 0:
+            return
+        
+        # Find rollbackable (non-active, non-pending) tasks (also dict->list)
+        already_run = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
+        # Can only roll back already-run tasks, not pending ones
+        cascades = {cid : [ct for ct in cts if ct in already_run] for (cid, cts) in cascades.items()}
+                
+        ## If any provided task is downstream of any other provided task, 
+        ## just roll back the more upstream one
+        for rt in rollbackable:
+            for cid, cts in cascades.items():
+                # Downstream tasks of rt itself includes rt, don't get faked out by trivial case
+                if cid == rt.id:
+                    continue
+                if rt in cts:
+                    # The rollbackable task under consideration "rt" exists downstream of some other
+                    # task, so the tasks downstream of rt are a strict subset of the tasks downstream
+                    # of the other task. Just rollback the other task, not rt.
+                    cascades.pop(rt.id) 
+                    break
+        
+        # Make list of tasks to roll back -- can't roll back a task until all
+        # dependents are rolled back, so order correspondingly
+        tasks_to_roll_back = reduce(lambda x,y:x+y, cascades.values()) # flatten
+        tasks_to_roll_back = tasks_to_roll_back[::-1] # order downstream tasks earlier
+                               
         ## Perform rollback
-        for rt in tasks_to_roll_back:
-            # Allows for tasks to show up on list more than once
-            if rt.status == 'pending':
-                continue
-            # Perform rollback
-            affected_tasks.append(rt)
-            rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
-            
-        # Update DB
-        self.write_tasks(affected_tasks)
+        affected_tasks = []
+        try:
+            tries_since_last_rollback = 0
+            while len(tasks_to_roll_back) > 0:
+                # Don't get caught in an infinite loop
+                if tries_since_last_rollback > len(tasks_to_roll_back):
+                    raise Exception("Rollback caught in a cycle, aborting")
+                tries_since_last_rollback += 1
+                
+                # Pop first task off beginning of list
+                rt = tasks_to_roll_back[0]
+                tasks_to_roll_back = tasks_to_roll_back[1:]
+                
+                # Don't "double rollback", this task is already fixed to pending
+                if rt.status == 'pending':
+                    continue
+                
+                # If any of this task's dependents haven't been rolled back, can't roll this back yet
+                # Pop to end of list and try again later
+                if any([dt not in affected_tasks for dt in rt._dependents]):
+                    tasks_to_roll_back.append(rt)
+                    continue
+                
+                # Perform rollback
+                affected_tasks.append(rt)
+                rt._rollback(delete_files=delete_files, rollback_dir=rollback_dir)
+                tries_since_last_rollback = 0
+        finally:
+            # Update dispatch DB -- even if rollback failed somewhere, need DB
+            # to know that some tasks were undone (files are now missing)
+            self.write_tasks(affected_tasks)
             
     
     ### Dispatch trimming (for scalability)
@@ -1070,7 +1110,7 @@ class SQLiteDispatcher(Dispatcher):
         
 
         if len(task_res) == 0:
-            return []
+            return {}
         
         # Objectify and package as task_id : task dict
         res_dict = {}
