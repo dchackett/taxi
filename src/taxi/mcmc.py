@@ -135,7 +135,11 @@ class MCMC(tasks.Runner):
         return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__,
                  task_id=getattr(self, 'id', None), filename=self.fout)
     
-    
+    def is_ready(self):
+        _is_ready = super(MCMC, self).is_ready()
+        if should_load_file(self.loadg):
+            _is_ready = _is_ready and os.path.exists(str(self.loadg))
+        return _is_ready
 
 class ConfigGenerator(MCMC):
     """Abstract superclass of tasks that run some external binary that
