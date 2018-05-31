@@ -172,8 +172,8 @@ class PhysicalSpectroTask(SpectroTask):
     savep_filename_prefix = fixable_dynamic_attribute('_savep_filename_prefix', _get_savep_filename_prefix)
         
     ## Spectroscopy typically has many different binaries.  Use a fixable property to specify which one.
-    binary_menu = BinaryMenu(default_dict={'irrep' : 'f', 'compute_baryons' : False}) # Load with binaries in run-spec script
-    binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc', 'irrep', 'screening', 'p_plus_a', 'compute_baryons'])
+    _binary_menu = BinaryMenu(default_dict={'irrep' : 'f', 'compute_baryons' : False}) # Load with binaries in run-spec script
+    binary = binary_from_binary_menu(_binary_menu, key_attr_names=['Nc', 'irrep', 'screening', 'p_plus_a', 'compute_baryons'])
     
     # Required params, checked to be present and not None at dispatch compile time
     _required_params = ['binary', 'Ns', 'Nt', 'irrep', 'kappa', 'r0', 'screening', 'p_plus_a', 'compute_baryons'] + ['Nc', 'beta', 'Nf', 'label']
@@ -198,7 +198,7 @@ class PhysicalSpectroTask(SpectroTask):
         
         Instead of having to specify the binary and output file prefixes, these
         are dynamically determined from physical flags. Must have binaries specified
-        in self.binary_menu for the keys (Nc, irrep, screening, p_plus_a, compute_baryons).
+        in self._binary_menu for the keys (Nc, irrep, screening, p_plus_a, compute_baryons).
         
         Args:
             measure_on: A filename or a ConfigGenerator.

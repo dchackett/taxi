@@ -95,8 +95,8 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     saveg_meta = File(conventions.saveg_convention+'.info') # Gauge metainfo file -- want to copy this along with gauge files
     saveg_filename_prefix = conventions.saveg_filename_prefix
     
-    binary_menu = BinaryMenu(default_dict={'enable_metropolis' : True}) # Load with binaries in run-spec scripts
-    binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc', 'Nf', 'enable_metropolis'])
+    _binary_menu = BinaryMenu(default_dict={'enable_metropolis' : True}) # Load with binaries in run-spec scripts
+    binary = binary_from_binary_menu(_binary_menu, key_attr_names=['Nc', 'Nf', 'enable_metropolis'])
     
     # Required params, checked to be present and not None at dispatch compile time
     _required_params = ['binary', 'Nc', 'Ns', 'Nt', 'beta', 'kappa', 'irrep', 'label', 'nsteps1']
@@ -120,7 +120,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         
         Instead of having to specify the binary and output file prefixes, these
         are dynamically determined from physical flags. Must have binaries specified
-        in self.binary_menu for the key Nc.
+        in self._binary_menu for the keys Nc, Nf, and enable_metropolis.
         
         Args (superclass):
             seed (required): Seed for random number generator

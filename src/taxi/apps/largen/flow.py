@@ -36,8 +36,8 @@ class FlowTask(ConfigMeasurement, conventions.LargeN):
     
     saveg = None
     
-    binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
-    binary = binary_from_binary_menu(binary_menu, key_attr_names=['Nc'])
+    _binary_menu = BinaryMenu() # Load with binaries in run-spec scripts
+    binary = binary_from_binary_menu(_binary_menu, key_attr_names=['Nc'])
     
     # Required params, checked to be present and not None at dispatch compile time
     _required_params = ['binary', 'Ns', 'Nt', 'Nc', 'tmax', 'epsilon'] + ['beta', 'kappa', 'irrep_fnc', 'Nf', 'label']
@@ -58,7 +58,7 @@ class FlowTask(ConfigMeasurement, conventions.LargeN):
         
         Instead of having to specify the binary and output file prefixes, these
         are dynamically determined from physical flags. Must have binaries specified
-        in self.binary_menu for the key Nc.
+        in self._binary_menu for the key Nc.
         
         Args:
             measure_on: A filename or a ConfigGenerator.
