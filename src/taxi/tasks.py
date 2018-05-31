@@ -445,10 +445,11 @@ class Copy(Runner):
         return "<{class_name}({task_id}):{filename}>".format(class_name=self.__class__.__name__, task_id=getattr(self, 'id', None), filename=filename)
     
     def _rollback(self, rollback_dir=None, delete_files=False):
-        hash_src = hashlib.md5(open(self.src, 'rb').read()).digest()
-        hash_dest = hashlib.md5(open(self.dest, 'rb').read()).digest()
-        if hash_src != hash_dest:
-            print "WARNING: Hash for source {0} ({1}) != hash for dest {2} ({3})); files do not match, can't remove copied file.".format(self.src, hash_src, self.dest, hash_dest)
-            self.output_files = [] # Block rollback (dest should be Copy's only output file; might cause trouble in subclasses)
-            
-        super(Copy, self).rollback(rollback_dir=rollback_dir, delete_files=delete_files)
+        if os.path.exists(self.src) and os.path.exists(self.dest):
+            hash_src = hashlib.md5(open(self.src, 'rb').read()).digest()
+            hash_dest = hashlib.md5(open(self.dest, 'rb').read()).digest()
+            if hash_src != hash_dest:
+                print "WARNING: Hash for source {0} ({1}) != hash for dest {2} ({3})); files do not match, can't remove copied file.".format(self.src, hash_src, self.dest, hash_dest)
+                self.output_files = [] # Block rollback (dest should be Copy's only output file; might cause trouble in subclasses)
+        
+        super(Copy, self)._rollback(rollback_dir=rollback_dir, delete_files=delete_files)
