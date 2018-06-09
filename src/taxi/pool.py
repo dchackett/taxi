@@ -453,7 +453,7 @@ class SQLitePool(Pool):
             this_pool_row = self.execute_select(pool_query)
             if len(this_pool_row) != 1:
                 raise Exception("Must provide pool_name if there are more than one pools in pool DB.  Found {0} != 1.".format(len(this_pool_row)))
-            
+            self.pool_name = this_pool_row[0]['name']
 
         if len(this_pool_row) == 0:
             # Case: Pool name provided, but doesn't exist in pools table
