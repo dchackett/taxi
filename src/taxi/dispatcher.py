@@ -475,8 +475,6 @@ class Dispatcher(object):
         # - If dependent has different number of nodes, make it a new tree
         for tree in trees:
             for tree_task in tree:
-                if not tree_task.trunk:
-                    continue
                 n_trunks_found = 0
                 for d in tree_task._dependents:
                     if d.branch_root:
