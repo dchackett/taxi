@@ -661,10 +661,11 @@ class Dispatcher(object):
 
 
     ## Cascading rollback
-    def _all_tasks_downstream_of(task):
+    def _all_tasks_downstream_of(self, task):
         downstream_tasks = [task]
         for dst in downstream_tasks:
-            downstream_tasks.append(dst._dependents)
+            for t in dst._dependents:
+                downstream_tasks.append(t)
         return downstream_tasks
     
     def rollback(self, tasks, delete_files=False, rollback_dir=None):
@@ -756,7 +757,8 @@ class Dispatcher(object):
                 
                 # If any of this task's dependents haven't been rolled back, can't roll this back yet
                 # Pop to end of list and try again later
-                if any([dt not in affected_tasks for dt in rt._dependents]):
+                # Cycle block: Check if tasks are pending in case they haven't been run or have already been rolled back
+                if any([dt not in affected_tasks for dt in rt._dependents if dt.status != 'pending']):
                     tasks_to_roll_back.append(rt)
                     continue
                 
