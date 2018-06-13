@@ -422,7 +422,7 @@ class InputFile(File):
         
 
 def should_save_file(fn):
-    """Convenience function for File properties in Runners.
+    """Convenience function for File properties in BinaryRunners.
     Returns True if file should be saved, i.e.,
         - fn is an instance of FileInstanceInterface and fn.save
         - fn is a string and not ''
@@ -437,7 +437,7 @@ def should_save_file(fn):
 
 
 def should_load_file(fn):
-    """Convenience function for File properties in Runners.
+    """Convenience function for File properties in BinaryRunners.
     Returns True if file should be saved, i.e.,
         - fn is an instmethodsance of FileInstanceInterface
         - fn is a string and not ''

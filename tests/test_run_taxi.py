@@ -19,7 +19,7 @@ import taxi.local.local_taxi as local_taxi
 import taxi.local.sqlite_queue_runner as qrun
 
 ## TaskRunner that always fails, for testing purposes
-class FailRunner(taxi.tasks.Runner):
+class FailRunner(taxi.tasks.BinaryRunner):
     def execute(self):
         raise BaseException
 

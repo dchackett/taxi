@@ -18,8 +18,8 @@ from taxi.file import output_file_attributes_for_task
         
 
 
-class MCMC(tasks.Runner):
-    """Abstract superclass for Runners that run binaries from typical MCMC suites
+class MCMC(tasks.BinaryRunner):
+    """Abstract superclass for BinaryRunners that run binaries from typical MCMC suites
     (e.g., MILC)."""
     
     ## Modular file naming conventions
@@ -101,7 +101,7 @@ class MCMC(tasks.Runner):
 
             
     def execute(self, cores=None):
-        """Versus Runner, checks to make sure loadg exists before running.
+        """Versus BinaryRunner, checks to make sure loadg exists before running.
         """
         assert not should_load_file(self.loadg) or os.path.exists(str(self.loadg)),\
             "Error: file {loadg} does not exist.".format(loadg=self.loadg)
@@ -140,6 +140,7 @@ class MCMC(tasks.Runner):
         if should_load_file(self.loadg):
             _is_ready = _is_ready and os.path.exists(str(self.loadg))
         return _is_ready
+
 
 class ConfigGenerator(MCMC):
     """Abstract superclass of tasks that run some external binary that

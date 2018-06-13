@@ -196,13 +196,13 @@ class Respawn(Task):
         return "<Respawn>"
         
         
-class Runner(Task):
+class BinaryRunner(Task):
     """Abstract superclass to run some external program"""
     
     binary = 'echo' # Default: For testing purposes
     
     def __init__(self, cores=None, use_mpi=None, allow_output_clobbering=False, **kwargs):
-        super(Runner, self).__init__(**kwargs)
+        super(BinaryRunner, self).__init__(**kwargs)
         
         # MPI - Don't clobber anything set by a subclass
         if not hasattr(self, 'cores'):
@@ -312,12 +312,12 @@ class Runner(Task):
         
         
     def _rollback(self, rollback_dir=None, delete_files=False):
-        """Called by Dispatcher.rollback() to roll back this Runner.
+        """Called by Dispatcher.rollback() to roll back this BinaryRunner.
         Removes all output files generated in executing the task (which are
         stored in self.output_files) by either deleting them (if delete_files) or
         by moving them to rollback_dir (if specified).
         """
-        super(Runner, self)._rollback()
+        super(BinaryRunner, self)._rollback()
         
         
         if self.output_files is not None and len(self.output_files) > 0:
@@ -363,10 +363,10 @@ class Runner(Task):
             
             
 
-class Copy(Runner):
+class Copy(BinaryRunner):
     """Copy a file from src to dest. Does not overwrite anything unless told to.
     
-    Unlike the usual runner, doesn't call a binary."""
+    Unlike the usual BinaryRunner, doesn't call a binary."""
     
     binary = None
     _required_params = ['src', 'dest']
