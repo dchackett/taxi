@@ -170,7 +170,7 @@ class Pool(object):
             
         taxi_status = queue.report_taxi_status(my_taxi)
 
-        for job in taxi_status['job_numbers']:
+        for job in taxi_status['job_number']:
             queue.cancel_job(job)
             self.update_taxi_job_id(my_taxi, None)
 
