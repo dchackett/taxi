@@ -697,7 +697,9 @@ class Dispatcher(object):
         
         
         ## Find all tasks downstream of all provided rollbackable tasks
-        cascades = {rt.id : self._all_tasks_downstream_of(rt) for rt in rollbackable}
+        cascades = {}
+        for rt in rollbackable:
+            cascades[rt.id] = self._all_tasks_downstream_of(rt)
         
         ## Abort rolling back any task that requires rolling back a downstream active task
         active_cascades = set()
