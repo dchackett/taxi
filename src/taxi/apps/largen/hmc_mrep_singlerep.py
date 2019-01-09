@@ -175,9 +175,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         self.nsteps1 = nsteps1
         self.nsteps2 = nsteps2
         self.nsteps_gauge = nsteps_gauge
-        self.shift = shift
-        if nsteps2 is None:
-            shift = 0 # No shift if not using Hasenbuch
+        self.shift_if_hasenbusch = shift
         self.trajL = trajL
         
         self.n_safe = n_safe
@@ -196,6 +194,14 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     @property
     def multip(self):
         return self.Nf/2
+    
+    # automatically/dynamically disable shift if no Hasenbusch
+    @property
+    def shift(self):
+        if self.nsteps2 is None:
+            return 0 # No shift if not using Hasenbuch
+        else:
+            return self.shift_if_hasenbusch
     
     
     # Overridable dynamic attribute for nsteps_safe, uses nsteps1*safe_factor
