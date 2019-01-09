@@ -697,6 +697,7 @@ class Dispatcher(object):
         
         
         ## Find all tasks downstream of all provided rollbackable tasks
+        # cascades = {rt.id : self._all_tasks_downstream_of(rt) for rt in rollbackable}
         cascades = {}
         for rt in rollbackable:
             cascades[rt.id] = self._all_tasks_downstream_of(rt)
@@ -709,14 +710,22 @@ class Dispatcher(object):
                     print "Can't rollback active task w/ id={0} (downstream of id={1}). Kill it first.".format(ct.id, cid)
                     active_cascades.add(cid)
         # Filter out cascades with active tasks
-        cascades = {cid : cts for (cid, cts) in cascades.items() if cid not in active_cascades}
+        # {cid : cts for (cid, cts) in cascades.items() if cid not in active_cascades}
+        cascades = {}
+        for (cid, cts) in cascades.items():
+            if cid not in active_cascades:
+                cascades[cid] = cts 
         if len(cascades) == 0:
             return
         
         # Find rollbackable (non-active, non-pending) tasks (also dict->list)
         already_run = [t for t in task_blob.values() if t.status not in ['active', 'pending']]
         # Can only roll back already-run tasks, not pending ones
-        cascades = {cid : [ct for ct in cts if ct in already_run] for (cid, cts) in cascades.items()}
+        # cascades = {cid : [ct for ct in cts if ct in already_run] for (cid, cts) in cascades.items()}
+        new_cascades = {}
+        for (cid, cts) in cascades.items():
+            new_cascades[cid] = [ct for ct in cts if ct in already_run]
+        cascades = new_cascades
                 
         ## If any provided task is downstream of any other provided task, 
         ## just roll back the more upstream one
