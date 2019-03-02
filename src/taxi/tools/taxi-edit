@@ -1,6 +1,12 @@
 #!/bin/bash
 
-python -i -c """
+if [[ -z $(which ipython) ]]; then
+ PYTHONBIN='python'
+else
+ PYTHONBIN='ipython'
+fi
+
+$PYTHONBIN -i -c """
 import taxi
 import taxi.tools as tools
 import taxi.mcmc
