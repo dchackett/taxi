@@ -34,7 +34,7 @@ def dispatch_and_pool(*db_paths):
         try:
             p = pool(db_paths[0])
         except:
-            d = None
+            p = None
     
     elif len(db_paths) == 2:
         # Try first two
@@ -53,5 +53,8 @@ def dispatch_and_pool(*db_paths):
         except:
             d = dispatch(db_paths[2])
             p = pool(db_paths[0], pool_name=db_paths[1])
+            
+    if len(db_paths) > 0 and d is None and p is None:
+        raise Exception("Unable to load either a Dispatcher or a Pool from provided DB paths:" + str(db_paths))
         
     return d,p
