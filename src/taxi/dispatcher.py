@@ -695,7 +695,7 @@ class Dispatcher(object):
             # Could do this with recursion instead, but recursion is slow in Python
             rollbackable.append(task)
         
-        
+
         ## Find all tasks downstream of all provided rollbackable tasks
         # cascades = {rt.id : self._all_tasks_downstream_of(rt) for rt in rollbackable}
         cascades = {}
@@ -711,10 +711,11 @@ class Dispatcher(object):
                     active_cascades.add(cid)
         # Filter out cascades with active tasks
         # {cid : cts for (cid, cts) in cascades.items() if cid not in active_cascades}
-        cascades = {}
+        new_cascades = {}
         for (cid, cts) in cascades.items():
             if cid not in active_cascades:
-                cascades[cid] = cts 
+                new_cascades[cid] = cts 
+        cascades = new_cascades
         if len(cascades) == 0:
             return
         
