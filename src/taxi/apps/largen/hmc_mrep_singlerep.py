@@ -19,6 +19,7 @@ iseed {seed}
 
 ## gauge action params
 beta {beta}
+{gammarat_str}
     
 ## fermion observables
 max_cg_iterations {maxcgobs}
@@ -103,7 +104,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
     
     def __init__(self,
                  # Application-specific required arguments
-                 Nc=None, Ns=None, Nt=None, beta=None, kappa=None, irrep=None, label=None, nsteps1=None,
+                 Nc=None, Ns=None, Nt=None, beta=None, gammarat=None, kappa=None, irrep=None, label=None, nsteps1=None,
                  # Application-specific defaults
                  Nf=2,
                  trajL=1.0,
@@ -163,6 +164,7 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
         self.Ns = Ns
         self.Nt = Nt
         self.beta = beta
+        self.gammarat = gammarat
         self.label = label
         
         # Kappa and irrep logic
@@ -237,6 +239,12 @@ class SingleRepHMCTask(ConfigGenerator, conventions.LargeN):
             input_dict['npseudo'] = 2
             input_dict['nlevels'] = 2
             input_dict['_nsteps2'] = 'nstep {n2}'.format(n2=self.nsteps2)
+            
+        # NDS gammarat logic
+        if hasattr(self, 'gammarat') and self.gammarat is not None:
+            input_dict['gammarat_str'] = 'gammarat {gr}'.format(gr=self.gammarat)
+        else:
+            input_dict['gammarat_str'] = ''
             
         input_str += hmc_input_template.format(**input_dict)
 
