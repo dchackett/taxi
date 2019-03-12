@@ -527,6 +527,8 @@ def make_forking_streams(make_mcmc_stream, starter, param_tree, serial=True):
     def _recursive_make_forking_streams(starter, param_tree, serial):
         if isinstance(param_tree, dict):
             new_stream = make_mcmc_stream(starter=starter, **param_tree)
+            assert len(new_stream) >= param_tree['fork_after_Nth'], \
+                "Stream for params {0} is too short to fork after {1}".format(param_tree, param_tree['fork_after_Nth'])
             starter = new_stream[param_tree['fork_after_Nth']-1]
             task_pool.append(new_stream)
             return starter
